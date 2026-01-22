@@ -6,9 +6,9 @@ const router = express.Router();
 
 // Middleware to extract tenant ID
 const requireTenant = (req, res, next) => {
-  const tenantId = req.headers['x-tenant-id'] || req.body?.tenantId || req.query?.tenantId;
+  const tenantId = req.headers['x-tenant-id'];
   if (!tenantId) {
-    return res.status(400).json({ error: 'X-Tenant-ID header or tenantId is required' });
+    return res.status(400).json({ error: 'X-Tenant-ID header is required' });
   }
   req.tenantId = tenantId;
   next();
@@ -263,6 +263,135 @@ const fetchDeviceParameters = async (nbiUrl, deviceId) => {
   return data?.parameters || {};
 };
 
+// GET /api/tr069/devices - Get all devices from GenieACS
+router.get('/devices', async (req, res) => {
+  try {
+    const config = await resolveGenieacsConfig(req.tenantId);
+    const nbiUrl = (config.genieacsApiUrl || getNbiUrl()).replace(/\/$/, '');
+    
+    console.log(`[TR069 API] Fetching devices from GenieACS NBI: ${nbiUrl}`);
+    
+    // Build query - GenieACS may not support tenant filtering in query
+    // So we'll fetch all devices and filter on backend if needed
+    const queryParams = new URLSearchParams();
+    
+    if (req.query.limit) {
+      queryParams.append('limit', req.query.limit);
+    }
+    
+    // If GenieACS supports query filtering, use it
+    // Otherwise fetch all and filter by tenant metadata on backend
+    const queryString = queryParams.toString();
+    const devicesUrl = `${nbiUrl}/devices${queryString ? `?${queryString}` : ''}`;
+    
+    console.log(`[TR069 API] Fetching devices from: ${devicesUrl}`);
+    
+    const response = await fetch(devicesUrl, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' }
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      console.error(`[TR069 API] GenieACS NBI error: ${response.status} ${text}`);
+      return res.status(response.status).json({
+        success: false,
+        error: 'Failed to fetch devices from GenieACS',
+        details: text,
+        nbiUrl: nbiUrl
+      });
+    }
+
+    const devices = await response.json();
+    
+    // Ensure devices is an array
+    const deviceArray = Array.isArray(devices) ? devices : (devices.devices || []);
+    
+    console.log(`[TR069 API] Retrieved ${deviceArray.length} devices from GenieACS`);
+    
+    // Filter by tenant if tenantId is set in device metadata
+    // If devices don't have tenant metadata, return all devices (single-tenant GenieACS)
+    let filteredDevices = deviceArray;
+    if (req.tenantId) {
+      // Check if any device has tenant metadata
+      const hasTenantMetadata = deviceArray.some(d => d._tenantId || d.tenantId);
+      
+      if (hasTenantMetadata) {
+        // Filter by tenant
+        filteredDevices = deviceArray.filter(d => 
+          (d._tenantId || d.tenantId) === req.tenantId
+        );
+        console.log(`[TR069 API] Filtered to ${filteredDevices.length} devices for tenant ${req.tenantId}`);
+      } else {
+        // No tenant metadata - assume single-tenant GenieACS, return all devices
+        console.log(`[TR069 API] No tenant metadata found - returning all ${deviceArray.length} devices (single-tenant mode)`);
+      }
+    }
+    
+    // Add tenant ID to each device if not present
+    const enrichedDevices = filteredDevices.map(device => ({
+      ...device,
+      _tenantId: device._tenantId || req.tenantId,
+      tenantId: device.tenantId || req.tenantId
+    }));
+    
+    res.json({
+      success: true,
+      devices: enrichedDevices,
+      count: enrichedDevices.length
+    });
+  } catch (error) {
+    console.error('[TR069 API] Failed to fetch devices:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch devices from GenieACS',
+      details: error.message
+    });
+  }
+});
+
+// POST /api/tr069/sync - Sync devices from GenieACS (for compatibility)
+router.post('/sync', async (req, res) => {
+  try {
+    const config = await resolveGenieacsConfig(req.tenantId);
+    const nbiUrl = (config.genieacsApiUrl || getNbiUrl()).replace(/\/$/, '');
+    
+    // Fetch devices from GenieACS
+    const tenantQuery = { _tenantId: req.tenantId };
+    const queryString = new URLSearchParams({ 
+      query: JSON.stringify(tenantQuery) 
+    }).toString();
+    
+    const response = await fetch(`${nbiUrl}/devices?${queryString}`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' }
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`GenieACS NBI error: ${response.status} ${text}`);
+    }
+
+    const devices = await response.json();
+    const deviceArray = Array.isArray(devices) ? devices : (devices.devices || []);
+    
+    res.json({
+      success: true,
+      message: `Synced ${deviceArray.length} devices from GenieACS`,
+      synced: deviceArray.length,
+      devices: deviceArray,
+      tenantId: req.tenantId
+    });
+  } catch (error) {
+    console.error('[TR069 API] Sync failed:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to sync devices from GenieACS',
+      details: error.message
+    });
+  }
+});
+
 // GET /api/tr069/metrics - Return historical metrics for charts
 router.get('/metrics', async (req, res) => {
   try {
@@ -327,8 +456,12 @@ router.post('/tasks', async (req, res) => {
       return res.status(400).json({ error: `Unsupported action: ${action}` });
     }
 
-    const nbiUrl = getNbiUrl();
-    const tasksEndpoint = `${nbiUrl.replace(/\/$/, '')}/tasks`;
+    // Get GenieACS NBI URL from tenant config
+    const config = await resolveGenieacsConfig(req.tenantId);
+    const nbiUrl = (config.genieacsApiUrl || getNbiUrl()).replace(/\/$/, '');
+    const tasksEndpoint = `${nbiUrl}/tasks`;
+
+    console.log(`[TR069 API] Creating task ${taskName} for device ${deviceId} via ${tasksEndpoint}`);
 
     const buildTaskPayload = (paramPath, paramValue) => ({
       device: deviceId,
@@ -351,6 +484,7 @@ router.post('/tasks', async (req, res) => {
 
       if (!response.ok) {
         const errorText = await response.text();
+        console.error(`[TR069 API] GenieACS task creation failed: ${response.status} ${errorText}`);
         return res.status(response.status).json({
           success: false,
           error: 'GenieACS task creation failed',
@@ -361,6 +495,8 @@ router.post('/tasks', async (req, res) => {
       const result = await response.json();
       createdTasks.push(result);
     }
+
+    console.log(`[TR069 API] Successfully created ${createdTasks.length} task(s) for device ${deviceId}`);
 
     return res.json({
       success: true,
