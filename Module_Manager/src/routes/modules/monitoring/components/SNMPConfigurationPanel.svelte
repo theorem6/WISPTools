@@ -146,13 +146,12 @@
       if (response.ok) {
         const config = await response.json();
         snmpConfig = { ...snmpConfig, ...config };
-      } else if (response.status === 404) {
-        // Endpoint doesn't exist yet, use default config
-        console.log('SNMP configuration endpoint not found, using defaults');
+      } else {
+        const errorBody = await response.json().catch(() => ({}));
+        console.warn('SNMP configuration load failed:', errorBody);
       }
     } catch (error) {
       console.error('Failed to load SNMP configuration:', error);
-      // Don't show error to user if endpoint doesn't exist
     } finally {
       loading = false;
     }
@@ -173,19 +172,13 @@
       if (response.ok) {
         dispatch('configurationSaved');
         alert('SNMP configuration saved successfully');
-      } else if (response.status === 404) {
-        // Endpoint doesn't exist yet
-        console.warn('SNMP configuration endpoint not implemented yet');
-        alert('SNMP configuration endpoint not available. This feature is coming soon.');
       } else {
-        throw new Error('Failed to save configuration');
+        const errorBody = await response.json().catch(() => ({}));
+        throw new Error(errorBody.error || 'Failed to save configuration');
       }
     } catch (error) {
       console.error('Failed to save SNMP configuration:', error);
-      // Only show error if it's not a 404
-      if (!error.message.includes('404')) {
-        alert('Failed to save SNMP configuration');
-      }
+      alert(error.message || 'Failed to save SNMP configuration');
     } finally {
       saving = false;
     }
