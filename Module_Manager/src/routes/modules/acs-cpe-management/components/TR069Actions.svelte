@@ -1,5 +1,6 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
+  import { currentTenant } from '$lib/stores/tenantStore';
   
   export let device: any;
   export let show: boolean = false;
@@ -13,13 +14,21 @@
     if (!confirm(`Reboot ${device.id}? This will disconnect the device temporarily.`)) {
       return;
     }
+
+    if (!$currentTenant?.id) {
+      actionResult = '⚠️ No tenant selected';
+      return;
+    }
     
     actionInProgress = true;
     try {
       // TODO: Call GenieACS API
       const response = await fetch(`/api/tr069/tasks`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-tenant-id': $currentTenant.id
+        },
         body: JSON.stringify({
           deviceId: device.id,
           action: 'reboot'
@@ -53,11 +62,19 @@
       return;
     }
     
+    if (!$currentTenant?.id) {
+      actionResult = '⚠️ No tenant selected';
+      return;
+    }
+
     actionInProgress = true;
     try {
       const response = await fetch(`/api/tr069/tasks`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-tenant-id': $currentTenant.id
+        },
         body: JSON.stringify({
           deviceId: device.id,
           action: 'factoryReset'
@@ -81,11 +98,19 @@
   }
   
   async function executeRefresh() {
+    if (!$currentTenant?.id) {
+      actionResult = '⚠️ No tenant selected';
+      return;
+    }
+
     actionInProgress = true;
     try {
       const response = await fetch(`/api/tr069/tasks`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-tenant-id': $currentTenant.id
+        },
         body: JSON.stringify({
           deviceId: device.id,
           action: 'refreshParameters'

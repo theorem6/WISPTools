@@ -1,5 +1,6 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
+  import { currentTenant } from '$lib/stores/tenantStore';
 
   export let show = false;
   export let device: any = null;
@@ -58,6 +59,10 @@
 
   async function saveParameters() {
     if (!device?.id) return;
+    if (!$currentTenant?.id) {
+      error = 'No tenant selected';
+      return;
+    }
 
     const filtered = parameters
       .map(row => ({ parameter: row.parameter.trim(), value: row.value }))
@@ -75,7 +80,10 @@
     try {
       const response = await fetch('/api/tr069/tasks', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-tenant-id': $currentTenant?.id || ''
+        },
         body: JSON.stringify({
           deviceId: device.id,
           action: 'setParameterValues',

@@ -204,6 +204,22 @@ export class ApiService {
     });
   }
 
+  // ============================================================================
+  // TR-069 Configuration
+  // ============================================================================
+
+  async getTR069Config() {
+    return this.get('/api/tr069/configuration');
+  }
+
+  async saveTR069Config(genieacsUrl: string, genieacsApiUrl: string) {
+    return this.post('/api/tr069/configuration', { genieacsUrl, genieacsApiUrl });
+  }
+
+  async testTR069Connection(genieacsApiUrl: string) {
+    return this.post('/api/tr069/connection-test', { genieacsApiUrl });
+  }
+
   /**
    * Get devices (tenant-filtered)
    */

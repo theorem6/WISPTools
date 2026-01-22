@@ -5,6 +5,7 @@
   import TR069Actions from '../components/TR069Actions.svelte';
   import ParameterEditorModal from '../components/ParameterEditorModal.svelte';
   import { loadCPEDevices, type CPEDevice } from '../lib/cpeDataService';
+  import { currentTenant } from '$lib/stores/tenantStore';
 
   let devices: CPEDevice[] = [];
   let isLoading = false;
@@ -56,9 +57,17 @@
 
   async function refreshDevice(deviceId: string) {
     try {
+      const tenantId = $currentTenant?.id;
+      if (!tenantId) {
+        console.warn('No tenant selected for refresh');
+        return;
+      }
       const response = await fetch('/api/tr069/tasks', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-tenant-id': tenantId
+        },
         body: JSON.stringify({
           deviceId,
           action: 'refreshParameters'

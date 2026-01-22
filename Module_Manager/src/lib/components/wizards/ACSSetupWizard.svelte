@@ -5,7 +5,7 @@
    * Guides users through ACS/TR-069 CPE management configuration.
    */
   
-  import { createEventDispatcher } from 'svelte';
+  import { createEventDispatcher, onMount } from 'svelte';
   import { currentTenant } from '$lib/stores/tenantStore';
   
   export let show = false;
@@ -30,6 +30,41 @@
   // Configuration state
   let genieacsUrl = '';
   let genieacsApiUrl = '';
+  let isLoaded = false;
+
+  onMount(async () => {
+    if (show && autoStart) {
+      await loadConfiguration();
+    }
+  });
+
+  async function loadConfiguration() {
+    if (!$currentTenant?.id) {
+      error = 'No tenant selected';
+      return;
+    }
+
+    isLoading = true;
+    error = '';
+    try {
+      const response = await fetch('/api/tr069/configuration', {
+        headers: {
+          'Content-Type': 'application/json',
+          'x-tenant-id': $currentTenant.id
+        }
+      });
+      const data = await response.json();
+      if (response.ok && data?.config) {
+        genieacsUrl = data.config.genieacsUrl || '';
+        genieacsApiUrl = data.config.genieacsApiUrl || '';
+      }
+      isLoaded = true;
+    } catch (err: any) {
+      error = err.message || 'Failed to load configuration';
+    } finally {
+      isLoading = false;
+    }
+  }
   
   function handleClose() {
     dispatch('close');
@@ -74,13 +109,30 @@
         normalizedUrl = 'https://' + normalizedUrl;
       }
       normalizedUrl = normalizedUrl.replace(/\/$/, '');
-      
+
       // Extract API URL (typically GenieACS URL + /api)
-      genieacsApiUrl = normalizedUrl + '/api';
-      
-      // TODO: Save configuration to backend/Firestore
-      // await saveACSConfig({ genieacsUrl: normalizedUrl, genieacsApiUrl, tenantId });
-      
+      const normalizedApiUrl = genieacsApiUrl.trim()
+        ? genieacsApiUrl.trim().replace(/\/$/, '')
+        : `${normalizedUrl}/api`;
+
+      const response = await fetch('/api/tr069/configuration', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-tenant-id': tenantId
+        },
+        body: JSON.stringify({
+          genieacsUrl: normalizedUrl,
+          genieacsApiUrl: normalizedApiUrl
+        })
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Failed to save configuration');
+      }
+
+      genieacsUrl = normalizedUrl;
+      genieacsApiUrl = normalizedApiUrl;
       success = 'Configuration saved successfully!';
       
       // Move to test step
@@ -95,23 +147,35 @@
   }
   
   async function testConnection() {
+    const tenantId = $currentTenant?.id;
+    if (!tenantId) {
+      error = 'No tenant selected';
+      return;
+    }
+
     isLoading = true;
     error = '';
     success = '';
     
     try {
-      if (!genieacsUrl.trim()) {
-        error = 'GenieACS URL is required';
+      if (!genieacsApiUrl.trim()) {
+        error = 'GenieACS API URL is required';
         return;
       }
-      
-      // TODO: Test connection to GenieACS API
-      // const response = await fetch(`${genieacsApiUrl}/devices`, { method: 'GET' });
-      // if (!response.ok) throw new Error('Connection failed');
-      
-      // Simulate connection test
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
+
+      const response = await fetch('/api/tr069/connection-test', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-tenant-id': tenantId
+        },
+        body: JSON.stringify({ genieacsApiUrl: genieacsApiUrl.trim() })
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Connection failed');
+      }
+
       success = 'Connection successful! GenieACS is accessible.';
       
       // Move to completion step
