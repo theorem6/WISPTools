@@ -36,24 +36,24 @@ async function getDeviceStatusesFromPingMetrics(deviceIds, tenantId) {
     const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
     const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000);
     
-    // Convert deviceIds to both string and ObjectId formats for querying
-    const deviceIdQueries = deviceIds.map(id => {
+    // Convert deviceIds to a flat array including both string and ObjectId formats
+    const deviceIdArray = [];
+    deviceIds.forEach(id => {
+      deviceIdArray.push(id);
       if (mongoose.Types.ObjectId.isValid(id)) {
-        return { device_id: { $in: [id, new mongoose.Types.ObjectId(id)] } };
+        deviceIdArray.push(new mongoose.Types.ObjectId(id));
       }
-      return { device_id: id };
     });
     
     // Single query to get all recent successful pings (last 15 minutes)
+    // Use $in for better performance than $or
     const recentMetrics = await PingMetrics.find({
-      $and: [
-        { $or: deviceIdQueries },
-        { tenant_id: tenantId },
-        { timestamp: { $gte: fifteenMinutesAgo } },
-        { $or: [
-          { success: true },
-          { response_time_ms: { $ne: null } }
-        ]}
+      device_id: { $in: deviceIdArray },
+      tenant_id: tenantId,
+      timestamp: { $gte: fifteenMinutesAgo },
+      $or: [
+        { success: true },
+        { response_time_ms: { $ne: null } }
       ]
     })
     .sort({ timestamp: -1 })
@@ -70,22 +70,21 @@ async function getDeviceStatusesFromPingMetrics(deviceIds, tenantId) {
     // For devices not yet marked, check 30-minute window
     const unmarkedIds = deviceIds.filter(id => !statusMap.has(String(id)));
     if (unmarkedIds.length > 0) {
-      const unmarkedQueries = unmarkedIds.map(id => {
+      const unmarkedIdArray = [];
+      unmarkedIds.forEach(id => {
+        unmarkedIdArray.push(id);
         if (mongoose.Types.ObjectId.isValid(id)) {
-          return { device_id: { $in: [id, new mongoose.Types.ObjectId(id)] } };
+          unmarkedIdArray.push(new mongoose.Types.ObjectId(id));
         }
-        return { device_id: id };
       });
       
       const thirtyMinMetrics = await PingMetrics.find({
-        $and: [
-          { $or: unmarkedQueries },
-          { tenant_id: tenantId },
-          { timestamp: { $gte: thirtyMinutesAgo } },
-          { $or: [
-            { success: true },
-            { response_time_ms: { $ne: null } }
-          ]}
+        device_id: { $in: unmarkedIdArray },
+        tenant_id: tenantId,
+        timestamp: { $gte: thirtyMinutesAgo },
+        $or: [
+          { success: true },
+          { response_time_ms: { $ne: null } }
         ]
       })
       .sort({ timestamp: -1 })
@@ -102,15 +101,16 @@ async function getDeviceStatusesFromPingMetrics(deviceIds, tenantId) {
     // For remaining devices, check if they have any metrics at all (mark as offline)
     const stillUnmarkedIds = deviceIds.filter(id => !statusMap.has(String(id)));
     if (stillUnmarkedIds.length > 0) {
-      const stillUnmarkedQueries = stillUnmarkedIds.map(id => {
+      const stillUnmarkedIdArray = [];
+      stillUnmarkedIds.forEach(id => {
+        stillUnmarkedIdArray.push(id);
         if (mongoose.Types.ObjectId.isValid(id)) {
-          return { device_id: { $in: [id, new mongoose.Types.ObjectId(id)] } };
+          stillUnmarkedIdArray.push(new mongoose.Types.ObjectId(id));
         }
-        return { device_id: id };
       });
       
       const anyMetrics = await PingMetrics.find({
-        $or: stillUnmarkedQueries,
+        device_id: { $in: stillUnmarkedIdArray },
         tenant_id: tenantId
       })
       .select('device_id')
