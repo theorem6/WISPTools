@@ -10,6 +10,7 @@
   import { acsCpeDocs } from '$lib/docs/acs-cpe-docs';
   import { loadCPEDevices, syncCPEDevices as syncCPEDevicesService } from './lib/cpeDataService';
   import { syncACSCPEToInventory } from '$lib/services/acsInventorySync';
+  import ACSSetupWizard from '$lib/components/wizards/ACSSetupWizard.svelte';
   
   // Module data
   let moduleData = {
@@ -31,6 +32,7 @@
   let syncMessage = '';
   let isSyncingInventory = false;
   let inventorySyncMessage = '';
+  let showSetupWizard = false;
   
   // Multi-tenant state - use tenant store
   $: tenantName = $currentTenant?.displayName || 'No Tenant Selected';
@@ -435,6 +437,15 @@
             🔄 Sync Devices from GenieACS
           {/if}
         </button>
+
+        <button
+          class="btn btn-secondary"
+          onclick={() => showSetupWizard = true}
+          disabled={isLoading}
+          title="Configure GenieACS connection and settings"
+        >
+          ⚙️ Setup ACS
+        </button>
         
         <button 
           class="btn btn-primary" 
@@ -569,52 +580,67 @@
           />
         </div>
       </div>
-      
-      <div class="cpe-table">
-        <table>
-          <thead>
-            <tr>
-              <th>Device ID</th>
-              <th>Manufacturer</th>
-              <th>Status</th>
-              <th>Location</th>
-              <th>Last Contact</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {#each cpeDevices as cpe}
-              <tr class="cpe-row" class:online={cpe.status === 'Online'} class:offline={cpe.status === 'Offline'}>
-                <td class="device-id">{cpe.id}</td>
-                <td class="manufacturer">{cpe.manufacturer}</td>
-                <td class="status">
-                  <span class="status-badge {cpe.status.toLowerCase()}">
-                    {cpe.status}
-                  </span>
-                </td>
-                <td class="location">
-                  {#if cpe.location}
-                    📍 {cpe.location.latitude.toFixed(4)}, {cpe.location.longitude.toFixed(4)}
-                  {:else}
-                    No GPS data
-                  {/if}
-                </td>
-                <td class="last-contact">
-                  {cpe.lastContact ? new Date(cpe.lastContact).toLocaleString() : 'Unknown'}
-                </td>
-                <td class="actions">
-                  <button 
-                    class="btn btn-sm btn-primary"
-                    onclick={() => handleCPEClick(cpe)}
-                  >
-                    📊 View Performance
-                  </button>
-                </td>
+
+      {#if !isLoading && cpeDevices.length === 0}
+        <div class="empty-state">
+          <h4>No CPE devices yet</h4>
+          <p>Connect your GenieACS server and sync devices to populate this list.</p>
+          <div class="empty-actions">
+            <button class="btn btn-primary" onclick={() => showSetupWizard = true}>
+              ⚙️ Run ACS Setup
+            </button>
+            <button class="btn btn-secondary" onclick={handleSync}>
+              🔄 Sync from GenieACS
+            </button>
+          </div>
+        </div>
+      {:else}
+        <div class="cpe-table">
+          <table>
+            <thead>
+              <tr>
+                <th>Device ID</th>
+                <th>Manufacturer</th>
+                <th>Status</th>
+                <th>Location</th>
+                <th>Last Contact</th>
+                <th>Actions</th>
               </tr>
-            {/each}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {#each cpeDevices as cpe}
+                <tr class="cpe-row" class:online={cpe.status === 'Online'} class:offline={cpe.status === 'Offline'}>
+                  <td class="device-id">{cpe.id}</td>
+                  <td class="manufacturer">{cpe.manufacturer}</td>
+                  <td class="status">
+                    <span class="status-badge {cpe.status.toLowerCase()}">
+                      {cpe.status}
+                    </span>
+                  </td>
+                  <td class="location">
+                    {#if cpe.location}
+                      📍 {cpe.location.latitude.toFixed(4)}, {cpe.location.longitude.toFixed(4)}
+                    {:else}
+                      No GPS data
+                    {/if}
+                  </td>
+                  <td class="last-contact">
+                    {cpe.lastContact ? new Date(cpe.lastContact).toLocaleString() : 'Unknown'}
+                  </td>
+                  <td class="actions">
+                    <button 
+                      class="btn btn-sm btn-primary"
+                      onclick={() => handleCPEClick(cpe)}
+                    >
+                      📊 View Performance
+                    </button>
+                  </td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+        </div>
+      {/if}
     </div>
   </div>
 
@@ -657,6 +683,15 @@
     content={helpContent}
     on:close={() => showHelpModal = false}
   />
+
+  {#if showSetupWizard}
+    <ACSSetupWizard
+      show={showSetupWizard}
+      autoStart={true}
+      on:close={() => showSetupWizard = false}
+      on:complete={() => { showSetupWizard = false; loadDevices(); }}
+    />
+  {/if}
 </div>
 </TenantGuard>
 
@@ -849,6 +884,32 @@
     background: var(--danger-light);
     border: 1px solid var(--danger);
     color: var(--danger);
+  }
+
+  .empty-state {
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    border-radius: 12px;
+    padding: 1.5rem;
+    text-align: center;
+    color: #e2e8f0;
+  }
+
+  .empty-state h4 {
+    margin: 0 0 0.5rem 0;
+    font-size: 1.1rem;
+  }
+
+  .empty-state p {
+    margin: 0 0 1rem 0;
+    color: rgba(226, 232, 240, 0.8);
+  }
+
+  .empty-actions {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: center;
+    flex-wrap: wrap;
   }
 
   .stat-card.tenant-stat {
