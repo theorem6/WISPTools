@@ -870,6 +870,7 @@ router.get('/presets', async (req, res) => {
 
 // POST /api/tr069/presets - Create new preset
 router.post('/presets', async (req, res) => {
+  let client;
   try {
     const presetData = req.body;
     
@@ -880,7 +881,8 @@ router.post('/presets', async (req, res) => {
       });
     }
     
-    const { client, db } = await getGenieACSMongoDB();
+    const { client: mongoClient, db } = await getGenieACSMongoDB();
+    client = mongoClient;
     
     // Generate preset ID from name
     const presetId = presetData.name
@@ -928,6 +930,13 @@ router.post('/presets', async (req, res) => {
     });
   } catch (error) {
     console.error('[TR069 API] Failed to create preset:', error);
+    if (client) {
+      try {
+        await client.close();
+      } catch (e) {
+        // Ignore close errors
+      }
+    }
     res.status(500).json({
       success: false,
       error: 'Failed to create preset',
@@ -938,15 +947,13 @@ router.post('/presets', async (req, res) => {
 
 // PUT /api/tr069/presets/:id - Update preset
 router.put('/presets/:id', async (req, res) => {
+  let client;
   try {
     const presetId = req.params.id;
     const updates = req.body;
     
-    const { MongoClient } = require('mongodb');
-    const mongoUrl = process.env.MONGODB_URI || 'mongodb+srv://genieacs-user:fg2E8I10Pnx58gYP@cluster0.1radgkw.mongodb.net/genieacs?retryWrites=true&w=majority&appName=Cluster0';
-    const client = new MongoClient(mongoUrl);
-    await client.connect();
-    const db = client.db('genieacs');
+    const { client: mongoClient, db } = await getGenieACSMongoDB();
+    client = mongoClient;
     
     // Check if preset exists and belongs to tenant
     const existing = await db.collection('presets').findOne({ 
@@ -981,6 +988,13 @@ router.put('/presets/:id', async (req, res) => {
     });
   } catch (error) {
     console.error('[TR069 API] Failed to update preset:', error);
+    if (client) {
+      try {
+        await client.close();
+      } catch (e) {
+        // Ignore close errors
+      }
+    }
     res.status(500).json({
       success: false,
       error: 'Failed to update preset',
@@ -991,14 +1005,12 @@ router.put('/presets/:id', async (req, res) => {
 
 // DELETE /api/tr069/presets/:id - Delete preset
 router.delete('/presets/:id', async (req, res) => {
+  let client;
   try {
     const presetId = req.params.id;
     
-    const { MongoClient } = require('mongodb');
-    const mongoUrl = process.env.MONGODB_URI || 'mongodb+srv://genieacs-user:fg2E8I10Pnx58gYP@cluster0.1radgkw.mongodb.net/genieacs?retryWrites=true&w=majority&appName=Cluster0';
-    const client = new MongoClient(mongoUrl);
-    await client.connect();
-    const db = client.db('genieacs');
+    const { client: mongoClient, db } = await getGenieACSMongoDB();
+    client = mongoClient;
     
     // Check if preset exists and belongs to tenant
     const existing = await db.collection('presets').findOne({ 
@@ -1026,6 +1038,13 @@ router.delete('/presets/:id', async (req, res) => {
     });
   } catch (error) {
     console.error('[TR069 API] Failed to delete preset:', error);
+    if (client) {
+      try {
+        await client.close();
+      } catch (e) {
+        // Ignore close errors
+      }
+    }
     res.status(500).json({
       success: false,
       error: 'Failed to delete preset',
@@ -1036,14 +1055,12 @@ router.delete('/presets/:id', async (req, res) => {
 
 // POST /api/tr069/presets/:id/toggle - Toggle preset enabled status
 router.post('/presets/:id/toggle', async (req, res) => {
+  let client;
   try {
     const presetId = req.params.id;
     
-    const { MongoClient } = require('mongodb');
-    const mongoUrl = process.env.MONGODB_URI || 'mongodb+srv://genieacs-user:fg2E8I10Pnx58gYP@cluster0.1radgkw.mongodb.net/genieacs?retryWrites=true&w=majority&appName=Cluster0';
-    const client = new MongoClient(mongoUrl);
-    await client.connect();
-    const db = client.db('genieacs');
+    const { client: mongoClient, db } = await getGenieACSMongoDB();
+    client = mongoClient;
     
     const existing = await db.collection('presets').findOne({ 
       _id: presetId,
