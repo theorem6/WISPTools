@@ -135,7 +135,16 @@ app.use('/api/epc', require('./routes/epc'));
 app.use('/api/epc', require('./routes/epc-commands')); // Remote command management
 app.use('/api/epc', require('./routes/epc-logs')); // EPC logs
 app.use('/api/epc/snmp', require('./routes/epc-snmp')); // EPC SNMP discovery
-app.use('/api/mikrotik', require('./routes/mikrotik'));
+
+// MikroTik routes (optional - graceful failure if node-routeros not installed)
+try {
+  app.use('/api/mikrotik', require('./routes/mikrotik'));
+  console.log('✅ MikroTik routes enabled');
+} catch (error) {
+  console.warn('⚠️ MikroTik routes disabled:', error.message);
+  console.warn('   → Install node-routeros package to enable MikroTik management');
+}
+
 app.use('/api/tr069', require('./routes/tr069'));
 app.use('/api/snmp', require('./routes/snmp'));
 app.use('/api/mme', require('./routes/mme-status')); // MME subscriber status reporting
