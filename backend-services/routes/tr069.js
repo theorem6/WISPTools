@@ -513,4 +513,95 @@ router.post('/tasks', async (req, res) => {
   }
 });
 
+// DELETE /api/tr069/devices - Delete all devices for a tenant (admin/cleanup)
+router.delete('/devices', async (req, res) => {
+  try {
+    const config = await resolveGenieacsConfig(req.tenantId);
+    const nbiUrl = (config.genieacsApiUrl || getNbiUrl()).replace(/\/$/, '');
+    
+    console.log(`[TR069 API] Deleting all devices for tenant: ${req.tenantId}`);
+    
+    // First, get all devices for this tenant
+    const devicesResponse = await fetch(`${nbiUrl}/devices`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    
+    if (!devicesResponse.ok) {
+      const text = await devicesResponse.text();
+      return res.status(devicesResponse.status).json({
+        success: false,
+        error: 'Failed to fetch devices from GenieACS',
+        details: text
+      });
+    }
+    
+    const devices = await devicesResponse.json();
+    const deviceArray = Array.isArray(devices) ? devices : (devices.devices || []);
+    
+    // Filter devices by tenant
+    let devicesToDelete = deviceArray;
+    if (req.tenantId) {
+      const hasTenantMetadata = deviceArray.some(d => d._tenantId || d.tenantId);
+      if (hasTenantMetadata) {
+        devicesToDelete = deviceArray.filter(d => 
+          (d._tenantId || d.tenantId) === req.tenantId
+        );
+      }
+    }
+    
+    console.log(`[TR069 API] Found ${devicesToDelete.length} devices to delete for tenant ${req.tenantId}`);
+    
+    if (devicesToDelete.length === 0) {
+      return res.json({
+        success: true,
+        message: 'No devices found for this tenant',
+        deleted: 0
+      });
+    }
+    
+    // Delete each device via GenieACS NBI API
+    let deletedCount = 0;
+    let errors = [];
+    
+    for (const device of devicesToDelete) {
+      const deviceId = device._id || device.id;
+      if (!deviceId) continue;
+      
+      try {
+        const deleteResponse = await fetch(`${nbiUrl}/devices/${deviceId}`, {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        
+        if (deleteResponse.ok) {
+          deletedCount++;
+        } else {
+          const errorText = await deleteResponse.text();
+          errors.push({ deviceId, error: errorText });
+          console.error(`[TR069 API] Failed to delete device ${deviceId}: ${errorText}`);
+        }
+      } catch (error) {
+        errors.push({ deviceId, error: error.message });
+        console.error(`[TR069 API] Error deleting device ${deviceId}:`, error);
+      }
+    }
+    
+    res.json({
+      success: true,
+      message: `Deleted ${deletedCount} of ${devicesToDelete.length} devices`,
+      deleted: deletedCount,
+      total: devicesToDelete.length,
+      errors: errors.length > 0 ? errors : undefined
+    });
+  } catch (error) {
+    console.error('[TR069 API] Failed to delete devices:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to delete devices from GenieACS',
+      details: error.message
+    });
+  }
+});
+
 module.exports = router;
