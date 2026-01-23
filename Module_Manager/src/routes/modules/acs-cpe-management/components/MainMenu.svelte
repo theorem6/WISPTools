@@ -37,6 +37,22 @@
       adminOnly: false
     },
     {
+      id: 'alerts',
+      name: 'Alerts',
+      icon: '🚨',
+      description: 'Alert rules and notifications',
+      path: '/modules/acs-cpe-management/alerts',
+      adminOnly: false
+    },
+    {
+      id: 'firmware',
+      name: 'Firmware',
+      icon: '💾',
+      description: 'Firmware version tracking and upgrades',
+      path: '/modules/acs-cpe-management/firmware',
+      adminOnly: false
+    },
+    {
       id: 'faults',
       name: 'Faults',
       icon: '⚠️',

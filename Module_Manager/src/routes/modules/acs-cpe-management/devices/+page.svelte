@@ -11,6 +11,11 @@
   let isLoading = false;
   let searchTerm = '';
   let statusFilter = 'all';
+  let manufacturerFilter = '';
+  let modelFilter = '';
+  let firmwareFilter = '';
+  let customerFilter = '';
+  let showAdvancedFilters = false;
   let expandedDeviceId: string | null = null;
   let actionDevice: CPEDevice | null = null;
   let showActionsModal = false;
@@ -75,7 +80,39 @@
   async function loadDevices() {
     isLoading = true;
     try {
-      devices = await loadCPEDevices();
+      // Use filtered endpoint if advanced filters are active
+      if (manufacturerFilter || modelFilter || firmwareFilter || customerFilter) {
+        const { authService } = await import('$lib/services/authService');
+        const user = authService.getCurrentUser();
+        if (!user) throw new Error('Not authenticated');
+        
+        const token = await user.getIdToken();
+        const params = new URLSearchParams();
+        
+        if (manufacturerFilter) params.append('manufacturer', manufacturerFilter);
+        if (modelFilter) params.append('model', modelFilter);
+        if (firmwareFilter) params.append('firmware', firmwareFilter);
+        if (customerFilter) params.append('customerId', customerFilter);
+        if (statusFilter !== 'all') params.append('status', statusFilter);
+        if (searchTerm) params.append('search', searchTerm);
+        
+        const response = await fetch(`/api/tr069/devices/filtered?${params.toString()}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'X-Tenant-ID': $currentTenant.id,
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        const data = await response.json();
+        if (data.success) {
+          devices = data.devices || [];
+        } else {
+          throw new Error(data.error || 'Failed to load devices');
+        }
+      } else {
+        devices = await loadCPEDevices();
+      }
       console.log(`Loaded ${devices.length} CPE devices`);
     } catch (error) {
       console.error('Failed to load devices:', error);
@@ -148,10 +185,17 @@
 
   // Filtered devices
   $: filteredDevices = devices.filter(device => {
-    const matchesSearch = device.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         device.manufacturer.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || device.status === statusFilter;
-    return matchesSearch && matchesStatus;
+    // Basic search filter (if not using filtered endpoint)
+    if (!manufacturerFilter && !modelFilter && !firmwareFilter && !customerFilter) {
+      const matchesSearch = !searchTerm || 
+        device.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        device.manufacturer?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        device.model?.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesStatus = statusFilter === 'all' || device.status === statusFilter;
+      return matchesSearch && matchesStatus;
+    }
+    // If using filtered endpoint, devices are already filtered
+    return true;
   });
 
   $: onlineCount = devices.filter(d => d.status === 'Online').length;
@@ -319,13 +363,74 @@
       />
     </div>
     <div class="filter-group">
-      <select bind:value={statusFilter} class="filter-select">
+      <select bind:value={statusFilter} class="filter-select" on:change={loadDevices}>
         <option value="all">All Status</option>
-        <option value="Online">Online</option>
-        <option value="Offline">Offline</option>
+        <option value="online">Online</option>
+        <option value="offline">Offline</option>
       </select>
     </div>
+    <button 
+      class="btn btn-secondary btn-sm" 
+      on:click={() => showAdvancedFilters = !showAdvancedFilters}
+    >
+      {showAdvancedFilters ? '▼' : '▶'} Advanced Filters
+    </button>
+    <button 
+      class="btn btn-secondary btn-sm" 
+      on:click={() => {
+        manufacturerFilter = '';
+        modelFilter = '';
+        firmwareFilter = '';
+        customerFilter = '';
+        loadDevices();
+      }}
+    >
+      Clear Filters
+    </button>
   </div>
+
+  {#if showAdvancedFilters}
+    <div class="advanced-filters">
+      <div class="filter-row">
+        <div class="filter-group">
+          <label>Manufacturer</label>
+          <input 
+            type="text" 
+            bind:value={manufacturerFilter}
+            placeholder="Filter by manufacturer..."
+            on:input={loadDevices}
+          />
+        </div>
+        <div class="filter-group">
+          <label>Model</label>
+          <input 
+            type="text" 
+            bind:value={modelFilter}
+            placeholder="Filter by model..."
+            on:input={loadDevices}
+          />
+        </div>
+        <div class="filter-group">
+          <label>Firmware</label>
+          <input 
+            type="text" 
+            bind:value={firmwareFilter}
+            placeholder="Filter by firmware version..."
+            on:input={loadDevices}
+          />
+        </div>
+        <div class="filter-group">
+          <label>Customer ID</label>
+          <input 
+            type="text" 
+            bind:value={customerFilter}
+            placeholder="Filter by customer ID..."
+            on:input={loadDevices}
+          />
+        </div>
+      </div>
+    </div>
+  {/if}
 
   <!-- Bulk Actions Bar -->
   {#if selectedCount > 0}

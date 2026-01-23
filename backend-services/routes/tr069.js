@@ -1062,6 +1062,493 @@ router.post('/presets/:id/toggle', async (req, res) => {
   }
 });
 
+// ============================================================================
+// ALERT MANAGEMENT ENDPOINTS
+// ============================================================================
+
+// GET /api/tr069/alerts/rules - Get alert rules for ACS devices
+router.get('/alerts/rules', async (req, res) => {
+  try {
+    const { AlertRule } = require('../routes/monitoring-schema');
+    
+    const rules = await AlertRule.find({
+      tenantId: req.tenantId,
+      source: 'acs'
+    }).lean();
+    
+    res.json({
+      success: true,
+      rules: rules || []
+    });
+  } catch (error) {
+    console.error('[TR069 API] Failed to get alert rules:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get alert rules',
+      details: error.message
+    });
+  }
+});
+
+// POST /api/tr069/alerts/rules - Create alert rule for ACS devices
+router.post('/alerts/rules', async (req, res) => {
+  try {
+    const { AlertRule } = require('../routes/monitoring-schema');
+    const { v4: uuidv4 } = require('uuid');
+    
+    const ruleData = req.body;
+    
+    if (!ruleData.name || !ruleData.metric_name || !ruleData.operator || ruleData.threshold === undefined) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required fields: name, metric_name, operator, threshold'
+      });
+    }
+    
+    const rule = new AlertRule({
+      rule_id: uuidv4(),
+      tenant_id: req.tenantId,
+      tenantId: req.tenantId,
+      name: ruleData.name,
+      source: 'acs',
+      metric_name: ruleData.metric_name,
+      operator: ruleData.operator, // 'gt', 'lt', 'eq', 'gte', 'lte'
+      threshold: ruleData.threshold,
+      severity: ruleData.severity || 'warning',
+      duration_seconds: ruleData.duration_seconds || 300,
+      cooldown_minutes: ruleData.cooldown_minutes || 15,
+      enabled: ruleData.enabled !== undefined ? ruleData.enabled : true,
+      device_filter: ruleData.device_filter || {}, // Optional: filter by device properties
+      created_at: new Date()
+    });
+    
+    await rule.save();
+    
+    res.json({
+      success: true,
+      rule: rule,
+      message: 'Alert rule created successfully'
+    });
+  } catch (error) {
+    console.error('[TR069 API] Failed to create alert rule:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to create alert rule',
+      details: error.message
+    });
+  }
+});
+
+// PUT /api/tr069/alerts/rules/:id - Update alert rule
+router.put('/alerts/rules/:id', async (req, res) => {
+  try {
+    const { AlertRule } = require('../routes/monitoring-schema');
+    const ruleId = req.params.id;
+    const updates = req.body;
+    
+    const rule = await AlertRule.findOne({
+      rule_id: ruleId,
+      tenantId: req.tenantId
+    });
+    
+    if (!rule) {
+      return res.status(404).json({
+        success: false,
+        error: 'Alert rule not found'
+      });
+    }
+    
+    Object.assign(rule, updates);
+    await rule.save();
+    
+    res.json({
+      success: true,
+      rule: rule,
+      message: 'Alert rule updated successfully'
+    });
+  } catch (error) {
+    console.error('[TR069 API] Failed to update alert rule:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to update alert rule',
+      details: error.message
+    });
+  }
+});
+
+// DELETE /api/tr069/alerts/rules/:id - Delete alert rule
+router.delete('/alerts/rules/:id', async (req, res) => {
+  try {
+    const { AlertRule } = require('../routes/monitoring-schema');
+    const ruleId = req.params.id;
+    
+    const result = await AlertRule.deleteOne({
+      rule_id: ruleId,
+      tenantId: req.tenantId
+    });
+    
+    if (result.deletedCount === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Alert rule not found'
+      });
+    }
+    
+    res.json({
+      success: true,
+      message: 'Alert rule deleted successfully'
+    });
+  } catch (error) {
+    console.error('[TR069 API] Failed to delete alert rule:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to delete alert rule',
+      details: error.message
+    });
+  }
+});
+
+// GET /api/tr069/alerts - Get active alerts for ACS devices
+router.get('/alerts', async (req, res) => {
+  try {
+    const { Alert } = require('../routes/monitoring-schema');
+    
+    const alerts = await Alert.find({
+      tenantId: req.tenantId,
+      source: 'acs',
+      status: { $in: ['firing', 'acknowledged'] }
+    })
+    .sort({ first_triggered: -1 })
+    .limit(100)
+    .lean();
+    
+    res.json({
+      success: true,
+      alerts: alerts || []
+    });
+  } catch (error) {
+    console.error('[TR069 API] Failed to get alerts:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get alerts',
+      details: error.message
+    });
+  }
+});
+
+// ============================================================================
+// FIRMWARE MANAGEMENT ENDPOINTS
+// ============================================================================
+
+// GET /api/tr069/firmware - Get firmware versions for devices
+router.get('/firmware', async (req, res) => {
+  try {
+    const config = await resolveGenieacsConfig(req.tenantId);
+    const devicesEndpoint = `${config.genieacsApiUrl}/devices`;
+    
+    const response = await fetch(devicesEndpoint, {
+      headers: {
+        'X-Tenant-ID': req.tenantId
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`GenieACS API error: ${response.status}`);
+    }
+    
+    const devices = await response.json();
+    
+    // Extract firmware versions
+    const firmwareVersions = new Map();
+    devices.forEach(device => {
+      const firmware = device.parameters?.['InternetGatewayDevice.DeviceInfo.SoftwareVersion']?._value ||
+                      device.parameters?.['Device.DeviceInfo.SoftwareVersion']?._value ||
+                      device.firmware ||
+                      'Unknown';
+      
+      if (!firmwareVersions.has(firmware)) {
+        firmwareVersions.set(firmware, {
+          version: firmware,
+          deviceCount: 0,
+          devices: []
+        });
+      }
+      
+      const versionInfo = firmwareVersions.get(firmware);
+      versionInfo.deviceCount++;
+      versionInfo.devices.push({
+        id: device._id,
+        manufacturer: device.manufacturer,
+        model: device.model
+      });
+    });
+    
+    res.json({
+      success: true,
+      firmwareVersions: Array.from(firmwareVersions.values())
+    });
+  } catch (error) {
+    console.error('[TR069 API] Failed to get firmware versions:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get firmware versions',
+      details: error.message
+    });
+  }
+});
+
+// POST /api/tr069/firmware/upload - Upload firmware file (placeholder)
+router.post('/firmware/upload', async (req, res) => {
+  try {
+    // TODO: Implement firmware file upload
+    // This would typically involve:
+    // 1. File upload handling (multer)
+    // 2. Storage (S3, GCS, or local)
+    // 3. Metadata storage in database
+    
+    res.json({
+      success: false,
+      error: 'Firmware upload not yet implemented',
+      message: 'This feature is coming soon'
+    });
+  } catch (error) {
+    console.error('[TR069 API] Failed to upload firmware:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to upload firmware',
+      details: error.message
+    });
+  }
+});
+
+// POST /api/tr069/firmware/upgrade - Schedule firmware upgrade
+router.post('/firmware/upgrade', async (req, res) => {
+  try {
+    const { deviceIds, firmwareUrl, scheduleAt } = req.body;
+    
+    if (!deviceIds || !Array.isArray(deviceIds) || deviceIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'deviceIds array is required'
+      });
+    }
+    
+    if (!firmwareUrl) {
+      return res.status(400).json({
+        success: false,
+        error: 'firmwareUrl is required'
+      });
+    }
+    
+    const config = await resolveGenieacsConfig(req.tenantId);
+    const tasksEndpoint = `${config.genieacsApiUrl}/tasks`;
+    
+    const results = {
+      success: 0,
+      failed: 0,
+      errors: []
+    };
+    
+    for (const deviceId of deviceIds) {
+      try {
+        const taskPayload = {
+          device: deviceId,
+          name: 'download',
+          fileType: '1 Firmware Upgrade Image',
+          fileName: firmwareUrl,
+          targetFileName: 'firmware.bin'
+        };
+        
+        if (scheduleAt) {
+          taskPayload.timestamp = new Date(scheduleAt).toISOString();
+        }
+        
+        const response = await fetch(tasksEndpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(taskPayload)
+        });
+        
+        if (response.ok) {
+          results.success++;
+        } else {
+          throw new Error(`Failed to schedule upgrade: ${response.status}`);
+        }
+      } catch (error) {
+        results.failed++;
+        results.errors.push({ deviceId, error: error.message });
+      }
+    }
+    
+    res.json({
+      success: true,
+      results: results,
+      message: `Firmware upgrade scheduled for ${results.success} device(s)`
+    });
+  } catch (error) {
+    console.error('[TR069 API] Failed to schedule firmware upgrade:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to schedule firmware upgrade',
+      details: error.message
+    });
+  }
+});
+
+// ============================================================================
+// ADVANCED FILTERING ENDPOINTS
+// ============================================================================
+
+// GET /api/tr069/devices/filtered - Get devices with advanced filtering
+router.get('/devices/filtered', async (req, res) => {
+  try {
+    const {
+      manufacturer,
+      model,
+      firmware,
+      customerId,
+      status,
+      lastContactMin,
+      lastContactMax,
+      locationRadius,
+      locationLat,
+      locationLon,
+      tags,
+      search
+    } = req.query;
+    
+    const config = await resolveGenieacsConfig(req.tenantId);
+    const devicesEndpoint = `${config.genieacsApiUrl}/devices`;
+    
+    const response = await fetch(devicesEndpoint, {
+      headers: {
+        'X-Tenant-ID': req.tenantId
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`GenieACS API error: ${response.status}`);
+    }
+    
+    let devices = await response.json();
+    
+    // Apply filters
+    if (manufacturer) {
+      devices = devices.filter(d => 
+        d.manufacturer?.toLowerCase().includes(manufacturer.toLowerCase())
+      );
+    }
+    
+    if (model) {
+      devices = devices.filter(d => 
+        d.model?.toLowerCase().includes(model.toLowerCase())
+      );
+    }
+    
+    if (firmware) {
+      devices = devices.filter(d => {
+        const fw = d.parameters?.['InternetGatewayDevice.DeviceInfo.SoftwareVersion']?._value ||
+                   d.firmware || '';
+        return fw.toLowerCase().includes(firmware.toLowerCase());
+      });
+    }
+    
+    if (customerId) {
+      devices = devices.filter(d => 
+        d._customerId === customerId || d.customerId === customerId
+      );
+    }
+    
+    if (status) {
+      const now = Date.now();
+      const fiveMinutesAgo = now - 5 * 60 * 1000;
+      
+      if (status === 'online') {
+        devices = devices.filter(d => {
+          const lastContact = d._lastInform ? new Date(d._lastInform).getTime() : 0;
+          return lastContact >= fiveMinutesAgo;
+        });
+      } else if (status === 'offline') {
+        devices = devices.filter(d => {
+          const lastContact = d._lastInform ? new Date(d._lastInform).getTime() : 0;
+          return lastContact < fiveMinutesAgo;
+        });
+      }
+    }
+    
+    if (lastContactMin || lastContactMax) {
+      const minTime = lastContactMin ? new Date(lastContactMin).getTime() : 0;
+      const maxTime = lastContactMax ? new Date(lastContactMax).getTime() : Date.now();
+      
+      devices = devices.filter(d => {
+        const lastContact = d._lastInform ? new Date(d._lastInform).getTime() : 0;
+        return lastContact >= minTime && lastContact <= maxTime;
+      });
+    }
+    
+    if (locationRadius && locationLat && locationLon) {
+      const radiusKm = parseFloat(locationRadius);
+      const lat = parseFloat(locationLat);
+      const lon = parseFloat(locationLon);
+      
+      devices = devices.filter(d => {
+        if (!d.Location || !d.Location._value) return false;
+        
+        const coords = d.Location._value.split(',').map(parseFloat);
+        if (coords.length !== 2) return false;
+        
+        const [deviceLat, deviceLon] = coords;
+        const distance = getDistance(lat, lon, deviceLat, deviceLon);
+        
+        return distance <= radiusKm;
+      });
+    }
+    
+    if (tags && Array.isArray(tags)) {
+      devices = devices.filter(d => {
+        const deviceTags = d.tags || [];
+        return tags.some(tag => deviceTags.includes(tag));
+      });
+    }
+    
+    if (search) {
+      const searchLower = search.toLowerCase();
+      devices = devices.filter(d => 
+        d._id?.toLowerCase().includes(searchLower) ||
+        d.manufacturer?.toLowerCase().includes(searchLower) ||
+        d.model?.toLowerCase().includes(searchLower) ||
+        d.serialNumber?.toLowerCase().includes(searchLower) ||
+        d._customerName?.toLowerCase().includes(searchLower)
+      );
+    }
+    
+    res.json({
+      success: true,
+      devices: devices,
+      count: devices.length
+    });
+  } catch (error) {
+    console.error('[TR069 API] Failed to get filtered devices:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get filtered devices',
+      details: error.message
+    });
+  }
+});
+
+// Helper function to calculate distance between coordinates
+function getDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371; // Earth's radius in km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+            Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
 // DELETE /api/tr069/devices - Delete all devices for a tenant (admin/cleanup)
 router.delete('/devices', async (req, res) => {
   try {

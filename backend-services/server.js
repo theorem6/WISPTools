@@ -154,6 +154,15 @@ console.log('⚠️ Ping monitoring service DISABLED - cloud backend should not 
 console.log('   → Ping monitoring runs ONLY on remote EPC/SNMP agents');
 console.log('   → Backend only receives and stores metrics from remote agents');
 
+// Start ACS Alert Service
+try {
+  const acsAlertService = require('./services/acs-alert-service');
+  acsAlertService.start(60000); // Check every minute
+  console.log('✅ ACS Alert Service started');
+} catch (error) {
+  console.error('❌ Failed to start ACS Alert Service:', error);
+}
+
 // EPC management routes (includes delete endpoint)
 app.use('/api/epc-management', require('./routes/epc-management'));
 app.use('/api/deploy', require('./routes/epc-deployment'));
