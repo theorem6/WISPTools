@@ -585,6 +585,13 @@ router.post('/devices/:id/test-connection', async (req, res) => {
       return res.status(400).json({ error: 'Missing connection details (ip, username, password)' });
     }
 
+    if (!mikrotikManager) {
+      return res.status(503).json({ 
+        error: 'Mikrotik management not available',
+        message: 'node-routeros module is not installed. Install it to enable Mikrotik management.'
+      });
+    }
+
     const connection = await mikrotikManager.createConnection({
       host: ipAddress,
       user: resolvedUsername,
