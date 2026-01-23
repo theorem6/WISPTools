@@ -729,55 +729,54 @@ router.post('/bulk-tasks', async (req, res) => {
     // Handle preset application
     if (action === 'applyPreset' && presetId) {
       // Get preset from MongoDB (GenieACS database)
-      const { MongoClient } = require('mongodb');
-      const mongoUrl = process.env.MONGODB_URI || 'mongodb+srv://genieacs-user:fg2E8I10Pnx58gYP@cluster0.1radgkw.mongodb.net/genieacs?retryWrites=true&w=majority&appName=Cluster0';
-      const client = new MongoClient(mongoUrl);
-      await client.connect();
-      const db = client.db('genieacs');
-      
-      // Find preset with tenant filter
-      const preset = await db.collection('presets').findOne({ 
-        _id: presetId,
-        $or: [
-          { _tenantId: req.tenantId },
-          { _tenantId: { $exists: false } } // Legacy presets without tenant
-        ]
-      });
-      
-      if (!preset) {
-        await client.close();
-        return res.status(404).json({ success: false, error: 'Preset not found' });
-      }
-      
-      // Apply preset configurations to each device
-      for (const deviceId of deviceIds) {
-        try {
-          for (const config of preset.configurations || []) {
-            const taskPayload = {
-              device: deviceId,
-              name: 'setParameterValues',
-              parameter: config.path || config.name,
-              value: config.value
-            };
-            
-            const response = await fetch(tasksEndpoint, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(taskPayload)
-            });
-            
-            if (!response.ok) {
-              throw new Error(`Failed to apply preset config: ${response.status}`);
-            }
-          }
-          results.success++;
-        } catch (error) {
-          results.failed++;
-          results.errors.push({ deviceId, error: error.message });
+      let presetClient;
+      try {
+        const { client, db } = await getGenieACSMongoDB();
+        presetClient = client;
+        
+        // Find preset with tenant filter
+        const preset = await db.collection('presets').findOne({ 
+          _id: presetId,
+          $or: [
+            { _tenantId: req.tenantId },
+            { _tenantId: { $exists: false } } // Legacy presets without tenant
+          ]
+        });
+        
+        if (!preset) {
+          await presetClient.close();
+          return res.status(404).json({ success: false, error: 'Preset not found' });
         }
-      }
-      
-      await client.close();
+        
+        // Apply preset configurations to each device
+        for (const deviceId of deviceIds) {
+          try {
+            for (const config of preset.configurations || []) {
+              const taskPayload = {
+                device: deviceId,
+                name: 'setParameterValues',
+                parameter: config.path || config.name,
+                value: config.value
+              };
+              
+              const response = await fetch(tasksEndpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(taskPayload)
+              });
+              
+              if (!response.ok) {
+                throw new Error(`Failed to apply preset config: ${response.status}`);
+              }
+            }
+            results.success++;
+          } catch (error) {
+            results.failed++;
+            results.errors.push({ deviceId, error: error.message });
+          }
+        }
+        
+        await presetClient.close();
     } else {
       // Handle standard bulk actions
       for (const deviceId of deviceIds) {
