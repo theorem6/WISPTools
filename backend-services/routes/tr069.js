@@ -4,6 +4,23 @@ const { Tenant } = require('../models/tenant');
 
 const router = express.Router();
 
+// Helper function to get GenieACS MongoDB connection
+async function getGenieACSMongoDB() {
+  const { MongoClient } = require('mongodb');
+  // Use GenieACS MongoDB URI from env, or construct from main MONGODB_URI
+  let mongoUrl = process.env.GENIEACS_MONGODB_URI;
+  if (!mongoUrl) {
+    // Construct GenieACS URI from main MONGODB_URI by changing database name
+    const mainUri = process.env.MONGODB_URI || 'mongodb+srv://genieacs-user:Aezlf1N3Z568EwL9@cluster0.1radgkw.mongodb.net/hss_management?retryWrites=true&w=majority&appName=Cluster0';
+    const uriObj = new URL(mainUri);
+    uriObj.pathname = '/genieacs';
+    mongoUrl = uriObj.toString();
+  }
+  const client = new MongoClient(mongoUrl);
+  await client.connect();
+  return { client, db: client.db('genieacs') };
+}
+
 // Middleware to extract tenant ID
 const requireTenant = (req, res, next) => {
   const tenantId = req.headers['x-tenant-id'];
@@ -811,12 +828,10 @@ router.post('/bulk-tasks', async (req, res) => {
 
 // GET /api/tr069/presets - Get all presets for tenant
 router.get('/presets', async (req, res) => {
+  let client;
   try {
-    const { MongoClient } = require('mongodb');
-    const mongoUrl = process.env.MONGODB_URI || 'mongodb+srv://genieacs-user:fg2E8I10Pnx58gYP@cluster0.1radgkw.mongodb.net/genieacs?retryWrites=true&w=majority&appName=Cluster0';
-    const client = new MongoClient(mongoUrl);
-    await client.connect();
-    const db = client.db('genieacs');
+    const { client: mongoClient, db } = await getGenieACSMongoDB();
+    client = mongoClient;
     
     // Get presets for this tenant (or global presets without tenant)
     const presets = await db.collection('presets')
@@ -838,6 +853,13 @@ router.get('/presets', async (req, res) => {
     });
   } catch (error) {
     console.error('[TR069 API] Failed to get presets:', error);
+    if (client) {
+      try {
+        await client.close();
+      } catch (e) {
+        // Ignore close errors
+      }
+    }
     res.status(500).json({
       success: false,
       error: 'Failed to get presets',
@@ -858,11 +880,7 @@ router.post('/presets', async (req, res) => {
       });
     }
     
-    const { MongoClient } = require('mongodb');
-    const mongoUrl = process.env.MONGODB_URI || 'mongodb+srv://genieacs-user:fg2E8I10Pnx58gYP@cluster0.1radgkw.mongodb.net/genieacs?retryWrites=true&w=majority&appName=Cluster0';
-    const client = new MongoClient(mongoUrl);
-    await client.connect();
-    const db = client.db('genieacs');
+    const { client, db } = await getGenieACSMongoDB();
     
     // Generate preset ID from name
     const presetId = presetData.name
