@@ -777,6 +777,20 @@ router.post('/bulk-tasks', async (req, res) => {
         }
         
         await presetClient.close();
+      } catch (error) {
+        if (presetClient) {
+          try {
+            await presetClient.close();
+          } catch (e) {
+            // Ignore close errors
+          }
+        }
+        return res.status(500).json({ 
+          success: false, 
+          error: 'Failed to load preset', 
+          details: error.message 
+        });
+      }
     } else {
       // Handle standard bulk actions
       for (const deviceId of deviceIds) {
