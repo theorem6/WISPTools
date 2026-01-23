@@ -155,8 +155,10 @@ router.post('/', async (req, res) => {
       });
     }
     
-    // Generate CWMP URL
-    const cwmpUrl = `https://${finalSubdomain}.lte-pci-mapper-65450042-bbf71.us-east4.hosted.app`;
+    // Generate tenant-specific CWMP URL
+    // Format: https://wisptools.io/cwmp/{subdomain}
+    const cwmpBaseUrl = process.env.CWMP_BASE_URL || process.env.PUBLIC_CWMP_BASE_URL || 'https://wisptools.io';
+    const cwmpUrl = `${cwmpBaseUrl}/cwmp/${finalSubdomain}`;
     
     // Create tenant
     const tenant = new Tenant({

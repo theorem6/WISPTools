@@ -360,10 +360,15 @@
     selectedCPE = null;
   }
 
-  // Reactive statements for future map integration
-  // $: if (mapInstance && cpeDevices.length > 0) {
-  //   mapper.updateCPEDevices(cpeDevices);
-  // }
+  // Reactive statements for performance analytics
+  $: onlineCount = cpeDevices.filter(d => d.status === 'Online').length;
+  $: totalCount = cpeDevices.length;
+  $: uptimePercentage = totalCount > 0 ? ((onlineCount / totalCount) * 100).toFixed(0) : '0';
+
+  // Calculate average RSSI from devices (placeholder - would need actual metrics)
+  $: averageRSSI = -62.3; // Placeholder - in real implementation would calculate from device metrics
+  $: signalQuality = 94.2; // Placeholder - in real implementation would calculate from device metrics
+  $: averageUptime = '2.3h'; // Placeholder - in real implementation would calculate from device metrics
 </script>
 
 <svelte:head>
@@ -569,14 +574,89 @@
       </div>
     </div>
 
+    <!-- Performance Analytics Section -->
+    <div class="performance-analytics-section">
+      <div class="section-header">
+        <h3>📊 Performance Analytics</h3>
+        <div class="analytics-controls">
+          <select class="time-select">
+            <option value="1h">Last Hour</option>
+            <option value="6h" selected>Last 6 Hours</option>
+            <option value="24h">Last 24 Hours</option>
+            <option value="7d">Last 7 Days</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="analytics-content">
+        <!-- Performance Summary Cards -->
+        <div class="analytics-grid">
+          <div class="analytics-card">
+            <div class="analytics-icon">📶</div>
+            <div class="analytics-metric">
+              <div class="metric-value">{averageRSSI} dBm</div>
+              <div class="metric-label">Average RSSI</div>
+              <div class="metric-trend positive">↗️ +2.1 dBm</div>
+            </div>
+          </div>
+
+          <div class="analytics-card">
+            <div class="analytics-icon">📡</div>
+            <div class="analytics-metric">
+              <div class="metric-value">{onlineCount}/{totalCount}</div>
+              <div class="metric-label">Online CPEs</div>
+              <div class="metric-trend positive">{uptimePercentage}% uptime</div>
+            </div>
+          </div>
+
+          <div class="analytics-card">
+            <div class="analytics-icon">⚡</div>
+            <div class="analytics-metric">
+              <div class="metric-value">{signalQuality}%</div>
+              <div class="metric-label">Signal Quality</div>
+              <div class="metric-trend positive">↗️ +1.8%</div>
+            </div>
+          </div>
+
+          <div class="analytics-card">
+            <div class="analytics-icon">🔄</div>
+            <div class="analytics-metric">
+              <div class="metric-value">{averageUptime}</div>
+              <div class="metric-label">Avg. Uptime</div>
+              <div class="metric-trend neutral">⟷ Stable</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Performance Charts Placeholder -->
+        <div class="performance-charts">
+          <div class="chart-placeholder">
+            <div class="chart-icon">📈</div>
+            <h4>Network Performance Trends</h4>
+            <p>Aggregated performance charts across all CPE devices will be displayed here</p>
+            <div class="chart-preview">
+              <div class="chart-bars">
+                <div class="bar" style="height: 60%"></div>
+                <div class="bar" style="height: 80%"></div>
+                <div class="bar" style="height: 70%"></div>
+                <div class="bar" style="height: 90%"></div>
+                <div class="bar" style="height: 75%"></div>
+                <div class="bar" style="height: 85%"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- CPE Device List -->
     <div class="cpe-list-section">
       <div class="section-header">
         <h3>CPE Device List</h3>
         <div class="list-controls">
-          <input 
-            type="text" 
-            placeholder="Search CPE devices..." 
+          <input
+            type="text"
+            placeholder="Search CPE devices..."
             class="search-input"
           />
         </div>
@@ -1237,6 +1317,156 @@
     color: var(--text-secondary);
   }
 
+  /* Performance Analytics Styles */
+  .performance-analytics-section {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 0.5rem;
+    overflow: hidden;
+    margin-bottom: 2rem;
+  }
+
+  .analytics-content {
+    padding: 1.5rem;
+  }
+
+  .analytics-controls {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+  }
+
+  .time-select {
+    padding: 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: 0.375rem;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-size: 0.875rem;
+  }
+
+  .analytics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+
+  .analytics-card {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 0.5rem;
+    padding: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    transition: all 0.2s;
+  }
+
+  .analytics-card:hover {
+    border-color: var(--accent-color);
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.1);
+  }
+
+  .analytics-icon {
+    font-size: 2.5rem;
+    opacity: 0.8;
+  }
+
+  .analytics-metric {
+    flex: 1;
+  }
+
+  .metric-value {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 0.25rem;
+  }
+
+  .metric-label {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.25rem;
+  }
+
+  .metric-trend {
+    font-size: 0.75rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+  }
+
+  .metric-trend.positive {
+    color: #10b981;
+  }
+
+  .metric-trend.negative {
+    color: #ef4444;
+  }
+
+  .metric-trend.neutral {
+    color: var(--text-secondary);
+  }
+
+  .performance-charts {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 0.5rem;
+    padding: 2rem;
+    text-align: center;
+  }
+
+  .chart-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .chart-icon {
+    font-size: 3rem;
+    opacity: 0.6;
+  }
+
+  .chart-placeholder h4 {
+    margin: 0;
+    color: var(--text-primary);
+    font-size: 1.25rem;
+  }
+
+  .chart-placeholder p {
+    margin: 0;
+    color: var(--text-secondary);
+    max-width: 400px;
+  }
+
+  .chart-preview {
+    margin-top: 1rem;
+    width: 100%;
+    max-width: 300px;
+  }
+
+  .chart-bars {
+    display: flex;
+    align-items: end;
+    justify-content: center;
+    gap: 4px;
+    height: 60px;
+  }
+
+  .bar {
+    width: 20px;
+    background: linear-gradient(180deg, var(--accent-color) 0%, rgba(59, 130, 246, 0.6) 100%);
+    border-radius: 2px 2px 0 0;
+    transition: all 0.3s;
+  }
+
+  .bar:nth-child(2n) {
+    background: linear-gradient(180deg, #10b981 0%, rgba(16, 185, 129, 0.6) 100%);
+  }
+
   /* Responsive design */
   @media (max-width: 768px) {
     .header-content {
@@ -1259,6 +1489,22 @@
       flex-direction: column;
       gap: 1rem;
       align-items: flex-start;
+    }
+
+    .analytics-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .analytics-card {
+      padding: 1rem;
+    }
+
+    .metric-value {
+      font-size: 1.5rem;
+    }
+
+    .performance-charts {
+      padding: 1.5rem;
     }
   }
 </style>

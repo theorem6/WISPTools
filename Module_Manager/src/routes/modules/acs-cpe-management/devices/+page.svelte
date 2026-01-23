@@ -16,10 +16,61 @@
   let showActionsModal = false;
   let showParameterEditor = false;
   let editDevice: CPEDevice | null = null;
+  let selectedDevices = new Set<string>();
+  let isBulkActionInProgress = false;
+  let bulkActionMessage = '';
+  let showPresetSelectModal = false;
+  let availablePresets: any[] = [];
+  let isLoadingPresets = false;
 
   onMount(async () => {
     await loadDevices();
+    await loadPresets();
   });
+
+  async function loadPresets() {
+    if (!$currentTenant?.id) return;
+    
+    isLoadingPresets = true;
+    try {
+      const { authService } = await import('$lib/services/authService');
+      const user = authService.getCurrentUser();
+      if (!user) return;
+      
+      const token = await user.getIdToken();
+      
+      const response = await fetch('/api/tr069/presets', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'X-Tenant-ID': $currentTenant.id,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        availablePresets = data.presets || [];
+      }
+    } catch (err) {
+      console.error('Failed to load presets:', err);
+    } finally {
+      isLoadingPresets = false;
+    }
+  }
+
+  function openPresetSelectModal() {
+    if (selectedDevices.size === 0) {
+      bulkActionMessage = '⚠️ Please select at least one device';
+      setTimeout(() => bulkActionMessage = '', 3000);
+      return;
+    }
+    showPresetSelectModal = true;
+  }
+
+  async function applySelectedPreset(presetId: string) {
+    showPresetSelectModal = false;
+    await executeBulkAction('applyPreset', presetId);
+  }
 
   async function loadDevices() {
     isLoading = true;
@@ -105,6 +156,93 @@
 
   $: onlineCount = devices.filter(d => d.status === 'Online').length;
   $: offlineCount = devices.filter(d => d.status === 'Offline').length;
+  $: selectedCount = selectedDevices.size;
+  $: allSelected = filteredDevices.length > 0 && filteredDevices.every(d => selectedDevices.has(d.id));
+  $: someSelected = selectedDevices.size > 0 && !allSelected;
+
+  function toggleSelectAll() {
+    if (allSelected) {
+      selectedDevices.clear();
+    } else {
+      filteredDevices.forEach(d => selectedDevices.add(d.id));
+    }
+    selectedDevices = selectedDevices; // Trigger reactivity
+  }
+
+  function toggleSelectDevice(deviceId: string) {
+    if (selectedDevices.has(deviceId)) {
+      selectedDevices.delete(deviceId);
+    } else {
+      selectedDevices.add(deviceId);
+    }
+    selectedDevices = selectedDevices; // Trigger reactivity
+  }
+
+  async function executeBulkAction(action: 'refreshParameters' | 'reboot' | 'applyPreset', presetId?: string) {
+    if (selectedDevices.size === 0) {
+      bulkActionMessage = '⚠️ Please select at least one device';
+      setTimeout(() => bulkActionMessage = '', 3000);
+      return;
+    }
+
+    const confirmMessage = action === 'reboot' 
+      ? `Reboot ${selectedDevices.size} device(s)? This will disconnect them temporarily.`
+      : action === 'applyPreset'
+      ? `Apply preset to ${selectedDevices.size} device(s)?`
+      : `Refresh parameters for ${selectedDevices.size} device(s)?`;
+
+    if (!confirm(confirmMessage)) {
+      return;
+    }
+
+    if (!$currentTenant?.id) {
+      bulkActionMessage = '⚠️ No tenant selected';
+      setTimeout(() => bulkActionMessage = '', 3000);
+      return;
+    }
+
+    isBulkActionInProgress = true;
+    bulkActionMessage = '';
+    const deviceIds = Array.from(selectedDevices);
+
+    try {
+      const { authService } = await import('$lib/services/authService');
+      const user = authService.getCurrentUser();
+      if (!user) throw new Error('Not authenticated');
+      
+      const token = await user.getIdToken();
+      
+      const response = await fetch('/api/tr069/bulk-tasks', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'x-tenant-id': $currentTenant.id
+        },
+        body: JSON.stringify({
+          deviceIds,
+          action,
+          ...(presetId ? { presetId } : {})
+        })
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        bulkActionMessage = `✅ ${data.message || `Bulk operation completed: ${data.results.success} succeeded, ${data.results.failed} failed`}`;
+        selectedDevices.clear();
+        selectedDevices = selectedDevices;
+        await loadDevices(); // Reload to show updated status
+      } else {
+        bulkActionMessage = `❌ ${data.error || 'Bulk operation failed'}`;
+      }
+    } catch (error) {
+      console.error('Bulk operation error:', error);
+      bulkActionMessage = `❌ Error: ${error instanceof Error ? error.message : String(error)}`;
+    } finally {
+      isBulkActionInProgress = false;
+      setTimeout(() => bulkActionMessage = '', 5000);
+    }
+  }
 </script>
 
 <svelte:head>
@@ -189,11 +327,65 @@
     </div>
   </div>
 
+  <!-- Bulk Actions Bar -->
+  {#if selectedCount > 0}
+    <div class="bulk-actions-bar">
+      <div class="bulk-info">
+        <span class="bulk-count">{selectedCount}</span>
+        <span>device(s) selected</span>
+      </div>
+      <div class="bulk-buttons">
+        <button 
+          class="btn btn-secondary btn-sm" 
+          on:click={() => { selectedDevices.clear(); selectedDevices = selectedDevices; }}
+          disabled={isBulkActionInProgress}
+        >
+          Clear Selection
+        </button>
+        <button 
+          class="btn btn-primary btn-sm" 
+          on:click={() => executeBulkAction('refreshParameters')}
+          disabled={isBulkActionInProgress}
+        >
+          {isBulkActionInProgress ? 'Processing...' : '🔄 Refresh Selected'}
+        </button>
+        <button 
+          class="btn btn-warning btn-sm" 
+          on:click={() => executeBulkAction('reboot')}
+          disabled={isBulkActionInProgress}
+        >
+          {isBulkActionInProgress ? 'Processing...' : '⚡ Reboot Selected'}
+        </button>
+        <button 
+          class="btn btn-primary btn-sm" 
+          on:click={openPresetSelectModal}
+          disabled={isBulkActionInProgress || isLoadingPresets}
+        >
+          {isLoadingPresets ? 'Loading...' : '⚙️ Apply Preset'}
+        </button>
+      </div>
+      {#if bulkActionMessage}
+        <div class="bulk-message {bulkActionMessage.includes('✅') ? 'success' : bulkActionMessage.includes('⚠️') ? 'warning' : 'error'}">
+          {bulkActionMessage}
+        </div>
+      {/if}
+    </div>
+  {/if}
+
   <!-- Devices Table -->
   <div class="devices-table-container">
     <table class="devices-table">
       <thead>
         <tr>
+          <th class="col-select">
+            <input
+              type="checkbox"
+              checked={allSelected}
+              indeterminate={someSelected}
+              on:change={toggleSelectAll}
+              class="select-all-checkbox"
+            />
+          </th>
           <th class="col-expand"></th>
           <th class="col-status">Status</th>
           <th class="col-device-id">Device ID</th>
@@ -209,7 +401,7 @@
       <tbody>
         {#if isLoading}
           <tr>
-            <td colspan="10" class="loading-cell">
+            <td colspan="11" class="loading-cell">
               <div class="loading-container">
                 <div class="spinner-large"></div>
                 <p>Loading devices...</p>
@@ -218,7 +410,7 @@
           </tr>
         {:else if filteredDevices.length === 0}
           <tr>
-            <td colspan="10" class="empty-cell">
+            <td colspan="11" class="empty-cell">
               <div class="empty-state">
                 <div class="empty-icon">📱</div>
                 <h3>No devices found</h3>
@@ -231,7 +423,9 @@
             <CPEDeviceRow 
               {device}
               isExpanded={expandedDeviceId === device.id}
+              isSelected={selectedDevices.has(device.id)}
               on:toggleExpand={handleToggleExpand}
+              on:toggleSelect={(e) => toggleSelectDevice(e.detail.id)}
               on:reboot={handleReboot}
               on:factoryReset={handleFactoryReset}
               on:refresh={handleRefresh}
@@ -265,6 +459,53 @@
       loadDevices();
     }}
   />
+{/if}
+
+<!-- Preset Selection Modal -->
+{#if showPresetSelectModal}
+  <div class="modal-overlay" on:click={() => showPresetSelectModal = false}>
+    <div class="modal-content" on:click|stopPropagation>
+      <div class="modal-header">
+        <h2>Apply Preset to {selectedDevices.size} Device(s)</h2>
+        <button class="close-btn" on:click={() => showPresetSelectModal = false}>×</button>
+      </div>
+      
+      <div class="modal-body">
+        {#if isLoadingPresets}
+          <div class="loading">Loading presets...</div>
+        {:else if availablePresets.length === 0}
+          <div class="empty-state">
+            <p>No presets available. Create a preset first.</p>
+            <a href="/modules/acs-cpe-management/presets" class="btn btn-primary">Go to Presets</a>
+          </div>
+        {:else}
+          <p>Select a preset to apply to {selectedDevices.size} selected device(s):</p>
+          <div class="preset-list">
+            {#each availablePresets.filter(p => p.enabled) as preset}
+              <div class="preset-item" on:click={() => applySelectedPreset(preset._id)}>
+                <div class="preset-name">{preset.name}</div>
+                <div class="preset-description">{preset.description || 'No description'}</div>
+                <div class="preset-meta">
+                  <span>{preset.configurations?.length || 0} configurations</span>
+                  {#if preset.tags && preset.tags.length > 0}
+                    <span class="preset-tags">
+                      {#each preset.tags as tag}
+                        <span class="tag">{tag}</span>
+                      {/each}
+                    </span>
+                  {/if}
+                </div>
+              </div>
+            {/each}
+          </div>
+        {/if}
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-secondary" on:click={() => showPresetSelectModal = false}>Cancel</button>
+      </div>
+    </div>
+  </div>
 {/if}
 
 <style>
@@ -423,6 +664,198 @@
     gap: 1rem;
   }
 
+  .bulk-actions-bar {
+    padding: 1rem 2rem;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .bulk-info {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .bulk-count {
+    background: var(--accent-color);
+    color: white;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    font-size: 0.875rem;
+  }
+
+  .bulk-buttons {
+    display: flex;
+    gap: 0.5rem;
+    flex: 1;
+  }
+
+  .btn-sm {
+    padding: 0.375rem 0.75rem;
+    font-size: 0.875rem;
+  }
+
+  .btn-warning {
+    background: #f59e0b;
+    color: white;
+  }
+
+  .btn-warning:hover:not(:disabled) {
+    background: #d97706;
+  }
+
+  .bulk-message {
+    padding: 0.5rem 1rem;
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    margin-left: auto;
+  }
+
+  .bulk-message.success {
+    background: rgba(16, 185, 129, 0.15);
+    color: #10b981;
+  }
+
+  .bulk-message.warning {
+    background: rgba(245, 158, 11, 0.15);
+    color: #f59e0b;
+  }
+
+  .bulk-message.error {
+    background: rgba(239, 68, 68, 0.15);
+    color: #ef4444;
+  }
+
+  /* Preset Selection Modal Styles */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 1rem;
+  }
+
+  .modal-content {
+    background: var(--card-bg);
+    border-radius: 0.5rem;
+    width: 100%;
+    max-width: 600px;
+    max-height: 90vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+  }
+
+  .modal-header {
+    padding: 1.5rem;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .modal-header h2 {
+    margin: 0;
+    font-size: 1.25rem;
+  }
+
+  .close-btn {
+    background: none;
+    border: none;
+    font-size: 2rem;
+    line-height: 1;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 0;
+    width: 2rem;
+    height: 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.25rem;
+  }
+
+  .close-btn:hover {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+  }
+
+  .modal-body {
+    padding: 1.5rem;
+    overflow-y: auto;
+    flex: 1;
+  }
+
+  .modal-footer {
+    padding: 1.5rem;
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+  }
+
+  .preset-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-top: 1rem;
+  }
+
+  .preset-item {
+    padding: 1rem;
+    border: 1px solid var(--border-color);
+    border-radius: 0.375rem;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .preset-item:hover {
+    background: var(--bg-secondary);
+    border-color: var(--brand-primary);
+  }
+
+  .preset-name {
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+  }
+
+  .preset-description {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.5rem;
+  }
+
+  .preset-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+  }
+
+  .preset-tags {
+    display: flex;
+    gap: 0.25rem;
+  }
+
+  .preset-tags .tag {
+    background: var(--bg-tertiary);
+    padding: 0.125rem 0.5rem;
+    border-radius: 0.25rem;
+    font-size: 0.75rem;
+  }
+
   .filter-group {
     flex: 1;
   }
@@ -491,6 +924,22 @@
   }
 
   /* Column widths */
+  .col-select {
+    width: 40px;
+    text-align: center;
+  }
+
+  .select-all-checkbox,
+  .device-checkbox {
+    cursor: pointer;
+    width: 18px;
+    height: 18px;
+  }
+
+  .device-row.selected {
+    background: rgba(59, 130, 246, 0.1);
+  }
+
   .col-expand {
     width: 50px;
     text-align: center;

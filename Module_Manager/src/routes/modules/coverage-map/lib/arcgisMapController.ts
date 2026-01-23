@@ -24,6 +24,7 @@ export interface CoverageMapInitOptions {
   equipment: NetworkEquipment[];
   externalPlanFeatures?: PlanLayerFeature[];
   marketingLeads?: PlanMarketingAddress[];
+  projectOverlays?: Map<string, PlanLayerFeature[]>;
 }
 
 interface CoverageMapData {
@@ -48,6 +49,8 @@ export class CoverageMapController {
   private backhaulLayer: any = null;
   private marketingLayer: any = null;
   private planDraftLayer: any = null;
+  private projectOverlayLayer: any = null;
+  private projectOverlays: Map<string, PlanLayerFeature[]> = new Map();
   private planDraftGraphics: Map<string, any> = new Map();
   
   // Track graphics by ID for incremental updates
@@ -125,6 +128,7 @@ export class CoverageMapController {
     
     this.setPlanFeatures(options.externalPlanFeatures ?? []);
     this.marketingLeads = options.marketingLeads ?? [];
+    this.setProjectOverlays(options.projectOverlays ?? new Map());
 
     await this.initializeMap();
     
@@ -867,6 +871,22 @@ export class CoverageMapController {
     }
   }
 
+  public setProjectOverlays(overlays: Map<string, PlanLayerFeature[]>): void {
+    this.projectOverlays = overlays;
+    this.hasPerformedInitialFit = false;
+    if (this.mapReady) {
+      this.renderProjectOverlays()
+        .then(() => {
+          // Fit to project overlays if they exist and no other content
+          if (this.projectOverlays.size > 0 && this.getTotalFeatureCount() === this.getProjectOverlayCount()) {
+            return this.fitMapToVisibleGraphics(true);
+          }
+          return this.fitMapToVisibleGraphics();
+        })
+        .catch(err => console.error('[CoverageMap] Project overlay render error:', err));
+    }
+  }
+
   public setMarketingLeads(leads: PlanMarketingAddress[]): void {
     const previousCount = this.marketingLeads.length;
     const incomingLeads = Array.isArray(leads) ? [...leads] : [];
@@ -1137,17 +1157,18 @@ export class CoverageMapController {
     this.graphicsLayer = new GraphicsLayer({ title: 'Network Assets', listMode: 'show' });
     this.marketingLayer = new GraphicsLayer({ title: 'Marketing Addresses', listMode: 'show' });
     this.planDraftLayer = new GraphicsLayer({ title: 'Plan Features', listMode: 'show' });
+    this.projectOverlayLayer = new GraphicsLayer({ title: 'Project Overlays', listMode: 'show' });
 
     try {
       this.map = new Map({
         basemap: this.currentBasemap,
-        layers: [this.backhaulLayer, this.graphicsLayer, this.marketingLayer, this.planDraftLayer]
+        layers: [this.backhaulLayer, this.graphicsLayer, this.marketingLayer, this.planDraftLayer, this.projectOverlayLayer]
       });
     } catch (basemapError) {
       console.warn('Failed to load basemap, trying fallback...', basemapError);
       this.map = new Map({
         basemap: 'gray-vector',
-        layers: [this.backhaulLayer, this.graphicsLayer, this.marketingLayer, this.planDraftLayer]
+        layers: [this.backhaulLayer, this.graphicsLayer, this.marketingLayer, this.planDraftLayer, this.projectOverlayLayer]
       });
       this.currentBasemap = 'gray-vector';
     }
@@ -2622,11 +2643,204 @@ export class CoverageMapController {
     }
   }
 
+  private async renderProjectOverlays(): Promise<void> {
+    if (!this.projectOverlayLayer || !this.mapView) return;
+
+    try {
+      // Clear existing project overlay graphics
+      this.projectOverlayLayer.removeAll();
+
+      if (!this.projectOverlays || this.projectOverlays.size === 0) {
+        return;
+      }
+
+      const [
+        { default: Graphic },
+        { default: Point },
+        { default: SimpleMarkerSymbol },
+        { default: SimpleFillSymbol },
+        { default: Polyline },
+        { default: Polygon }
+      ] = await Promise.all([
+        import('@arcgis/core/Graphic.js'),
+        import('@arcgis/core/geometry/Point.js'),
+        import('@arcgis/core/symbols/SimpleMarkerSymbol.js'),
+        import('@arcgis/core/symbols/SimpleFillSymbol.js'),
+        import('@arcgis/core/geometry/Polyline.js'),
+        import('@arcgis/core/geometry/Polygon.js')
+      ]);
+
+      // Render features from all visible projects
+      for (const [projectId, features] of this.projectOverlays.entries()) {
+        const projectInfo = Array.from(this.projectOverlays.keys()).find(id => id === projectId);
+        if (!projectInfo) continue;
+
+        for (const feature of features) {
+          const normalized = this.normalizePlanFeature(feature);
+          const color = '#10b981'; // Green for project overlays
+          const status = normalized.status || 'overlay';
+
+          let esriGeometry: any = null;
+          try {
+            esriGeometry = this.planGeometryToEsriGeometry(normalized.geometry);
+          } catch (geomError) {
+            console.warn('[CoverageMap] Failed to convert project overlay geometry:', geomError);
+            continue;
+          }
+
+          if (!esriGeometry) continue;
+
+          const label = normalized.properties?.name ||
+                       normalized.properties?.label ||
+                       `${normalized.featureType} (${status})`;
+
+          if (esriGeometry.type === 'point') {
+            const symbol = new SimpleMarkerSymbol({
+              style: 'circle',
+              color,
+              size: '14px',
+              outline: {
+                color: 'white',
+                width: 2
+              }
+            });
+
+            const attributes = {
+              id: normalized.id,
+              projectId,
+              featureType: normalized.featureType,
+              type: `project-${normalized.featureType}`,
+              status,
+              name: label,
+              isProjectOverlay: true,
+              properties: normalized.properties ?? {}
+            };
+
+            const graphic = new Graphic({
+              geometry: esriGeometry,
+              symbol,
+              attributes,
+              popupTemplate: {
+                title: `${label} (Project Overlay)`,
+                content: `Type: ${normalized.featureType}<br>Status: ${status}<br>Project: ${projectId}`
+              }
+            });
+
+            this.projectOverlayLayer!.add(graphic);
+          } else if (esriGeometry.type === 'polyline') {
+            const symbol = {
+              type: 'simple-line',
+              color,
+              width: 3,
+              style: 'solid'
+            };
+
+            const attributes = {
+              id: normalized.id,
+              projectId,
+              featureType: normalized.featureType,
+              type: `project-${normalized.featureType}`,
+              status,
+              name: label,
+              isProjectOverlay: true,
+              properties: normalized.properties ?? {}
+            };
+
+            const graphic = new Graphic({
+              geometry: esriGeometry,
+              symbol,
+              attributes,
+              popupTemplate: {
+                title: `${label} (Project Overlay)`,
+                content: `Type: ${normalized.featureType}<br>Status: ${status}<br>Project: ${projectId}`
+              }
+            });
+
+            this.projectOverlayLayer!.add(graphic);
+          } else if (esriGeometry.type === 'polygon') {
+            const symbol = new SimpleFillSymbol({
+              color: `${color}30`,
+              outline: {
+                color,
+                width: 2
+              }
+            });
+
+            const attributes = {
+              id: normalized.id,
+              projectId,
+              featureType: normalized.featureType,
+              type: `project-${normalized.featureType}`,
+              status,
+              name: label,
+              isProjectOverlay: true,
+              properties: normalized.properties ?? {}
+            };
+
+            const graphic = new Graphic({
+              geometry: esriGeometry,
+              symbol,
+              attributes,
+              popupTemplate: {
+                title: `${label} (Project Overlay)`,
+                content: `Type: ${normalized.featureType}<br>Status: ${status}<br>Project: ${projectId}`
+              }
+            });
+
+            this.projectOverlayLayer!.add(graphic);
+          }
+        }
+      }
+
+      console.log(`[CoverageMap] Rendered project overlays for ${this.projectOverlays.size} projects`);
+    } catch (err) {
+      console.error('[CoverageMap] Failed to render project overlays:', err);
+    }
+  }
+
+  private getProjectOverlayCount(): number {
+    let count = 0;
+    for (const features of this.projectOverlays.values()) {
+      count += features.length;
+    }
+    return count;
+  }
+
+  private planGeometryToEsriGeometry(geometry: any): any {
+    if (!geometry) return null;
+
+    if (typeof geometry.longitude === 'number' && typeof geometry.latitude === 'number') {
+      return {
+        type: 'point',
+        longitude: geometry.longitude,
+        latitude: geometry.latitude,
+        spatialReference: { wkid: 4326 }
+      };
+    }
+
+    if (geometry.type === 'LineString' && Array.isArray(geometry.coordinates)) {
+      return {
+        type: 'polyline',
+        paths: [geometry.coordinates],
+        spatialReference: { wkid: 4326 }
+      };
+    }
+
+    if (geometry.type === 'Polygon' && Array.isArray(geometry.coordinates)) {
+      return {
+        type: 'polygon',
+        rings: geometry.coordinates,
+        spatialReference: { wkid: 4326 }
+      };
+    }
+
+    return null;
+  }
 
   private filterSectorsByBand(allSectors: Sector[]): Sector[] {
     if (!allSectors || !Array.isArray(allSectors)) return [];
     if (!this.filters.bandFilters || !Array.isArray(this.filters.bandFilters)) return allSectors;
-    
+
     const activeBandFilters = this.filters.bandFilters.filter(f => f.enabled);
     if (activeBandFilters.length === 0) return allSectors;
 

@@ -12,6 +12,7 @@
   export let filters: CoverageMapFilters;
   export let externalPlanFeatures: PlanLayerFeature[] = [];
   export let marketingLeads: PlanMarketingAddress[] = [];
+  export let projectOverlays: Map<string, PlanLayerFeature[]> = new Map();
 
   const dispatch = createEventDispatcher();
 
@@ -46,7 +47,8 @@
       cpeDevices,
       equipment,
       externalPlanFeatures,
-      marketingLeads
+      marketingLeads,
+      projectOverlays
     });
     mapView = view;
     
@@ -85,7 +87,7 @@
     const sectorsChanged = !arraysEqual(sectors, lastSectors, (s) => String(s.id || s._id));
     const cpeChanged = !arraysEqual(cpeDevices, lastCPEDevices, (c) => String(c.id || c._id));
     const equipmentChanged = !arraysEqual(equipment, lastEquipment, (e) => String(e.id || e._id));
-    
+
     if (towersChanged || sectorsChanged || cpeChanged || equipmentChanged) {
       controller.setData({ towers, sectors, cpeDevices, equipment });
       lastTowers = towers;
@@ -93,6 +95,11 @@
       lastCPEDevices = cpeDevices;
       lastEquipment = equipment;
     }
+  }
+
+  // Update project overlays when they change
+  $: if (controller && projectOverlays) {
+    controller.setProjectOverlays(projectOverlays);
   }
   
   $: controller && controller.setFilters(filters);

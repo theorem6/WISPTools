@@ -165,6 +165,12 @@ import { iframeCommunicationService } from '$lib/services/iframeCommunicationSer
   $: mapState = $mapContext;
   $: mapMode = mapState?.mode ?? 'deploy';
 
+  // Update project overlays when they change
+  $: if (mapState?.visibleProjects && mapState?.projectOverlays) {
+    // The SharedMap component automatically sends updates to iframe when mapState changes
+    console.log('[Deploy] Project overlays updated:', mapState.visibleProjects.length, 'projects');
+  }
+
   $: {
     const tenantRole = $currentTenant?.userRole;
     const normalizedRole: 'admin' | 'operator' | 'viewer' = tenantRole === 'viewer'
@@ -718,12 +724,13 @@ import { iframeCommunicationService } from '$lib/services/iframeCommunicationSer
       visiblePlanIds = new Set(
         allProjects.filter(p => p.showOnMap).map(p => p.id)
       );
-      
+
       await mapLayerManager.loadProductionHardware(finalTenantId);
-      // Load first activated plan (any status) or first approved plan
-      const planToLoad = allProjects.find(p => p.showOnMap) || approvedPlans[0];
-      if (planToLoad) {
-        await mapLayerManager.loadPlan(finalTenantId, planToLoad);
+
+      // Load project overlays for all visible projects
+      const visibleProjects = allProjects.filter(p => p.showOnMap);
+      if (visibleProjects.length > 0) {
+        await mapLayerManager.loadVisibleProjects(finalTenantId, visibleProjects);
       }
       
       // Load deployed hardware count - validate tenantId again before making the call
@@ -873,20 +880,12 @@ import { iframeCommunicationService } from '$lib/services/iframeCommunicationSer
     try {
       isLoadingPlans = true;
       
-      // First, deactivate all other plans (set showOnMap to false)
-      const otherPlans = readyPlans.filter(p => p.id !== plan.id && p.showOnMap);
-      for (const otherPlan of otherPlans) {
-        await planService.updatePlan(otherPlan.id, { showOnMap: false });
-      }
-      
-      // Then activate the selected plan
+      // Show project overlay using new MapLayerManager method
+      await mapLayerManager.showProjectOverlay(plan);
       await planService.updatePlan(plan.id, { showOnMap: true });
-      
-      // Load the plan on the map (works for any plan status)
-      await mapLayerManager.loadPlan(tenantId, plan);
-      
-      // Update visible plan IDs - only the activated plan
-      visiblePlanIds = new Set([plan.id]);
+
+      // Update visible plan IDs - add to the set (multiple projects can be visible)
+      visiblePlanIds.add(plan.id);
       
       // Reload plans to update state
       await loadReadyPlans();
@@ -910,32 +909,13 @@ import { iframeCommunicationService } from '$lib/services/iframeCommunicationSer
     try {
       isLoadingPlans = true;
       
-      // Deactivate the plan
+      // Hide project overlay using new MapLayerManager method
+      await mapLayerManager.hideProjectOverlay(plan.id);
       await planService.updatePlan(plan.id, { showOnMap: false });
-      
+
       // Remove from visible plans
       visiblePlanIds.delete(plan.id);
       visiblePlanIds = new Set(visiblePlanIds);
-      
-      // If this was the active plan on the map, clear planned objects
-      if (mapState?.activePlan?.id === plan.id) {
-        // Clear the plan and staged features from the map (planned objects)
-        // Keep production hardware (deployed objects) visible
-        setMapData({
-          activePlan: null,
-          stagedFeatures: [],
-          stagedSummary: { total: 0, byType: {}, byStatus: {} }
-        });
-        
-        // Try to load another active plan, or just show production hardware
-        const nextActivePlan = readyPlans.find(p => p.showOnMap && p.id !== plan.id);
-        if (nextActivePlan) {
-          await mapLayerManager.loadPlan(tenantId, nextActivePlan);
-        } else {
-          // Ensure production hardware is loaded (deployed objects persist)
-          await mapLayerManager.loadProductionHardware(tenantId);
-        }
-      }
       
       // Reload plans to update state
       await loadReadyPlans();

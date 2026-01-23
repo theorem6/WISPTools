@@ -17,6 +17,8 @@
 
   // Editable settings
   let settings: TenantSettings | null = null;
+  let cwmpUrl = '';
+  let genieacsApiUrl = '';
 
   onMount(async () => {
     if (!browser) return;
@@ -52,6 +54,17 @@
 
         // Initialize settings
         settings = { ...tenant.settings };
+        
+        // Load TR069 configuration to get latest CWMP URL
+        const { apiService } = await import('$lib/services/apiService');
+        const configResult = await apiService.getTR069Config();
+        if (configResult.success && configResult.data?.config) {
+          cwmpUrl = configResult.data.config.cwmpUrl || tenant.cwmpUrl || '';
+          genieacsApiUrl = configResult.data.config.genieacsApiUrl || '';
+        } else {
+          // Fallback to tenant's stored CWMP URL
+          cwmpUrl = tenant.cwmpUrl || '';
+        }
       } catch (err: any) {
         error = err.message || 'Failed to load tenant';
       } finally {
@@ -294,9 +307,29 @@
               <div class="credential-display">
                 <h4>Device Configuration:</h4>
                 <div class="config-item">
-                  <strong>ACS URL:</strong>
-                  <code>{tenant?.cwmpUrl || 'Loading...'}</code>
+                  <strong>ACS URL (CWMP):</strong>
+                  <code class="cwmp-url">{cwmpUrl || tenant?.cwmpUrl || 'Loading...'}</code>
+                  {#if cwmpUrl || tenant?.cwmpUrl}
+                    <button 
+                      class="copy-btn"
+                      on:click={() => {
+                        const url = cwmpUrl || tenant?.cwmpUrl || '';
+                        navigator.clipboard?.writeText(url);
+                        success = 'CWMP URL copied to clipboard!';
+                        setTimeout(() => success = '', 3000);
+                      }}
+                      title="Copy CWMP URL"
+                    >
+                      📋 Copy
+                    </button>
+                  {/if}
                 </div>
+                {#if genieacsApiUrl}
+                  <div class="config-item">
+                    <strong>GenieACS NBI API:</strong>
+                    <code>{genieacsApiUrl}</code>
+                  </div>
+                {/if}
                 {#if settings.requireAuth}
                   <div class="config-item">
                     <strong>Username:</strong>
@@ -599,6 +632,7 @@
     align-items: center;
     padding: 0.75rem;
     border-bottom: 1px solid var(--border-color);
+    gap: 0.75rem;
   }
 
   .config-item:last-child {
@@ -608,15 +642,39 @@
   .config-item strong {
     color: var(--text-secondary);
     font-size: 0.875rem;
+    min-width: 150px;
   }
 
   .config-item code {
+    flex: 1;
     background: var(--bg-secondary);
-    padding: 0.25rem 0.75rem;
+    padding: 0.5rem 0.75rem;
     border-radius: 0.25rem;
     font-family: 'Courier New', monospace;
     font-size: 0.875rem;
     color: var(--brand-primary);
+    word-break: break-all;
+  }
+
+  .config-item code.cwmp-url {
+    font-weight: 600;
+  }
+
+  .copy-btn {
+    padding: 0.5rem 1rem;
+    background: var(--brand-primary);
+    color: white;
+    border: none;
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+
+  .copy-btn:hover {
+    background: var(--brand-primary-hover);
+    transform: translateY(-1px);
   }
 
   .no-auth {

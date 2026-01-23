@@ -9,7 +9,6 @@
   import TR069SINRChart from '../components/TR069SINRChart.svelte';
   import TR069UptimeChart from '../components/TR069UptimeChart.svelte';
   import LTEKPICards from '../components/LTEKPICards.svelte';
-  import { generateTR069MetricsHistory, type TR069CellularMetrics } from '../lib/tr069MetricsService';
   import { getCurrentLTEKPIs, type LTEKPIs } from '../lib/lteMetricsService';
   import { loadCPEDevices, type CPEDevice } from '../lib/cpeDataService';
   import { currentTenant } from '$lib/stores/tenantStore';
@@ -57,22 +56,40 @@
       console.log(`Loading TR-069 metrics for device: ${selectedDeviceId}`);
       
       const hours = timeRange === '1h' ? 1 : timeRange === '6h' ? 6 : timeRange === '24h' ? 24 : 168;
-      if ($currentTenant?.id) {
-        const response = await fetch(`/api/tr069/metrics?deviceId=${selectedDeviceId}&hours=${hours}`, {
-          headers: {
-            'Content-Type': 'application/json',
-            'x-tenant-id': $currentTenant.id
-          }
-        });
-        const data = await response.json();
-        if (response.ok && data?.metrics) {
-          metrics = data.metrics;
-        } else {
-          metrics = generateTR069MetricsHistory(hours, selectedDeviceId);
-        }
-      } else {
-        metrics = generateTR069MetricsHistory(hours, selectedDeviceId);
+      
+      if (!$currentTenant?.id) {
+        console.error('No tenant selected');
+        metrics = [];
+        return;
       }
+      
+      // Get auth token
+      const { authService } = await import('$lib/services/authService');
+      const user = authService.getCurrentUser();
+      if (!user) {
+        throw new Error('Not authenticated');
+      }
+      
+      const token = await user.getIdToken();
+      
+      const response = await fetch(`/api/tr069/metrics?deviceId=${selectedDeviceId}&hours=${hours}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'X-Tenant-ID': $currentTenant.id,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok && data?.success && data?.metrics) {
+        console.log(`✅ Loaded ${data.metrics.length} real metrics from GenieACS`);
+        metrics = data.metrics;
+      } else {
+        console.warn('⚠️ No metrics available from GenieACS - device may not have reported data yet');
+        metrics = []; // Return empty array instead of fake data
+      }
+      
       kpis = getCurrentLTEKPIs();
       lastUpdate = new Date();
       
@@ -80,6 +97,7 @@
       selectedDevice = cpeDevices.find(d => d.id === selectedDeviceId) || null;
     } catch (error) {
       console.error('Failed to load TR-069 metrics:', error);
+      metrics = []; // Return empty array on error
     } finally {
       isLoading = false;
     }

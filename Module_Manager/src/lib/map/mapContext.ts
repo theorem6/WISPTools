@@ -10,6 +10,8 @@ export interface MapLayerState {
   stagedFeatures: PlanLayerFeature[];
   stagedSummary: PlanFeatureSummary;
   productionHardware: HardwareView[];
+  visibleProjects: PlanProject[];
+  projectOverlays: Map<string, PlanLayerFeature[]>;
   isLoading: boolean;
   lastUpdated: Date | null;
   error?: string;
@@ -22,6 +24,8 @@ const createDefaultState = (mode: MapModuleMode): MapLayerState => ({
   stagedFeatures: [],
   stagedSummary: { total: 0, byType: {}, byStatus: {} },
   productionHardware: [],
+  visibleProjects: [],
+  projectOverlays: new Map(),
   isLoading: false,
   lastUpdated: null
 });
@@ -32,7 +36,9 @@ export function setMapMode(mode: MapModuleMode) {
   mapContextStore.update(state => ({
     ...createDefaultState(mode),
     activePlan: state.activePlan,
-    productionHardware: state.productionHardware
+    productionHardware: state.productionHardware,
+    visibleProjects: state.visibleProjects,
+    projectOverlays: state.projectOverlays
   }));
 }
 

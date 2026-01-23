@@ -21,6 +21,8 @@ export interface MapLayerManagerState {
   summary: PlanFeatureSummary;
   isLoading: boolean;
   error?: string;
+  visibleProjects: PlanProject[];
+  projectOverlays: Map<string, PlanLayerFeature[]>;
 }
 
 const createState = (mode: MapModuleMode): MapLayerManagerState => ({
@@ -30,7 +32,9 @@ const createState = (mode: MapModuleMode): MapLayerManagerState => ({
   productionHardware: [],
   stagedFeatures: [],
   summary: { total: 0, byType: {}, byStatus: {} },
-  isLoading: false
+  isLoading: false,
+  visibleProjects: [],
+  projectOverlays: new Map()
 });
 
 export class MapLayerManager {
@@ -40,6 +44,100 @@ export class MapLayerManager {
   constructor(mode: MapModuleMode = 'plan') {
     this.stateStore = writable(createState(mode));
     setMapMode(mode);
+  }
+
+  // Project overlay methods for deploy module
+  async loadProjectOverlay(tenantId: string, project: PlanProject): Promise<PlanLayerFeature[]> {
+    try {
+      const { features } = await planService.getPlanFeatures(project.id);
+      const processedFeatures = features.map(feature => ({
+        ...feature,
+        properties: {
+          ...feature.properties,
+          projectId: project.id,
+          projectName: project.name,
+          overlay: true
+        }
+      }));
+
+      this.updateState(state => {
+        const newOverlays = new Map(state.projectOverlays);
+        newOverlays.set(project.id, processedFeatures);
+        return { projectOverlays: newOverlays };
+      });
+
+      // Update map data for overlay
+      setMapData({
+        projectOverlays: this.getSnapshot().projectOverlays
+      });
+
+      return processedFeatures;
+    } catch (error) {
+      console.error(`Failed to load project overlay for ${project.name}:`, error);
+      return [];
+    }
+  }
+
+  async showProjectOverlay(project: PlanProject): Promise<void> {
+    const current = this.getSnapshot();
+
+    if (!current.visibleProjects.find(p => p.id === project.id)) {
+      const features = await this.loadProjectOverlay(project.tenantId, project);
+
+      this.updateState(state => ({
+        visibleProjects: [...state.visibleProjects, project],
+        projectOverlays: new Map(state.projectOverlays).set(project.id, features)
+      }));
+
+      setMapData({
+        visibleProjects: [...current.visibleProjects, project],
+        projectOverlays: this.getSnapshot().projectOverlays
+      });
+    }
+  }
+
+  async hideProjectOverlay(projectId: string): Promise<void> {
+    const current = this.getSnapshot();
+
+    this.updateState(state => ({
+      visibleProjects: state.visibleProjects.filter(p => p.id !== projectId),
+      projectOverlays: (() => {
+        const newOverlays = new Map(state.projectOverlays);
+        newOverlays.delete(projectId);
+        return newOverlays;
+      })()
+    }));
+
+    setMapData({
+      visibleProjects: current.visibleProjects.filter(p => p.id !== projectId),
+      projectOverlays: this.getSnapshot().projectOverlays
+    });
+  }
+
+  async loadVisibleProjects(tenantId: string, projects: PlanProject[]): Promise<void> {
+    this.updateState({ isLoading: true });
+
+    try {
+      const overlayPromises = projects.map(project => this.loadProjectOverlay(tenantId, project));
+      await Promise.all(overlayPromises);
+
+      this.updateState(state => ({
+        visibleProjects: projects,
+        isLoading: false
+      }));
+
+      setMapData({
+        visibleProjects: projects,
+        projectOverlays: this.getSnapshot().projectOverlays,
+        isLoading: false
+      });
+    } catch (error) {
+      this.updateState({
+        isLoading: false,
+        error: 'Failed to load project overlays'
+      });
+      setMapError('Failed to load project overlays');
+    }
   }
 
   subscribe(run: (value: MapLayerManagerState) => void) {

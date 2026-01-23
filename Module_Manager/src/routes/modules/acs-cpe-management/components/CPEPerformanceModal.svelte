@@ -6,7 +6,6 @@
   import TR069PCIChart from './TR069PCIChart.svelte';
   import TR069EARFCNChart from './TR069EARFCNChart.svelte';
   import { 
-    generateTR069MetricsHistory, 
     getRSSIQuality,
     getRSRPQuality,
     getSINRQuality,
@@ -14,6 +13,7 @@
     type TR069CellularMetrics 
   } from '../lib/tr069MetricsService';
   import { currentTenant } from '$lib/stores/tenantStore';
+  import { customerService } from '$lib/services/customerService';
   
   export let device: any = null;
   export let show: boolean = false;
@@ -22,32 +22,57 @@
   
   let deviceMetrics: TR069CellularMetrics[] = [];
   let currentSignal = { rssi: -65, rsrp: -75, rsrq: -10, sinr: 15, pci: 156, earfcn: 5230, uptime: 0 };
+  let linkedCustomer: any = null;
+  let showCustomerLinkModal = false;
+  let customerSearchTerm = '';
+  let searchResults: any[] = [];
+  let isSearchingCustomers = false;
+  let isLinkingCustomer = false;
+  let customerLinkError = '';
+  let customerLinkSuccess = '';
 
   $: if (show && device) {
     loadDeviceMetrics();
+    loadLinkedCustomer();
   }
 
   async function loadDeviceMetrics() {
-    if ($currentTenant?.id) {
-      try {
-        const response = await fetch(`/api/tr069/device-metrics?deviceId=${device.id}&hours=6`, {
-          headers: {
-            'Content-Type': 'application/json',
-            'x-tenant-id': $currentTenant.id
-          }
-        });
-        const data = await response.json();
-        if (response.ok && data?.metrics) {
-          deviceMetrics = data.metrics;
-        } else {
-          deviceMetrics = generateTR069MetricsHistory(6, device.id);
-        }
-      } catch (error) {
-        console.error('Failed to load device metrics:', error);
-        deviceMetrics = generateTR069MetricsHistory(6, device.id);
+    if (!$currentTenant?.id) {
+      console.error('No tenant selected');
+      deviceMetrics = [];
+      return;
+    }
+    
+    try {
+      // Get auth token
+      const { authService } = await import('$lib/services/authService');
+      const user = authService.getCurrentUser();
+      if (!user) {
+        throw new Error('Not authenticated');
       }
-    } else {
-      deviceMetrics = generateTR069MetricsHistory(6, device.id);
+      
+      const token = await user.getIdToken();
+      
+      const response = await fetch(`/api/tr069/device-metrics?deviceId=${device.id}&hours=6`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'X-Tenant-ID': $currentTenant.id,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok && data?.success && data?.metrics) {
+        console.log(`✅ Loaded ${data.metrics.length} real metrics for device ${device.id}`);
+        deviceMetrics = data.metrics;
+      } else {
+        console.warn('⚠️ No metrics available from GenieACS');
+        deviceMetrics = []; // Empty array instead of fake data
+      }
+    } catch (error) {
+      console.error('Failed to load device metrics:', error);
+      deviceMetrics = []; // Empty array on error
     }
     
     // Get current signal values (last metric)
@@ -73,6 +98,108 @@
     if (event.target === event.currentTarget) {
       handleClose();
     }
+  }
+
+  async function loadLinkedCustomer() {
+    // Check if device has customer metadata
+    if (device._customerId || device.customerId) {
+      try {
+        const customerId = device._customerId || device.customerId;
+        const customer = await customerService.getCustomer(customerId);
+        linkedCustomer = customer;
+      } catch (err) {
+        console.warn('Failed to load linked customer:', err);
+        linkedCustomer = null;
+      }
+    } else {
+      linkedCustomer = null;
+    }
+  }
+
+  async function searchCustomers() {
+    if (customerSearchTerm.length < 2) {
+      searchResults = [];
+      return;
+    }
+
+    isSearchingCustomers = true;
+    try {
+      // Use customer service to search
+      const customers = await customerService.getCustomers({ 
+        search: customerSearchTerm,
+        limit: 10 
+      });
+      searchResults = customers || [];
+    } catch (err) {
+      console.error('Customer search failed:', err);
+      searchResults = [];
+    } finally {
+      isSearchingCustomers = false;
+    }
+  }
+
+  async function linkCustomer(customer: any) {
+    if (!$currentTenant?.id || !device?.id) {
+      customerLinkError = 'Missing tenant or device information';
+      return;
+    }
+
+    isLinkingCustomer = true;
+    customerLinkError = '';
+    customerLinkSuccess = '';
+
+    try {
+      const { authService } = await import('$lib/services/authService');
+      const user = authService.getCurrentUser();
+      if (!user) throw new Error('Not authenticated');
+      
+      const token = await user.getIdToken();
+      
+      const response = await fetch(`/api/tr069/devices/${device.id}/customer`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'X-Tenant-ID': $currentTenant.id,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          customerId: customer.customerId
+        })
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        customerLinkSuccess = 'Customer linked successfully! Device location updated.';
+        linkedCustomer = customer;
+        // Update device location if provided
+        if (data.device?.location) {
+          device.location = data.device.location;
+        }
+        setTimeout(() => {
+          showCustomerLinkModal = false;
+          customerLinkSuccess = '';
+          customerSearchTerm = '';
+          searchResults = [];
+        }, 2000);
+      } else {
+        customerLinkError = data.error || 'Failed to link customer';
+      }
+    } catch (err: any) {
+      console.error('Failed to link customer:', err);
+      customerLinkError = err.message || 'Failed to link customer';
+    } finally {
+      isLinkingCustomer = false;
+    }
+  }
+
+  async function unlinkCustomer() {
+    if (!confirm('Unlink customer from this device? Device location will not be updated automatically.')) {
+      return;
+    }
+
+    linkedCustomer = null;
+    // Note: Backend doesn't have unlink endpoint yet, but we can clear the UI
+    // In a full implementation, you'd call DELETE /api/tr069/devices/:deviceId/customer
   }
 
   $: rssiQuality = getRSSIQuality(currentSignal.rssi);
@@ -134,9 +261,51 @@
                   <span class="info-label">Longitude:</span>
                   <span class="info-value">{device.location.longitude.toFixed(6)}</span>
                 </div>
+                {#if device.location.address}
+                  <div class="info-item full-width">
+                    <span class="info-label">Address:</span>
+                    <span class="info-value">{device.location.address}</span>
+                  </div>
+                {/if}
               </div>
             </div>
           {/if}
+
+          <!-- Customer Linking -->
+          <div class="info-section">
+            <div class="section-header">
+              <h3>Customer</h3>
+              {#if linkedCustomer}
+                <button class="btn-link" on:click={unlinkCustomer}>Unlink</button>
+              {:else}
+                <button class="btn-link" on:click={() => showCustomerLinkModal = true}>Link Customer</button>
+              {/if}
+            </div>
+            {#if linkedCustomer}
+              <div class="customer-info">
+                <div class="info-item">
+                  <span class="info-label">Customer:</span>
+                  <span class="info-value">{linkedCustomer.fullName || linkedCustomer.customerId}</span>
+                </div>
+                {#if linkedCustomer.serviceAddress}
+                  <div class="info-item">
+                    <span class="info-label">Service Address:</span>
+                    <span class="info-value">
+                      {linkedCustomer.serviceAddress.street}, {linkedCustomer.serviceAddress.city}, {linkedCustomer.serviceAddress.state}
+                    </span>
+                  </div>
+                {/if}
+                {#if linkedCustomer.primaryPhone}
+                  <div class="info-item">
+                    <span class="info-label">Phone:</span>
+                    <span class="info-value">{linkedCustomer.primaryPhone}</span>
+                  </div>
+                {/if}
+              </div>
+            {:else}
+              <p class="no-customer">No customer linked. Link a customer to geolocate device from service address.</p>
+            {/if}
+          </div>
 
           {#if device.parameters && Object.keys(device.parameters).length > 0}
             <div class="info-section">
@@ -218,7 +387,66 @@
       
       <div class="modal-footer">
         <button class="btn btn-secondary" on:click={handleClose}>Close</button>
-        <button class="btn btn-primary">Manage Device</button>
+      </div>
+    </div>
+  </div>
+{/if}
+
+<!-- Customer Link Modal -->
+{#if showCustomerLinkModal}
+  <div class="modal-overlay" on:click={() => showCustomerLinkModal = false}>
+    <div class="modal-content customer-modal" on:click|stopPropagation>
+      <div class="modal-header">
+        <h2>Link Customer to Device</h2>
+        <button class="close-btn" on:click={() => showCustomerLinkModal = false}>×</button>
+      </div>
+      
+      <div class="modal-body">
+        {#if customerLinkError}
+          <div class="alert alert-error">{customerLinkError}</div>
+        {/if}
+        {#if customerLinkSuccess}
+          <div class="alert alert-success">{customerLinkSuccess}</div>
+        {/if}
+
+        <div class="form-group">
+          <label>Search Customers</label>
+          <input 
+            type="text" 
+            bind:value={customerSearchTerm}
+            on:input={searchCustomers}
+            placeholder="Search by name, phone, or customer ID..."
+            disabled={isLinkingCustomer}
+          />
+        </div>
+
+        {#if isSearchingCustomers}
+          <div class="loading">Searching...</div>
+        {:else if searchResults.length > 0}
+          <div class="customer-results">
+            {#each searchResults as customer}
+              <div class="customer-result-item" on:click={() => linkCustomer(customer)}>
+                <div class="customer-name">{customer.fullName || customer.customerId}</div>
+                <div class="customer-details">
+                  {#if customer.primaryPhone}
+                    <span>📞 {customer.primaryPhone}</span>
+                  {/if}
+                  {#if customer.serviceAddress}
+                    <span>📍 {customer.serviceAddress.street}, {customer.serviceAddress.city}</span>
+                  {/if}
+                </div>
+              </div>
+            {/each}
+          </div>
+        {:else if customerSearchTerm.length >= 2}
+          <div class="empty-state">No customers found</div>
+        {/if}
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-secondary" on:click={() => showCustomerLinkModal = false} disabled={isLinkingCustomer}>
+          Cancel
+        </button>
       </div>
     </div>
   </div>
@@ -308,10 +536,104 @@
     gap: 1rem;
   }
 
-  .info-item {
+  .info-item.full-width {
+    grid-column: 1 / -1;
+  }
+
+  .section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+  }
+
+  .btn-link {
+    background: none;
+    border: none;
+    color: var(--brand-primary);
+    cursor: pointer;
+    font-size: 0.875rem;
+    text-decoration: underline;
+    padding: 0;
+  }
+
+  .btn-link:hover {
+    color: var(--brand-primary-hover);
+  }
+
+  .customer-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .no-customer {
+    color: var(--text-secondary);
+    font-style: italic;
+    padding: 0.75rem;
+    background: var(--bg-tertiary);
+    border-radius: 0.375rem;
+  }
+
+  .customer-modal {
+    max-width: 500px;
+  }
+
+  .customer-results {
+    max-height: 400px;
+    overflow-y: auto;
+    margin-top: 1rem;
+  }
+
+  .customer-result-item {
+    padding: 1rem;
+    border: 1px solid var(--border-color);
+    border-radius: 0.375rem;
+    margin-bottom: 0.5rem;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .customer-result-item:hover {
+    background: var(--bg-secondary);
+    border-color: var(--brand-primary);
+  }
+
+  .customer-name {
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+  }
+
+  .customer-details {
     display: flex;
     flex-direction: column;
     gap: 0.25rem;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+  }
+
+  .alert {
+    padding: 0.75rem;
+    border-radius: 0.375rem;
+    margin-bottom: 1rem;
+  }
+
+  .alert-error {
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    color: #ef4444;
+  }
+
+  .alert-success {
+    background: rgba(34, 197, 94, 0.1);
+    border: 1px solid rgba(34, 197, 94, 0.3);
+    color: #22c55e;
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 2rem;
+    color: var(--text-secondary);
   }
 
   .info-label {

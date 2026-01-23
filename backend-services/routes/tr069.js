@@ -32,7 +32,30 @@ const resolveGenieacsConfig = async (tenantId) => {
 router.get('/configuration', async (req, res) => {
   try {
     const config = await resolveGenieacsConfig(req.tenantId);
-    res.json({ success: true, config });
+    
+    // Get tenant to build CWMP URL
+    const tenant = await Tenant.findById(req.tenantId).lean();
+    if (!tenant) {
+      return res.status(404).json({
+        success: false,
+        error: 'Tenant not found'
+      });
+    }
+    
+    // Generate tenant-specific CWMP URL
+    // Format: https://wisptools.io/cwmp/{tenant-subdomain}
+    // Or use Firebase Functions URL if available
+    const cwmpBaseUrl = process.env.CWMP_BASE_URL || process.env.PUBLIC_CWMP_BASE_URL || 'https://wisptools.io';
+    const cwmpUrl = `${cwmpBaseUrl}/cwmp/${tenant.subdomain}`;
+    
+    res.json({ 
+      success: true, 
+      config: {
+        ...config,
+        cwmpUrl: cwmpUrl,
+        tenantSubdomain: tenant.subdomain
+      }
+    });
   } catch (error) {
     console.error('[TR069 API] Failed to load configuration:', error);
     res.status(500).json({
@@ -47,24 +70,43 @@ router.post('/configuration', async (req, res) => {
   try {
     const { genieacsUrl, genieacsApiUrl } = req.body || {};
 
-    if (!genieacsUrl || !genieacsApiUrl) {
-      return res.status(400).json({ success: false, error: 'genieacsUrl and genieacsApiUrl are required' });
+    if (!genieacsApiUrl) {
+      return res.status(400).json({ success: false, error: 'genieacsApiUrl is required' });
     }
 
+    // Get tenant to ensure it exists and get subdomain
+    const tenant = await Tenant.findById(req.tenantId).lean();
+    if (!tenant) {
+      return res.status(404).json({
+        success: false,
+        error: 'Tenant not found'
+      });
+    }
+
+    // Generate tenant-specific CWMP URL if not provided
+    const cwmpBaseUrl = process.env.CWMP_BASE_URL || process.env.PUBLIC_CWMP_BASE_URL || 'https://wisptools.io';
+    const tenantCwmpUrl = genieacsUrl || `${cwmpBaseUrl}/cwmp/${tenant.subdomain}`;
+
+    // Update tenant's CWMP URL
     await Tenant.updateOne(
       { _id: req.tenantId },
       {
         $set: {
+          cwmpUrl: tenantCwmpUrl,
           'settings.genieacsConfig': {
-            genieacsUrl,
-            genieacsApiUrl,
+            genieacsUrl: tenantCwmpUrl,
+            genieacsApiUrl: genieacsApiUrl.replace(/\/$/, ''),
             updatedAt: new Date().toISOString()
           }
         }
       }
     );
 
-    res.json({ success: true, message: 'Configuration saved' });
+    res.json({ 
+      success: true, 
+      message: 'Configuration saved',
+      cwmpUrl: tenantCwmpUrl
+    });
   } catch (error) {
     console.error('[TR069 API] Failed to save configuration:', error);
     res.status(500).json({
@@ -508,6 +550,513 @@ router.post('/tasks', async (req, res) => {
     return res.status(500).json({
       success: false,
       error: 'Failed to execute TR-069 task',
+      details: error.message
+    });
+  }
+});
+
+// PUT /api/tr069/devices/:deviceId/customer - Link device to customer and geolocate
+router.put('/devices/:deviceId/customer', async (req, res) => {
+  try {
+    const { deviceId } = req.params;
+    const { customerId } = req.body;
+    
+    if (!customerId) {
+      return res.status(400).json({ success: false, error: 'customerId is required' });
+    }
+    
+    // Get customer record
+    const { Customer } = require('../models/customer');
+    const customer = await Customer.findOne({ 
+      customerId, 
+      tenantId: req.tenantId 
+    }).lean();
+    
+    if (!customer) {
+      return res.status(404).json({ success: false, error: 'Customer not found' });
+    }
+    
+    // Get device from GenieACS
+    const config = await resolveGenieacsConfig(req.tenantId);
+    const nbiUrl = (config.genieacsApiUrl || getNbiUrl()).replace(/\/$/, '');
+    
+    const deviceResponse = await fetch(`${nbiUrl}/devices/${deviceId}`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    
+    if (!deviceResponse.ok) {
+      return res.status(deviceResponse.status).json({
+        success: false,
+        error: 'Device not found in GenieACS'
+      });
+    }
+    
+    const device = await deviceResponse.json();
+    
+    // Geocode customer address if GPS not available on device
+    let latitude = device.parameters?.['InternetGatewayDevice.DeviceInfo.Location']?.split(',')[0];
+    let longitude = device.parameters?.['InternetGatewayDevice.DeviceInfo.Location']?.split(',')[1];
+    
+    if ((!latitude || !longitude) && customer.serviceAddress) {
+      // Use customer's existing geocoded coordinates if available
+      if (customer.serviceAddress.latitude && customer.serviceAddress.longitude) {
+        latitude = customer.serviceAddress.latitude.toString();
+        longitude = customer.serviceAddress.longitude.toString();
+      } else {
+        // Try to geocode using ArcGIS
+        const appConfig = require('../config/app');
+        const arcgisConfig = appConfig.externalServices.arcgis;
+        const address = `${customer.serviceAddress.street}, ${customer.serviceAddress.city}, ${customer.serviceAddress.state} ${customer.serviceAddress.zipCode}`;
+        
+        try {
+          const geocodeUrl = arcgisConfig.geocodeUrl;
+          const params = new URLSearchParams({
+            f: 'json',
+            singleLine: address,
+            outFields: 'Location'
+          });
+          
+          if (arcgisConfig.apiKey) {
+            params.append('token', arcgisConfig.apiKey);
+          }
+          
+          const geocodeResponse = await fetch(`${geocodeUrl}?${params.toString()}`);
+          if (geocodeResponse.ok) {
+            const geocodeData = await geocodeResponse.json();
+            if (geocodeData.candidates && geocodeData.candidates.length > 0) {
+              const location = geocodeData.candidates[0].location;
+              latitude = location.y.toString();
+              longitude = location.x.toString();
+            }
+          }
+        } catch (geocodeError) {
+          console.warn('[TR069 API] Geocoding failed:', geocodeError);
+        }
+      }
+    }
+    
+    // Update device metadata with customer link and location
+    const updateData = {
+      _customerId: customerId,
+      _customerName: customer.fullName,
+      'InternetGatewayDevice.DeviceInfo.Location': latitude && longitude 
+        ? `${latitude},${longitude}` 
+        : device.parameters?.['InternetGatewayDevice.DeviceInfo.Location']
+    };
+    
+    // Update device via GenieACS NBI
+    const updateResponse = await fetch(`${nbiUrl}/devices/${deviceId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updateData)
+    });
+    
+    if (!updateResponse.ok) {
+      const errorText = await updateResponse.text();
+      return res.status(updateResponse.status).json({
+        success: false,
+        error: 'Failed to update device',
+        details: errorText
+      });
+    }
+    
+    res.json({
+      success: true,
+      message: 'Device linked to customer successfully',
+      device: {
+        id: deviceId,
+        customerId,
+        customerName: customer.fullName,
+        location: latitude && longitude ? { latitude: parseFloat(latitude), longitude: parseFloat(longitude) } : null
+      }
+    });
+  } catch (error) {
+    console.error('[TR069 API] Failed to link device to customer:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to link device to customer',
+      details: error.message
+    });
+  }
+});
+
+// POST /api/tr069/bulk-tasks - Execute bulk operations on multiple devices
+router.post('/bulk-tasks', async (req, res) => {
+  try {
+    const { deviceIds, action, parameters, presetId } = req.body;
+    
+    if (!deviceIds || !Array.isArray(deviceIds) || deviceIds.length === 0) {
+      return res.status(400).json({ success: false, error: 'deviceIds array is required' });
+    }
+    
+    if (!action) {
+      return res.status(400).json({ success: false, error: 'action is required' });
+    }
+    
+    const config = await resolveGenieacsConfig(req.tenantId);
+    const nbiUrl = (config.genieacsApiUrl || getNbiUrl()).replace(/\/$/, '');
+    const tasksEndpoint = `${nbiUrl}/tasks`;
+    
+    const taskName = mapActionToTask(action);
+    if (!taskName && action !== 'applyPreset') {
+      return res.status(400).json({ success: false, error: `Unsupported action: ${action}` });
+    }
+    
+    const results = {
+      success: 0,
+      failed: 0,
+      errors: []
+    };
+    
+    // Handle preset application
+    if (action === 'applyPreset' && presetId) {
+      // Get preset from MongoDB (GenieACS database)
+      const { MongoClient } = require('mongodb');
+      const mongoUrl = process.env.MONGODB_URI || 'mongodb+srv://genieacs-user:fg2E8I10Pnx58gYP@cluster0.1radgkw.mongodb.net/genieacs?retryWrites=true&w=majority&appName=Cluster0';
+      const client = new MongoClient(mongoUrl);
+      await client.connect();
+      const db = client.db('genieacs');
+      
+      // Find preset with tenant filter
+      const preset = await db.collection('presets').findOne({ 
+        _id: presetId,
+        $or: [
+          { _tenantId: req.tenantId },
+          { _tenantId: { $exists: false } } // Legacy presets without tenant
+        ]
+      });
+      
+      if (!preset) {
+        await client.close();
+        return res.status(404).json({ success: false, error: 'Preset not found' });
+      }
+      
+      // Apply preset configurations to each device
+      for (const deviceId of deviceIds) {
+        try {
+          for (const config of preset.configurations || []) {
+            const taskPayload = {
+              device: deviceId,
+              name: 'setParameterValues',
+              parameter: config.path || config.name,
+              value: config.value
+            };
+            
+            const response = await fetch(tasksEndpoint, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(taskPayload)
+            });
+            
+            if (!response.ok) {
+              throw new Error(`Failed to apply preset config: ${response.status}`);
+            }
+          }
+          results.success++;
+        } catch (error) {
+          results.failed++;
+          results.errors.push({ deviceId, error: error.message });
+        }
+      }
+      
+      await client.close();
+    } else {
+      // Handle standard bulk actions
+      for (const deviceId of deviceIds) {
+        try {
+          const taskPayload = {
+            device: deviceId,
+            name: taskName,
+            ...(parameters ? { parameter: parameters.parameter, value: parameters.value } : {})
+          };
+          
+          const response = await fetch(tasksEndpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(taskPayload)
+          });
+          
+          if (response.ok) {
+            results.success++;
+          } else {
+            const errorText = await response.text();
+            throw new Error(errorText);
+          }
+        } catch (error) {
+          results.failed++;
+          results.errors.push({ deviceId, error: error.message });
+        }
+      }
+    }
+    
+    res.json({
+      success: true,
+      message: `Bulk operation completed: ${results.success} succeeded, ${results.failed} failed`,
+      results
+    });
+  } catch (error) {
+    console.error('[TR069 API] Bulk operation failed:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to execute bulk operation',
+      details: error.message
+    });
+  }
+});
+
+// ============================================================================
+// PRESET MANAGEMENT ENDPOINTS
+// ============================================================================
+
+// GET /api/tr069/presets - Get all presets for tenant
+router.get('/presets', async (req, res) => {
+  try {
+    const { MongoClient } = require('mongodb');
+    const mongoUrl = process.env.MONGODB_URI || 'mongodb+srv://genieacs-user:fg2E8I10Pnx58gYP@cluster0.1radgkw.mongodb.net/genieacs?retryWrites=true&w=majority&appName=Cluster0';
+    const client = new MongoClient(mongoUrl);
+    await client.connect();
+    const db = client.db('genieacs');
+    
+    // Get presets for this tenant (or global presets without tenant)
+    const presets = await db.collection('presets')
+      .find({
+        $or: [
+          { _tenantId: req.tenantId },
+          { _tenantId: { $exists: false } } // Legacy presets
+        ]
+      })
+      .sort({ weight: 1 })
+      .toArray();
+    
+    await client.close();
+    
+    res.json({
+      success: true,
+      presets: presets,
+      count: presets.length
+    });
+  } catch (error) {
+    console.error('[TR069 API] Failed to get presets:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get presets',
+      details: error.message
+    });
+  }
+});
+
+// POST /api/tr069/presets - Create new preset
+router.post('/presets', async (req, res) => {
+  try {
+    const presetData = req.body;
+    
+    if (!presetData.name) {
+      return res.status(400).json({
+        success: false,
+        error: 'Preset name is required'
+      });
+    }
+    
+    const { MongoClient } = require('mongodb');
+    const mongoUrl = process.env.MONGODB_URI || 'mongodb+srv://genieacs-user:fg2E8I10Pnx58gYP@cluster0.1radgkw.mongodb.net/genieacs?retryWrites=true&w=majority&appName=Cluster0';
+    const client = new MongoClient(mongoUrl);
+    await client.connect();
+    const db = client.db('genieacs');
+    
+    // Generate preset ID from name
+    const presetId = presetData.name
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '');
+    
+    // Check if preset already exists
+    const existing = await db.collection('presets').findOne({ 
+      _id: presetId,
+      _tenantId: req.tenantId 
+    });
+    
+    if (existing) {
+      await client.close();
+      return res.status(409).json({
+        success: false,
+        error: 'Preset with this name already exists'
+      });
+    }
+    
+    const preset = {
+      _id: presetId,
+      _tenantId: req.tenantId,
+      name: presetData.name,
+      description: presetData.description || '',
+      weight: presetData.weight || 0,
+      configurations: presetData.configurations || [],
+      preCondition: presetData.preCondition || '',
+      events: presetData.events || ['0 BOOTSTRAP', '1 BOOT'],
+      tags: presetData.tags || [],
+      enabled: presetData.enabled !== undefined ? presetData.enabled : true,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    
+    await db.collection('presets').insertOne(preset);
+    await client.close();
+    
+    res.json({
+      success: true,
+      preset: preset,
+      message: 'Preset created successfully'
+    });
+  } catch (error) {
+    console.error('[TR069 API] Failed to create preset:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to create preset',
+      details: error.message
+    });
+  }
+});
+
+// PUT /api/tr069/presets/:id - Update preset
+router.put('/presets/:id', async (req, res) => {
+  try {
+    const presetId = req.params.id;
+    const updates = req.body;
+    
+    const { MongoClient } = require('mongodb');
+    const mongoUrl = process.env.MONGODB_URI || 'mongodb+srv://genieacs-user:fg2E8I10Pnx58gYP@cluster0.1radgkw.mongodb.net/genieacs?retryWrites=true&w=majority&appName=Cluster0';
+    const client = new MongoClient(mongoUrl);
+    await client.connect();
+    const db = client.db('genieacs');
+    
+    // Check if preset exists and belongs to tenant
+    const existing = await db.collection('presets').findOne({ 
+      _id: presetId,
+      _tenantId: req.tenantId 
+    });
+    
+    if (!existing) {
+      await client.close();
+      return res.status(404).json({
+        success: false,
+        error: 'Preset not found'
+      });
+    }
+    
+    // Build update object
+    const { id, _id, createdAt, ...updateData } = updates;
+    updateData.updatedAt = new Date();
+    
+    await db.collection('presets').updateOne(
+      { _id: presetId, _tenantId: req.tenantId },
+      { $set: updateData }
+    );
+    
+    const updated = await db.collection('presets').findOne({ _id: presetId });
+    await client.close();
+    
+    res.json({
+      success: true,
+      preset: updated,
+      message: 'Preset updated successfully'
+    });
+  } catch (error) {
+    console.error('[TR069 API] Failed to update preset:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to update preset',
+      details: error.message
+    });
+  }
+});
+
+// DELETE /api/tr069/presets/:id - Delete preset
+router.delete('/presets/:id', async (req, res) => {
+  try {
+    const presetId = req.params.id;
+    
+    const { MongoClient } = require('mongodb');
+    const mongoUrl = process.env.MONGODB_URI || 'mongodb+srv://genieacs-user:fg2E8I10Pnx58gYP@cluster0.1radgkw.mongodb.net/genieacs?retryWrites=true&w=majority&appName=Cluster0';
+    const client = new MongoClient(mongoUrl);
+    await client.connect();
+    const db = client.db('genieacs');
+    
+    // Check if preset exists and belongs to tenant
+    const existing = await db.collection('presets').findOne({ 
+      _id: presetId,
+      _tenantId: req.tenantId 
+    });
+    
+    if (!existing) {
+      await client.close();
+      return res.status(404).json({
+        success: false,
+        error: 'Preset not found'
+      });
+    }
+    
+    await db.collection('presets').deleteOne({ 
+      _id: presetId,
+      _tenantId: req.tenantId 
+    });
+    await client.close();
+    
+    res.json({
+      success: true,
+      message: `Preset "${existing.name}" deleted successfully`
+    });
+  } catch (error) {
+    console.error('[TR069 API] Failed to delete preset:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to delete preset',
+      details: error.message
+    });
+  }
+});
+
+// POST /api/tr069/presets/:id/toggle - Toggle preset enabled status
+router.post('/presets/:id/toggle', async (req, res) => {
+  try {
+    const presetId = req.params.id;
+    
+    const { MongoClient } = require('mongodb');
+    const mongoUrl = process.env.MONGODB_URI || 'mongodb+srv://genieacs-user:fg2E8I10Pnx58gYP@cluster0.1radgkw.mongodb.net/genieacs?retryWrites=true&w=majority&appName=Cluster0';
+    const client = new MongoClient(mongoUrl);
+    await client.connect();
+    const db = client.db('genieacs');
+    
+    const existing = await db.collection('presets').findOne({ 
+      _id: presetId,
+      _tenantId: req.tenantId 
+    });
+    
+    if (!existing) {
+      await client.close();
+      return res.status(404).json({
+        success: false,
+        error: 'Preset not found'
+      });
+    }
+    
+    const newStatus = !existing.enabled;
+    await db.collection('presets').updateOne(
+      { _id: presetId, _tenantId: req.tenantId },
+      { $set: { enabled: newStatus, updatedAt: new Date() } }
+    );
+    await client.close();
+    
+    res.json({
+      success: true,
+      message: `Preset "${existing.name}" ${newStatus ? 'enabled' : 'disabled'}`,
+      enabled: newStatus
+    });
+  } catch (error) {
+    console.error('[TR069 API] Failed to toggle preset:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to toggle preset',
       details: error.message
     });
   }

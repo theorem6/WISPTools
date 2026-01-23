@@ -8,7 +8,7 @@
   import TR069SINRChart from '../components/TR069SINRChart.svelte';
   import TR069UptimeChart from '../components/TR069UptimeChart.svelte';
   import LTESignalChart from '../components/LTESignalChart.svelte';
-  import { generateTR069MetricsHistory, type TR069CellularMetrics } from '../lib/tr069MetricsService';
+  import { type TR069CellularMetrics } from '../lib/tr069MetricsService';
   import { loadCPEDevices, type CPEDevice } from '../lib/cpeDataService';
   import { currentTenant } from '$lib/stores/tenantStore';
 
@@ -46,27 +46,51 @@
     try {
       const hours = timeRange === '1h' ? 1 : timeRange === '6h' ? 6 : timeRange === '24h' ? 24 : 168;
       
+      if (!$currentTenant?.id) {
+        console.error('No tenant selected');
+        metricsMap = new Map();
+        return;
+      }
+      
+      // Get auth token
+      const { authService } = await import('$lib/services/authService');
+      const user = authService.getCurrentUser();
+      if (!user) {
+        throw new Error('Not authenticated');
+      }
+      
+      const token = await user.getIdToken();
+      
+      // Load metrics for each selected device
       for (const deviceId of selectedDevices) {
-        if ($currentTenant?.id) {
+        try {
           const response = await fetch(`/api/tr069/metrics?deviceId=${deviceId}&hours=${hours}`, {
             headers: {
-              'Content-Type': 'application/json',
-              'x-tenant-id': $currentTenant.id
+              'Authorization': `Bearer ${token}`,
+              'X-Tenant-ID': $currentTenant.id,
+              'Content-Type': 'application/json'
             }
           });
+          
           const data = await response.json();
-          if (response.ok && data?.metrics) {
+          
+          if (response.ok && data?.success && data?.metrics) {
+            console.log(`✅ Loaded ${data.metrics.length} real metrics for device ${deviceId}`);
             metricsMap.set(deviceId, data.metrics);
-            continue;
+          } else {
+            console.warn(`⚠️ No metrics available for device ${deviceId}`);
+            metricsMap.set(deviceId, []); // Empty array instead of fake data
           }
+        } catch (error) {
+          console.error(`Failed to load metrics for device ${deviceId}:`, error);
+          metricsMap.set(deviceId, []); // Empty array on error
         }
-        const metrics = generateTR069MetricsHistory(hours, deviceId);
-        metricsMap.set(deviceId, metrics);
       }
       
       metricsMap = new Map(metricsMap); // Trigger reactivity
     } catch (error) {
       console.error('Failed to load metrics:', error);
+      metricsMap = new Map();
     } finally {
       isLoading = false;
     }

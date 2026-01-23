@@ -29,6 +29,14 @@
       adminOnly: false
     },
     {
+      id: 'presets',
+      name: 'Presets',
+      icon: '⚙️',
+      description: 'Configuration presets and templates',
+      path: '/modules/acs-cpe-management/presets',
+      adminOnly: false
+    },
+    {
       id: 'faults',
       name: 'Faults',
       icon: '⚠️',

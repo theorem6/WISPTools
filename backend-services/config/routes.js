@@ -43,6 +43,7 @@ function registerRoutes(app) {
   apiRouter.use('/network', require('../routes/network'));
   apiRouter.use('/monitoring', require('../routes/monitoring'));
   apiRouter.use('/epc', require('../routes/epc'));
+  apiRouter.use('/tr069', require('../routes/tr069'));
   
   // System management routes
   apiRouter.use('/system', require('../routes/system'));

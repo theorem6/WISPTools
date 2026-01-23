@@ -68,6 +68,9 @@ export const analyzePCI = onRequest({
 });
 
 // Export GenieACS bridge functions (connects to real GenieACS)
+// NOTE: Single-tenant versions are deprecated - use multi-tenant versions below
+// Keeping for backward compatibility but not recommended for new implementations
+/*
 export {
   proxyGenieACSNBI,
   syncGenieACSDevices,
@@ -92,8 +95,9 @@ export {
   genieacsFS,
   genieacsUI
 } from './simpleGenieacsServices.js';
+*/
 
-// Export Multi-Tenant GenieACS functions
+// Export Multi-Tenant GenieACS functions (PRIMARY - USE THESE)
 export {
   proxyGenieACSNBIMultitenant,
   syncGenieACSDevicesMultitenant,

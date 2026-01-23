@@ -26,6 +26,8 @@
   import HSSRegistrationModal from './components/HSSRegistrationModal.svelte';
   import HardwareDeploymentModal from './components/HardwareDeploymentModal.svelte';
   import SiteEditModal from './components/SiteEditModal.svelte';
+  import UnifiedDeviceDetailsModal from './components/UnifiedDeviceDetailsModal.svelte';
+  import DeviceManagementPanel from './components/DeviceManagementPanel.svelte';
 import { coverageMapService } from './lib/coverageMapService.mongodb';
   import { reportGenerator } from './lib/reportGenerator';
   import HelpModal from '$lib/components/modals/HelpModal.svelte';
@@ -35,6 +37,7 @@ import { coverageMapService } from './lib/coverageMapService.mongodb';
   import { tipsService } from '$lib/services/tipsService';
   import { objectStateManager, type ModuleContext } from '$lib/services/objectStateManager';
 import { mapLayerManager } from '$lib/map/MapLayerManager';
+import { authService } from '$lib/services/authService';
   import type { 
     TowerSite, Sector, CPEDevice, NetworkEquipment, 
     CoverageMapFilters, Location 
@@ -77,6 +80,101 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
   let showSiteEditModal = false;
   let showHelpModal = false;
   const helpContent = coverageMapDocs;
+  
+  // Unified Device Management
+  let showDevicePanel = false;
+  let showUnifiedDeviceModal = false;
+  let selectedDevice: any = null;
+  let selectedDeviceType: 'snmp' | 'tr069' | 'mikrotik' | 'epc' | 'network-equipment' | 'unknown' = 'unknown';
+  let allDevices: any[] = []; // Combined devices from all sources
+  
+  async function loadAllDevicesForManagement() {
+    if (!tenantId) return;
+    
+    try {
+      const user = authService.getCurrentUser();
+      if (!user) return;
+      
+      const token = await user.getIdToken();
+      const devices: any[] = [];
+      
+      // Load SNMP devices
+      try {
+        const snmpResponse = await fetch('/api/monitoring/devices', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'X-Tenant-ID': tenantId,
+            'Content-Type': 'application/json'
+          }
+        });
+        if (snmpResponse.ok) {
+          const snmpData = await snmpResponse.json();
+          const snmpDevices = (snmpData.devices || []).map((d: any) => ({
+            ...d,
+            _deviceType: 'snmp'
+          }));
+          devices.push(...snmpDevices);
+        }
+      } catch (err) {
+        console.error('Error loading SNMP devices:', err);
+      }
+      
+      // Load MikroTik devices
+      try {
+        const mikrotikResponse = await fetch('/api/mikrotik/devices', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'X-Tenant-ID': tenantId,
+            'Content-Type': 'application/json'
+          }
+        });
+        if (mikrotikResponse.ok) {
+          const mikrotikData = await mikrotikResponse.json();
+          const mikrotikDevices = (mikrotikData.devices || []).map((d: any) => ({
+            ...d,
+            _deviceType: 'mikrotik'
+          }));
+          devices.push(...mikrotikDevices);
+        }
+      } catch (err) {
+        console.error('Error loading MikroTik devices:', err);
+      }
+      
+      // Load EPC devices
+      try {
+        const epcResponse = await fetch('/api/hss/epc/remote/list', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'X-Tenant-ID': tenantId,
+            'Content-Type': 'application/json'
+          }
+        });
+        if (epcResponse.ok) {
+          const epcData = await epcResponse.json();
+          const epcDevices = (epcData.epcs || []).map((d: any) => ({
+            ...d,
+            _deviceType: 'epc',
+            id: d.epc_id || d.id || d._id
+          }));
+          devices.push(...epcDevices);
+        }
+      } catch (err) {
+        console.error('Error loading EPC devices:', err);
+      }
+      
+      // Add network equipment
+      const networkEquipment = equipment.map((eq: any) => ({
+        ...eq,
+        _deviceType: 'network-equipment',
+        id: eq.id || eq._id
+      }));
+      devices.push(...networkEquipment);
+      
+      allDevices = devices;
+    } catch (error) {
+      console.error('Error loading devices for management:', error);
+    }
+  }
   
   // Tips Modal
   let showTipsModal = false;
@@ -241,6 +339,8 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
 
   let sharedMapMode: MapModuleMode | null = null;
   let externalProductionHardware: HardwareView[] = [];
+  let sharedVisibleProjects: any[] = [];
+  let sharedProjectOverlays: Map<string, PlanLayerFeature[]> = new Map();
   let sharedMapStateTimestamp: Date | null = null;
 
   $: {
@@ -501,7 +601,122 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
     loadAllData();
   }
   
-  let currentVisiblePlanIds: Set<string> = new Set();
+  // Load devices from all sources (SNMP, TR-069, MikroTik, EPC, Network Equipment)
+  async function loadAllDevices() {
+    if (!tenantId) return;
+    
+    try {
+      const user = authService.getCurrentUser();
+      if (!user) return;
+      
+      const token = await user.getIdToken();
+      const devices: any[] = [];
+      const seenIds = new Set<string>();
+      
+      // Helper to add device with deduplication
+      const addDevice = (device: any, type: string) => {
+        const deviceId = device.id || device._id || device.epc_id;
+        if (deviceId && !seenIds.has(String(deviceId))) {
+          seenIds.add(String(deviceId));
+          devices.push({
+            ...device,
+            _deviceType: type,
+            id: deviceId
+          });
+        }
+      };
+      
+      // Load devices from all sources in parallel
+      const [tr069Result, snmpResult, mikrotikResult, epcResult, networkEquipmentResult] = await Promise.allSettled([
+        // TR-069 devices from GenieACS
+        (async () => {
+          try {
+            const response = await fetch('/api/tr069/devices', {
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'X-Tenant-ID': tenantId,
+                'Content-Type': 'application/json'
+              }
+            });
+            if (response.ok) {
+              const data = await response.json();
+              return data.success ? (data.devices || []) : [];
+            }
+            return [];
+          } catch (e) {
+            console.error('[CoverageMap] Error loading TR-069 devices:', e);
+            return [];
+          }
+        })(),
+        // SNMP devices
+        (async () => {
+          try {
+            const { monitoringService } = await import('$lib/services/monitoringService');
+            const result = await monitoringService.getSNMPDevices();
+            return result.success ? (result.data?.devices || []) : [];
+          } catch (e) {
+            console.error('[CoverageMap] Error loading SNMP devices:', e);
+            return [];
+          }
+        })(),
+        // MikroTik devices
+        (async () => {
+          try {
+            const { monitoringService } = await import('$lib/services/monitoringService');
+            const result = await monitoringService.getMikrotikDevices();
+            return result.success ? (result.data?.devices || []) : [];
+          } catch (e) {
+            console.error('[CoverageMap] Error loading MikroTik devices:', e);
+            return [];
+          }
+        })(),
+        // EPC devices
+        (async () => {
+          try {
+            const { monitoringService } = await import('$lib/services/monitoringService');
+            const result = await monitoringService.getEPCDevices();
+            return result.success ? (result.data?.epcs || []) : [];
+          } catch (e) {
+            console.error('[CoverageMap] Error loading EPC devices:', e);
+            return [];
+          }
+        })(),
+        // Network equipment (already loaded as equipment array)
+        Promise.resolve(equipment || [])
+      ]);
+      
+      // Process TR-069 devices
+      if (tr069Result.status === 'fulfilled') {
+        tr069Result.value.forEach((device: any) => addDevice(device, 'tr069'));
+      }
+      
+      // Process SNMP devices
+      if (snmpResult.status === 'fulfilled') {
+        snmpResult.value.forEach((device: any) => addDevice(device, 'snmp'));
+      }
+      
+      // Process MikroTik devices
+      if (mikrotikResult.status === 'fulfilled') {
+        mikrotikResult.value.forEach((device: any) => addDevice(device, 'mikrotik'));
+      }
+      
+      // Process EPC devices
+      if (epcResult.status === 'fulfilled') {
+        epcResult.value.forEach((device: any) => addDevice(device, 'epc'));
+      }
+      
+      // Process network equipment
+      if (networkEquipmentResult.status === 'fulfilled') {
+        networkEquipmentResult.value.forEach((device: any) => addDevice(device, 'network-equipment'));
+      }
+      
+      allDevices = devices;
+      console.log(`[CoverageMap] Loaded ${devices.length} devices from all sources`);
+    } catch (error) {
+      console.error('[CoverageMap] Error loading devices:', error);
+      allDevices = [];
+    }
+  }
 
   async function loadAllData() {
     // Guard against duplicate concurrent loads
@@ -677,6 +892,9 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
       } else {
         console.log('[CoverageMap] Map component not ready yet, reactive bindings will handle refresh');
       }
+      
+      // Load all devices from various sources for unified device management
+      await loadAllDevices();
     } catch (err: any) {
       console.error('Failed to load data:', err);
       error = err.message || 'Failed to load network data';
@@ -838,6 +1056,8 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
       externalPlanFeatures = state.stagedFeatures ?? [];
       externalPlanSummary = state.stagedSummary ?? null;
       externalProductionHardware = state.productionHardware ?? [];
+      sharedVisibleProjects = state.visibleProjects ?? [];
+      sharedProjectOverlays = state.projectOverlays ? new Map(state.projectOverlays) : new Map();
       sharedMapStateTimestamp = state.lastUpdated ? new Date(state.lastUpdated) : null;
 
       const activePlanIdFromState = state.activePlanId ?? null;
@@ -1672,7 +1892,7 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
       <p>Loading network assets...</p>
     </div>
   {:else}
-    <CoverageMapView 
+    <CoverageMapView
       bind:this={mapComponent}
       {towers}
       {sectors}
@@ -1681,6 +1901,7 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
       {filters}
       externalPlanFeatures={planDraftsForMap}
       {marketingLeads}
+      projectOverlays={sharedProjectOverlays}
       on:map-right-click={handleMapRightClick}
       on:asset-click={handleAssetClick}
       on:plan-feature-moved={handlePlanFeatureMoved}
@@ -1747,6 +1968,14 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
         📊
       </button>
     {/if}
+    <button 
+      class="control-btn" 
+      onclick={() => showDevicePanel = !showDevicePanel} 
+      title="Device Management (SNMP, TR-069, MikroTik, EPC)"
+      class:active={showDevicePanel}
+    >
+      📱
+    </button>
     
     <!-- Map Type Toggle -->
     <div class="control-group">
@@ -1904,6 +2133,28 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
     </div>
   {/if}
 </div>
+
+<!-- Unified Device Management -->
+<DeviceManagementPanel
+  bind:show={showDevicePanel}
+  devices={allDevices}
+  on:deviceSelected={(e) => {
+    selectedDevice = e.detail.device;
+    selectedDeviceType = e.detail.deviceType;
+    showUnifiedDeviceModal = true;
+  }}
+  on:close={() => showDevicePanel = false}
+/>
+
+<UnifiedDeviceDetailsModal
+  bind:show={showUnifiedDeviceModal}
+  device={selectedDevice}
+  deviceType={selectedDeviceType}
+  on:close={() => {
+    showUnifiedDeviceModal = false;
+    selectedDevice = null;
+  }}
+/>
 
 <!-- Modals -->
 <AddSiteModal 

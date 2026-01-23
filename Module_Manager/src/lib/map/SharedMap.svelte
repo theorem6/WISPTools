@@ -120,6 +120,8 @@
               stagedSummary: mapState.stagedSummary,
               stagedFeatures: mapState.stagedFeatures,
               productionHardware: mapState.productionHardware,
+              visibleProjects: mapState.visibleProjects,
+              projectOverlays: Array.from(mapState.projectOverlays.entries()),
               lastUpdated: mapState.lastUpdated,
               capabilities: mapState.capabilities
             }

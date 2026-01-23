@@ -3,8 +3,13 @@
   
   export let device: any;
   export let isExpanded: boolean = false;
+  export let isSelected: boolean = false;
   
   const dispatch = createEventDispatcher();
+  
+  function handleToggleSelect() {
+    dispatch('toggleSelect', device);
+  }
   
   function handleReboot() {
     dispatch('reboot', device);
@@ -31,7 +36,15 @@
   }
 </script>
 
-<tr class="device-row" class:expanded={isExpanded}>
+<tr class="device-row" class:expanded={isExpanded} class:selected={isSelected}>
+  <td class="col-select">
+    <input
+      type="checkbox"
+      checked={isSelected}
+      on:change={handleToggleSelect}
+      class="device-checkbox"
+    />
+  </td>
   <td class="col-expand">
     <button class="expand-btn" on:click={toggleExpand} aria-label="Expand details">
       {isExpanded ? '▼' : '▶'}
@@ -72,7 +85,7 @@
 
 {#if isExpanded}
   <tr class="device-details-row">
-    <td colspan="10">
+    <td colspan="11">
       <div class="device-details">
         <div class="details-section">
           <h4>Device Information</h4>
@@ -146,8 +159,23 @@
     background: var(--bg-tertiary);
   }
 
+  .device-row.selected {
+    background: rgba(59, 130, 246, 0.1);
+  }
+
   .device-row.expanded {
     background: var(--bg-secondary);
+  }
+
+  .col-select {
+    width: 40px;
+    text-align: center;
+  }
+
+  .device-checkbox {
+    cursor: pointer;
+    width: 18px;
+    height: 18px;
   }
 
   .expand-btn {
