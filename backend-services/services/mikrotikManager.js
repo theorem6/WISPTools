@@ -3,7 +3,14 @@
  * Handles Mikrotik device configuration, monitoring, and management via RouterOS API
  */
 
-const { RouterOSAPI } = require('node-routeros');
+let RouterOSAPI;
+try {
+  RouterOSAPI = require('node-routeros').RouterOSAPI;
+} catch (error) {
+  console.warn('[Mikrotik Manager] node-routeros module not installed. MikroTik features will be disabled.');
+  RouterOSAPI = null;
+}
+
 const EventEmitter = require('events');
 
 class MikrotikManagerService extends EventEmitter {
@@ -108,6 +115,10 @@ class MikrotikManagerService extends EventEmitter {
    * Create RouterOS API connection
    */
   async createConnection(config) {
+    if (!RouterOSAPI) {
+      throw new Error('node-routeros module is not installed. Install it with: npm install node-routeros');
+    }
+    
     return new Promise((resolve, reject) => {
       const conn = new RouterOSAPI(config);
       

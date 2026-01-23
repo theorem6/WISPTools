@@ -6,7 +6,14 @@
 const express = require('express');
 const router = express.Router();
 const { UnifiedSite, UnifiedCPE, NetworkEquipment } = require('../models/network');
-const mikrotikManager = require('../services/mikrotikManager');
+
+let mikrotikManager;
+try {
+  mikrotikManager = require('../services/mikrotikManager');
+} catch (error) {
+  console.warn('[Mikrotik Routes] Mikrotik manager not available:', error.message);
+  mikrotikManager = null;
+}
 
 // Middleware to extract tenant ID
 const requireTenant = (req, res, next) => {
