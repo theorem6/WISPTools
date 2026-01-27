@@ -21,15 +21,12 @@
       if (result.success && result.user) {
         status = '✅ Sign-in successful!';
         
-        // Get return URL
         const returnUrl = sessionStorage.getItem('google_auth_return_url') || '/dashboard';
         sessionStorage.removeItem('google_auth_return_url');
 
-        // Wait a moment for auth state to update
         await new Promise(resolve => setTimeout(resolve, 500));
 
-        // Redirect to appropriate page
-        const context = sessionStorage.getItem('google_auth_context') || 'login';
+        const context = result.context || 'login';
         
         if (context === 'signup') {
           // For signup, check if user already has a tenant

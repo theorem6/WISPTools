@@ -2,9 +2,24 @@
 
 This document lists all OAuth redirect URIs that need to be configured in Google Cloud Console for Google Sign-In to work properly.
 
-## Required OAuth Redirect URIs
+## Login / Signup Google Auth (Module_Manager)
 
-Add these redirect URIs to your Google OAuth 2.0 Client ID in Google Cloud Console:
+The login and signup pages use **direct Google OAuth** with callback at `/auth/google/callback`.  
+Production app URL: **https://wisptools.io**.  
+OAuth client ID: `VITE_GOOGLE_AUTH_CLIENT_ID` or `PUBLIC_GOOGLE_AUTH_CLIENT_ID` (Firebase Web client for wisptools-production).
+
+**Authorized redirect URIs for this client must include:**
+
+- **https://wisptools.io/auth/google/callback** (production)
+- `https://wisptools-production.web.app/auth/google/callback` (if using Firebase hosting)
+- `https://wisptools-production.firebaseapp.com/auth/google/callback` (Firebase app domain)
+- `http://localhost:5173/auth/google/callback` (development)
+
+**Authorized JavaScript origins:** `https://wisptools.io`, `http://localhost:5173`, and any Firebase preview/hosting origins you use.
+
+---
+
+## CBRS / Google SAS (oauth path)
 
 ### Production Domains
 
@@ -42,13 +57,14 @@ Firebase Authentication also needs these domains authorized (already done):
 
 ## Verification
 
-After adding redirect URIs:
+**Login/signup flow:**
 
-1. Test Google Sign-In on `https://wisptools.io/login`
-2. Click "Sign in with Google"
-3. Complete OAuth flow
-4. Should redirect back to `https://wisptools.io/oauth/google/callback`
-5. Should then redirect to dashboard
+1. Test Google Sign-In on `https://wisptools.io/login` (or your app URL).
+2. Click "Sign in with Google".
+3. Complete OAuth flow.
+4. Should redirect to `https://<your-domain>/auth/google/callback` (with token in hash), then to dashboard or signup.
+
+**CBRS flow:** Same steps but callback is `/oauth/google/callback`.
 
 ## Common Errors
 
@@ -68,7 +84,8 @@ The redirect URI in the request does not match the ones authorized for the OAuth
 ### OAuth callback not working
 
 **Check:**
-- OAuth callback route exists: `/oauth/google/callback`
-- Route is accessible (not blocked by middleware)
-- Session storage is working (for OAuth state)
+- Login/signup: callback route is `/auth/google/callback` (Module_Manager).
+- CBRS: callback route is `/oauth/google/callback`.
+- Route is accessible (not blocked by middleware).
+- Session storage is working (for OAuth state).
 

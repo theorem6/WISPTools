@@ -25,8 +25,18 @@ const GOOGLE_SCOPES = [
   'https://www.googleapis.com/auth/userinfo.profile'
 ].join(' ');
 
-// Redirect URI for OAuth callback
-const REDIRECT_URI = browser ? `${window.location.origin}/auth/google/callback` : '';
+/** Production app URL - OAuth redirect must be authorized in Google Cloud for this origin. */
+const PRODUCTION_ORIGIN = 'https://wisptools.io';
+
+/**
+ * Get redirect URI at runtime (never at module load).
+ * Uses current origin so it works on wisptools.io, localhost, or Firebase preview URLs.
+ * For Google Cloud Console, authorize: https://wisptools.io/auth/google/callback and your dev URL.
+ */
+function getRedirectUri(): string {
+  if (typeof window === 'undefined') return '';
+  return `${window.location.origin}/auth/google/callback`;
+}
 
 /**
  * Generate a random state string for OAuth security
@@ -66,11 +76,21 @@ export async function initiateGoogleSignIn(context: 'login' | 'signup' = 'login'
   sessionStorage.setItem('google_auth_nonce', nonce);
   sessionStorage.setItem('google_auth_return_url', window.location.pathname + window.location.search);
 
+  const redirectUri = getRedirectUri();
+  if (!redirectUri) {
+    throw new Error('Google sign-in: redirect URI could not be determined (missing window.location.origin)');
+  }
+  if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_ID.includes('.apps.googleusercontent.com')) {
+    throw new Error(
+      'Google sign-in: OAuth client ID is missing or invalid. Set VITE_GOOGLE_AUTH_CLIENT_ID or PUBLIC_GOOGLE_AUTH_CLIENT_ID to your Web client ID from Firebase/Google Cloud Console.'
+    );
+  }
+
   // Construct Google OAuth URL with implicit flow (response_type=id_token)
   // This gives us the ID token directly in the URL hash, which we can use with Firebase
   const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
   authUrl.searchParams.set('client_id', GOOGLE_CLIENT_ID);
-  authUrl.searchParams.set('redirect_uri', REDIRECT_URI);
+  authUrl.searchParams.set('redirect_uri', redirectUri);
   authUrl.searchParams.set('response_type', 'id_token'); // Get ID token directly
   authUrl.searchParams.set('scope', GOOGLE_SCOPES);
   authUrl.searchParams.set('state', state);
@@ -79,7 +99,8 @@ export async function initiateGoogleSignIn(context: 'login' | 'signup' = 'login'
 
   console.log('[Google Auth] Redirecting to Google OAuth...', {
     clientId: GOOGLE_CLIENT_ID.substring(0, 20) + '...',
-    redirectUri: REDIRECT_URI,
+    redirectUri,
+    isWisptools: redirectUri.startsWith(PRODUCTION_ORIGIN),
     context
   });
 
@@ -87,11 +108,15 @@ export async function initiateGoogleSignIn(context: 'login' | 'signup' = 'login'
   window.location.href = authUrl.toString();
 }
 
+export type GoogleCallbackResult =
+  | { success: true; user: User; context: 'login' | 'signup' }
+  | { success: false; error: string };
+
 /**
  * Handle OAuth callback with ID token in URL hash
  * Authenticate with Firebase using the Google ID token
  */
-export async function handleGoogleCallback(): Promise<{ success: boolean; user?: User; error?: string }> {
+export async function handleGoogleCallback(): Promise<GoogleCallbackResult> {
   if (!browser) {
     return { success: false, error: 'OAuth callback can only run in browser' };
   }
@@ -116,14 +141,13 @@ export async function handleGoogleCallback(): Promise<{ success: boolean; user?:
 
     // Verify state to prevent CSRF attacks
     const storedState = sessionStorage.getItem('google_auth_state');
-    const storedNonce = sessionStorage.getItem('google_auth_nonce');
     
     if (!storedState || storedState !== state) {
       console.error('[Google Auth] State mismatch - possible CSRF attack');
       return { success: false, error: 'Invalid state parameter' };
     }
 
-    const context = sessionStorage.getItem('google_auth_context') || 'login';
+    const context = (sessionStorage.getItem('google_auth_context') || 'login') as 'login' | 'signup';
     console.log('[Google Auth] Processing OAuth callback...', { context });
 
     // Use Firebase to sign in with the Google ID token
@@ -131,7 +155,7 @@ export async function handleGoogleCallback(): Promise<{ success: boolean; user?:
     const credential = GoogleAuthProvider.credential(idToken);
     const result = await signInWithCredential(auth, credential);
 
-    // Clear stored state
+    // Clear stored state only after we have context to return
     sessionStorage.removeItem('google_auth_state');
     sessionStorage.removeItem('google_auth_nonce');
     sessionStorage.removeItem('google_auth_context');
@@ -140,12 +164,12 @@ export async function handleGoogleCallback(): Promise<{ success: boolean; user?:
 
     return {
       success: true,
-      user: result.user
+      user: result.user,
+      context
     };
   } catch (error: any) {
     console.error('[Google Auth] Error processing callback:', error);
     
-    // Clear stored state on error
     sessionStorage.removeItem('google_auth_state');
     sessionStorage.removeItem('google_auth_nonce');
     sessionStorage.removeItem('google_auth_context');
