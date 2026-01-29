@@ -1,0 +1,87 @@
+<script lang="ts">
+</script>
+
+<svelte:head>
+  <title>Getting Started – WISPTools Docs</title>
+</svelte:head>
+
+<h1>Getting Started</h1>
+<p class="lead">Welcome to WISPTools. This guide helps you get started with the LTE WISP Management Platform.</p>
+
+<section class="doc-section">
+  <h2>What is WISPTools?</h2>
+  <p>WISPTools is a management platform for LTE Wireless Internet Service Providers (WISPs). It provides:</p>
+  <ul>
+    <li><strong>Multi-tenant architecture</strong> – Manage multiple organizations</li>
+    <li><strong>HSS management</strong> – Home Subscriber Server for Open5GS</li>
+    <li><strong>Device management</strong> – TR-069/CWMP via GenieACS</li>
+    <li><strong>Network planning</strong> – Coverage mapping and PCI collision prevention</li>
+    <li><strong>Monitoring</strong> – SNMP monitoring and performance graphs</li>
+    <li><strong>CBRS/SAS</strong> – Spectrum Access System integration</li>
+  </ul>
+</section>
+
+<section class="doc-section">
+  <h2>Quick start</h2>
+  <h3>For new users</h3>
+  <ol>
+    <li><strong>Create an account</strong> – Complete registration and verify your email.</li>
+    <li><strong>Set up your first tenant</strong> – Configure organization details and subscription.</li>
+    <li><strong>Use the platform</strong> – Open the <a href="/dashboard">dashboard</a>, explore modules, and start managing your network.</li>
+  </ol>
+  <h3>For administrators</h3>
+  <ol>
+    <li><strong>Deploy the platform</strong> – Follow the <a href="/docs/deployment">deployment guide</a>; set up backend and frontend.</li>
+    <li><strong>Configure HSS</strong> – Set up Open5GS and connect MMEs (see repo <code>docs/</code> for admin guides).</li>
+    <li><strong>Manage tenants</strong> – Use Admin Management from the dashboard; configure GenieACS and user roles.</li>
+  </ol>
+</section>
+
+<section class="doc-section">
+  <h2>Next steps</h2>
+  <ul>
+    <li><a href="/docs">Documentation home</a></li>
+    <li><a href="/docs/deployment">Deployment</a></li>
+    <li><a href="/docs/reference/project-status">Project status & next steps</a></li>
+    <li><a href="/help">Help by topic</a></li>
+    <li><a href="/wizards">Wizards</a> – Guided flows for sites, subscribers, customers, RMA, plans, groups</li>
+  </ul>
+</section>
+
+<style>
+  .lead {
+    font-size: 1.125rem;
+    color: var(--text-secondary);
+    margin-bottom: 2rem;
+  }
+  .doc-section {
+    margin-bottom: 2rem;
+  }
+  .doc-section h2 {
+    font-size: 1.5rem;
+    margin-bottom: 0.75rem;
+    color: var(--text-primary);
+  }
+  .doc-section h3 {
+    font-size: 1.2rem;
+    margin-top: 1rem;
+    margin-bottom: 0.5rem;
+  }
+  .doc-section ul,
+  .doc-section ol {
+    padding-left: 1.5rem;
+  }
+  .doc-section a {
+    color: var(--primary-color);
+    text-decoration: none;
+  }
+  .doc-section a:hover {
+    text-decoration: underline;
+  }
+  .doc-section code {
+    background: var(--bg-secondary);
+    padding: 0.15rem 0.4rem;
+    border-radius: 4px;
+    font-size: 0.9em;
+  }
+</style>

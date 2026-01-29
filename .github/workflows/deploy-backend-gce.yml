@@ -1,0 +1,85 @@
+# Deploy backend-services to GCE VM (acs-hss-server)
+# Run manually from Actions tab, or on push to backend-services/
+# Requires GitHub secret: GCP_SA_KEY (JSON key for a service account with Compute Engine and IAP tunnel access)
+
+name: Deploy Backend to GCE
+
+on:
+  push:
+    branches: [ main, master ]
+    paths:
+      - 'backend-services/**'
+  workflow_dispatch:
+
+env:
+  GCP_PROJECT: lte-pci-mapper-65450042-bbf71
+  GCE_INSTANCE: acs-hss-server
+  GCE_ZONE: us-central1-a
+  REMOTE_DIR: /opt/lte-pci-mapper/backend-services
+
+jobs:
+  deploy-backend:
+    name: Deploy backend to GCE
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.GCP_PROJECT }}
+
+      - name: Create deployment archive
+        run: |
+          cd backend-services
+          tar --exclude=node_modules --exclude=.git --exclude='*.md' --exclude=docs \
+            -czf ../backend-deploy.tar.gz .
+          cd ..
+          echo "Archive size: $(du -h backend-deploy.tar.gz | cut -f1)"
+
+      - name: Upload to GCE and install
+        env:
+          USE_IAP: "true"
+        run: |
+          echo "Uploading backend to ${GCE_INSTANCE}..."
+          gcloud compute scp backend-deploy.tar.gz ${GCE_INSTANCE}:/tmp/ \
+            --zone=${GCE_ZONE} \
+            --project=${GCP_PROJECT} \
+            --tunnel-through-iap \
+            --quiet
+
+          echo "Running remote install and pm2 reload..."
+          gcloud compute ssh ${GCE_INSTANCE} \
+            --zone=${GCE_ZONE} \
+            --project=${GCP_PROJECT} \
+            --tunnel-through-iap \
+            --command="set -e
+              TARGET='${{ env.REMOTE_DIR }}'
+              PARENT=\$(dirname \"\$TARGET\")
+              sudo mkdir -p \"\$PARENT\" 2>/dev/null
+              sudo chown -R \$USER:\$USER \"\$PARENT\" 2>/dev/null
+              mv \"\$TARGET\" \"\${TARGET}.bak\" 2>/dev/null || true
+              mkdir -p \"\$TARGET\"
+              tar -xzf /tmp/backend-deploy.tar.gz -C \"\$TARGET\"
+              rm /tmp/backend-deploy.tar.gz
+              cd \"\$TARGET\" && npm install --omit=dev
+              command -v pm2 >/dev/null 2>&1 || sudo npm install -g pm2
+              pm2 reload ecosystem.config.js 2>/dev/null || (cd \"\$TARGET\" && pm2 start ecosystem.config.js)
+              pm2 save || true
+              echo Done."
+
+      - name: Summary
+        run: |
+          echo "✅ Backend deployed to GCE" >> $GITHUB_STEP_SUMMARY
+          echo "- Instance: ${{ env.GCE_INSTANCE }} (${{ env.GCE_ZONE }})" >> $GITHUB_STEP_SUMMARY
+          echo "- Dir: ${{ env.REMOTE_DIR }}" >> $GITHUB_STEP_SUMMARY

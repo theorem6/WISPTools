@@ -66,7 +66,7 @@
               <div class="project-meta">
                 <span class="badge status-{plan.status}">{plan.status}</span>
                 <span class="scope-count">
-                  {plan.scope.towers.length + plan.scope.sectors.length + plan.scope.cpeDevices.length + plan.scope.equipment.length} objects
+                  {(plan.scope?.towers?.length ?? 0) + (plan.scope?.sectors?.length ?? 0) + (plan.scope?.cpeDevices?.length ?? 0) + (plan.scope?.equipment?.length ?? 0)} objects
                 </span>
               </div>
             </div>

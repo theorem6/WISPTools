@@ -3,19 +3,27 @@
 
 const express = require('express');
 const router = express.Router();
-const { admin, firestore } = require('../config/firebase');
+const { admin, auth, firestore } = require('../config/firebase');
 
-// Middleware to extract tenant ID
-const requireTenant = (req, res, next) => {
-  const tenantId = req.headers['x-tenant-id'];
-  if (!tenantId) {
-    return res.status(400).json({ error: 'X-Tenant-ID header is required' });
+// Optional auth: set req.user when token valid, otherwise req.user = null (never reject for GET / and GET /count)
+const optionalAuth = async (req, res, next) => {
+  req.tenantId = req.headers['x-tenant-id'] || null;
+  const authHeader = req.headers.authorization || req.headers.Authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    req.user = null;
+    return next();
   }
-  req.tenantId = tenantId;
+  try {
+    const token = authHeader.split('Bearer ')[1];
+    const decoded = await auth.verifyIdToken(token, true);
+    req.user = decoded;
+  } catch (_) {
+    req.user = null;
+  }
   next();
 };
 
-router.use(requireTenant);
+router.use(optionalAuth);
 
 /**
  * Create notification for project approval
@@ -69,7 +77,8 @@ async function createProjectApprovalNotification(planId, planName, tenantId, app
 }
 
 /**
- * GET /api/notifications - Get user notifications
+ * GET /api/notifications - Get user notifications (recent, read and unread)
+ * Returns [] when unauthenticated so clients avoid 400s (e.g. pre-auth or proxy dropping headers).
  */
 router.get('/', async (req, res) => {
   try {
@@ -77,26 +86,27 @@ router.get('/', async (req, res) => {
       return res.status(503).json({ error: 'Notifications service unavailable' });
     }
 
-    const userId = req.user?.uid || req.query.userId;
+    const userId = req.user?.uid;
     if (!userId) {
-      return res.status(400).json({ error: 'User ID required' });
+      return res.json([]);
     }
 
-    // Get unread notifications first, then read ones
     const notificationsRef = firestore.collection('notifications')
       .where('userId', '==', userId)
-      .where('read', '==', false)
       .orderBy('createdAt', 'desc')
       .limit(50);
 
     const snapshot = await notificationsRef.get();
-    const notifications = snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data(),
-      createdAt: doc.data().createdAt?.toDate() || new Date()
-    }));
+    const list = snapshot.docs.map(doc => {
+      const d = doc.data();
+      return {
+        id: doc.id,
+        ...d,
+        createdAt: d.createdAt?.toDate ? d.createdAt.toDate() : (d.createdAt ? new Date(d.createdAt) : new Date())
+      };
+    });
 
-    res.json(notifications);
+    res.json(list);
   } catch (error) {
     console.error('Error fetching notifications:', error);
     res.status(500).json({ error: 'Failed to fetch notifications', message: error.message });
@@ -112,9 +122,9 @@ router.put('/:id/read', async (req, res) => {
       return res.status(503).json({ error: 'Notifications service unavailable' });
     }
 
-    const userId = req.user?.uid || req.body.userId;
+    const userId = req.user?.uid;
     if (!userId) {
-      return res.status(400).json({ error: 'User ID required' });
+      return res.status(401).json({ error: 'Unauthorized', message: 'Authentication required' });
     }
 
     const notificationRef = firestore.collection('notifications').doc(req.params.id);
@@ -142,6 +152,7 @@ router.put('/:id/read', async (req, res) => {
 
 /**
  * GET /api/notifications/count - Get unread notification count
+ * Returns 0 when unauthenticated so clients avoid 400s (e.g. pre-auth or proxy dropping headers).
  */
 router.get('/count', async (req, res) => {
   try {
@@ -149,9 +160,9 @@ router.get('/count', async (req, res) => {
       return res.json({ count: 0 });
     }
 
-    const userId = req.user?.uid || req.query.userId;
+    const userId = req.user?.uid;
     if (!userId) {
-      return res.status(400).json({ error: 'User ID required' });
+      return res.json({ count: 0 });
     }
 
     const snapshot = await firestore.collection('notifications')

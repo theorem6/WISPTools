@@ -122,17 +122,32 @@ export async function handleGoogleCallback(): Promise<GoogleCallbackResult> {
   }
 
   try {
+    // Google can return errors in query string (e.g. redirect_uri_mismatch, invalid_client)
+    const searchParams = new URLSearchParams(window.location.search);
+    const queryError = searchParams.get('error');
+    if (queryError) {
+      const desc = searchParams.get('error_description') || queryError;
+      const msg =
+        queryError === 'invalid_client' || desc.toLowerCase().includes('oauth client was not found')
+          ? "OAuth client not found. The app now uses Firebase's Google sign-in—ensure you're on the latest build. If you manage credentials, use the Web client from Google Cloud Console (APIs & Services > Credentials) for project wisptools-production and add https://wisptools.io/auth/google/callback to Authorized redirect URIs."
+          : desc;
+      return { success: false, error: msg };
+    }
+
     // Parse ID token from URL hash (implicit flow)
     const hash = window.location.hash.substring(1);
     const params = new URLSearchParams(hash);
-    
     const idToken = params.get('id_token');
     const state = params.get('state');
     const errorParam = params.get('error');
 
     if (errorParam) {
       const errorDesc = params.get('error_description') || errorParam;
-      return { success: false, error: errorDesc };
+      const msg =
+        errorParam === 'invalid_client' || (errorDesc && errorDesc.toLowerCase().includes('oauth client was not found'))
+          ? "OAuth client not found. The app now uses Firebase's Google sign-in—ensure you're on the latest build."
+          : errorDesc;
+      return { success: false, error: msg };
     }
 
     if (!idToken || !state) {

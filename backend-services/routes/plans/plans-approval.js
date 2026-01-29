@@ -17,10 +17,12 @@ const UnifiedTower = UnifiedSite; // Backwards compatibility alias
 
 /**
  * POST /plans/:id/approve - Approve plan for deployment
+ * Body: { notes?, assignedToUserId?, assignedToName?, assignedToUserIds?, assignedToNames? }
+ * assignedToUserId/Name set primary assignee; assignedToUserIds/Names (arrays) also populate deployment.assignedTeam
  */
 router.post('/:id/approve', async (req, res) => {
   try {
-    const { notes } = req.body;
+    const { notes, assignedToUserId, assignedToName, assignedToUserIds, assignedToNames } = req.body;
     const plan = await PlanProject.findOne({
       _id: req.params.id,
       tenantId: req.tenantId
@@ -40,6 +42,14 @@ router.post('/:id/approve', async (req, res) => {
       approvedAt: new Date(),
       approvalNotes: notes || ''
     };
+    if (!plan.deployment) plan.deployment = {};
+    if (assignedToUserId != null) {
+      plan.deployment.assignedTo = String(assignedToUserId);
+      plan.deployment.assignedToName = assignedToName != null ? String(assignedToName) : undefined;
+    }
+    if (Array.isArray(assignedToUserIds) && assignedToUserIds.length) {
+      plan.deployment.assignedTeam = assignedToUserIds.map(id => String(id));
+    }
     plan.updatedAt = new Date();
     await plan.save();
 
@@ -58,6 +68,22 @@ router.post('/:id/approve', async (req, res) => {
       console.error('Failed to sync marketing leads during plan approval:', leadError);
     }
     
+    // Log activity
+    try {
+      const { logActivity } = require('../../services/activityLogService');
+      logActivity({
+        tenantId: req.tenantId,
+        userId: req.user?.uid,
+        userEmail: req.user?.email,
+        action: 'plan_approved',
+        resource: 'plan',
+        resourceId: plan._id?.toString(),
+        details: { planName: plan.name, assignedTo: plan.deployment?.assignedTo }
+      });
+    } catch (logErr) {
+      console.warn('[Plan Approval] Activity log failed:', logErr.message);
+    }
+
     // Create notifications for field techs
     try {
       await createProjectApprovalNotification(

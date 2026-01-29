@@ -27,7 +27,7 @@
         return;
       }
       
-      serviceInfo = await customerPortalService.getCustomerServiceInfo();
+      serviceInfo = await customerPortalService.getCustomerServiceInfo(customer.tenantId);
     } catch (err: any) {
       error = err.message || 'Failed to load service information';
     } finally {

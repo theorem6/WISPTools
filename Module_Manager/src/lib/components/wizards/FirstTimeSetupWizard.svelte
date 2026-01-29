@@ -294,27 +294,27 @@
             <p>You're all set! Here's what you can do next:</p>
             
             <div class="next-steps">
-              <div class="next-step-item">
+              <a href="/modules/coverage-map" class="next-step-item">
                 <span class="icon">🗺️</span>
                 <div>
                   <strong>Explore Coverage Map</strong>
                   <p>Add tower sites and plan your network coverage</p>
                 </div>
-              </div>
-              <div class="next-step-item">
+              </a>
+              <a href="/modules/customers" class="next-step-item">
                 <span class="icon">👥</span>
                 <div>
                   <strong>Add Customers</strong>
                   <p>Start managing your customer base</p>
                 </div>
-              </div>
-              <div class="next-step-item">
+              </a>
+              <a href="/modules/work-orders" class="next-step-item">
                 <span class="icon">📋</span>
                 <div>
                   <strong>Create Work Orders</strong>
                   <p>Manage installations and service requests</p>
                 </div>
-              </div>
+              </a>
             </div>
           </div>
         {/if}
@@ -630,6 +630,15 @@
   
   .next-steps {
     margin: 2rem 0;
+  }
+
+  a.next-step-item {
+    text-decoration: none;
+    color: inherit;
+  }
+
+  a.next-step-item:hover {
+    background: var(--hover-bg, #f0f0f0);
   }
   
   .next-step-item {

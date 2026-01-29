@@ -64,8 +64,13 @@
       console.log('[Tenant Setup] Access granted -', userIsPlatformAdmin ? 'platform admin' : 'first-time user');
     } catch (err: any) {
       console.error('[Tenant Setup] Error checking existing tenants:', err);
-      // If we can't check (e.g., 401 error), allow first-time setup
-      // The backend will handle authorization when creating
+      // 503 / service misconfiguration - don't show create form; user may already have tenants we couldn't load
+      if (err?.status === 503 || err.message?.includes('INTERNAL_API_KEY') || err.message?.includes('Service Unavailable')) {
+        error = 'We couldn\'t load your organizations (service configuration issue). Please try again later or contact support.';
+        isLoading = false;
+        return;
+      }
+      // For other errors (e.g. 401), allow first-time setup; backend will handle authorization when creating
       console.log('[Tenant Setup] Allowing tenant creation despite check error');
     }
 

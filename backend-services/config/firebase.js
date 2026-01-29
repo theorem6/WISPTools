@@ -46,6 +46,9 @@ const resolveServiceAccount = () => {
   }
 
   console.warn('⚠️ Firebase Admin: No service account credentials found. Falling back to application default credentials (ADC).');
+  if (process.env.NODE_ENV === 'production') {
+    console.error('❌ Firebase Admin (PRODUCTION): ADC often lacks permission to verify Auth tokens. You will get 401/auth/insufficient-permission on /api/user-tenants. Set FIREBASE_SERVICE_ACCOUNT_JSON, FIREBASE_SERVICE_ACCOUNT_BASE64, or FIREBASE_SERVICE_ACCOUNT_KEY. See docs/fixes/AUTH_401_INSUFFICIENT_PERMISSION.md');
+  }
   return { source: 'adc', account: null };
 };
 

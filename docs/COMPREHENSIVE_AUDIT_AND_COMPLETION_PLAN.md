@@ -1,7 +1,115 @@
 # Comprehensive WISP Tools Audit & Completion Plan
 
 **Date:** January 2025  
-**Purpose:** Complete audit of missing features, incomplete implementations, and user experience improvements
+**Purpose:** Complete audit of missing features, incomplete implementations, and user experience improvements  
+**Master file** for WISPTools.io completion toward full WISP needs.
+
+---
+
+## ✅ Next Steps Completed (Latest)
+
+- **Improve empty states (Part 7 Quick Win)**  
+  - **Deploy module:** When "All Plans" has no projects, added **"📋 Create first project in Plan →"** Get Started CTA that navigates to `/modules/plan`.  
+- **Complete Simple TODOs**  
+  - **TR069Actions:** Removed obsolete "TODO: Call GenieACS API" comment; reboot and factory-reset already call `/api/tr069/tasks`.  
+  - MikrotikCredentialsModal and ACS wizard already have connection tests wired.  
+- **Enhanced help (Quick Tips)**  
+  - **CBRS module:** Added TipsModal with Quick Tips; tips auto-show on first visit; added tip "Get Started with CBRS" (Setup Wizard, Google sign-in, add first CBSD).  
+  - **CBRS DeviceList:** When no devices, empty state shows "No CBSD devices yet" and **"📡 Get Started with CBRS Setup"** button that opens the Setup Wizard.  
+- **CBRS (last objective)**  
+  - CBRS Setup Wizard already integrated; config-status banner shows "Run Setup Wizard →" when incomplete.  
+  - DeviceList empty state now has Get Started CTA; CBRS page wires `on:getstarted` to open wizard.  
+  - Quick Tips and first-visit tips added for CBRS.  
+  - `handleWizardComplete` reloads config, rebuilds service, and loads devices after wizard finish.  
+  - Form handlers `handleAddDevice` / `handleSubmitGrantRequest` accept optional `Event` for form submit (linter-clean).  
+- **Ordered list from top through CBRS:** Phase 1 (First-Time Setup Wizard, Module Setup Wizards, Empty States) and CBRS as last objective are complete.  
+- **Project Workflow (Phase 2)**  
+  - MapLayerManager now syncs `visibleProjects` and `projectOverlays` to mapContext so the iframe receives overlay state.  
+  - Deploy ProjectFilterPanel visibility toggle is wired to `mapLayerManager.showProjectOverlay` / `hideProjectOverlay` for immediate map updates.  
+  - ProjectFilterPanel uses optional chaining for `plan.scope` to avoid runtime errors.  
+  - Removed obsolete deploy TODOs (SharedMap overlay and task-assignment placeholders).  
+- **Error fixes**  
+  - AddInventoryModal: added `tenantId` prop and `inventoryData as unknown as Partial<InventoryItem>` for createItem type compatibility.  
+  - Root package.json: added devDependencies `@sveltejs/kit` and `vite` so root vite.config.ts resolves when tooling runs from workspace root.  
+  - **@sveltejs/kit/vite IDE warning:** If the IDE reports "Cannot find module '@sveltejs/kit/vite'", run build from the Svelte app: `cd Module_Manager && npm run build`.  
+- **Root vs app root (no subfolder confusion)**  
+  - The Svelte app root is **Module_Manager** only. Root `package.json` is wisp-billing-service; Svelte deps were removed from it.  
+  - Root `vite.config.ts` now only re-exports `Module_Manager/vite.config.ts` so tooling from repo root can resolve config without needing @sveltejs/kit at root.  
+  - Build/dev always from Module_Manager: `cd Module_Manager && npm run build` / `npm run dev`. See `APP_ROOT_AND_BUILD.md` at repo root.  
+- **Notification system (in-app)**  
+  - Backend `/api/notifications` now uses `verifyAuth` (Firebase token) so `req.user.uid` is set; GET returns recent notifications (read + unread), GET /count returns unread count, PUT /:id/read marks as read.  
+  - Module_Manager: added `notificationService` (getNotifications, getUnreadCount, markAsRead), `notificationStore` (list + unread count + refresh + markAsRead), and `NotificationCenter.svelte` (bell + dropdown).  
+  - Dashboard header shows NotificationCenter when logged in; project approval notifications (from Plan approval) are created in Firestore and shown in the in-app center.  
+- **Deployed:** Hosting (app) and Firestore (rules + indexes, including notifications index) deployed to wisptools-production. NotificationCenter uses Svelte 5 event syntax (`onclick`/`onkeydown`) so the build succeeds.  
+- **Next up (from plan):** Email/SMS/Push expansion for notifications, Customer Billing, Customer Portal.
+
+- **List continuation (latest)**  
+  - **Monitoring Setup Wizard → SNMP config API:** Wizard now loads existing SNMP config on open (GET /api/snmp/configuration) and prefills community/version; backend POST /api/snmp/configuration merges wizard payload into existing tenant `settings.snmpConfig` so other settings (discoverySubnets, etc.) are preserved.  
+  - **Notification expansion – email on project approval:** Firestore-triggered Cloud Function `onNotificationCreated` runs when a doc is created in `notifications` with `type === 'project_approved'`; it resolves user email via Firebase Auth and sends email via SendGrid when `SENDGRID_API_KEY` is set. Exported from `functions/src/notifications.ts` and `index.ts`.  
+  - **MapContextMenu sector/CPE in plan mode:** Confirmed MapContextMenu already shows “Add Sector to Plan” and “Add CPE Device to Plan” when `planMode` is true, and coverage-map `handleContextMenuAction` opens AddSectorModal / AddCPEModal with `planId={effectivePlanId}` and `initialLatitude={contextMenuLat}`.
+
+---
+
+- **Continue (latest)**  
+  - **Dashboard:** Added **Customer Portal** card (active) linking to `/modules/customers/portal` so the portal is discoverable; existing modules remain active.  
+  - **Customer Portal:** Documented current status in `CUSTOMER_PORTAL_IMPLEMENTATION_PLAN.md` (routes, dashboard entry; remaining: customer auth persistence, ticket integration, branding, password reset).  
+  - **Next up:** Customer Billing, Customer Portal auth/ticket wiring, optional SENDGRID_API_KEY for project-approval emails.
+
+- **Continue (tickets + SendGrid doc)**  
+  - **Customer Portal tickets:** Backend `requireCustomerAuth` now allows `auth/me` without `X-Tenant-ID` (tenant check only when header present). `customerPortalService` accepts optional `tenantId` and sends `X-Tenant-ID` for `/tickets`, `/tickets/:id`, `/tickets/:id/comments`, `/service`. Portal pages (tickets list, ticket detail, new ticket, dashboard, service) pass `customer.tenantId` into all portal API calls so tickets and service info load correctly.  
+  - **SendGrid doc:** Added `docs/SENDGRID_PROJECT_APPROVAL_EMAILS.md` with steps to set `SENDGRID_API_KEY` (and optional `SENDGRID_FROM_EMAIL`) for the `onNotificationCreated` Cloud Function so project-approval emails are sent.
+
+- **Continue (plan – Customer Portal password reset)**  
+  - **Portal password reset:** "Forgot password?" on portal login now opens an inline form; user enters email, submits; `customerAuthService.requestPasswordReset(email)` calls `authService.resetPassword(email)` (Firebase) and optionally notifies backend `/api/customer-portal/auth/reset-password`. Reset link goes to `/reset-password` (existing main app page). Fixed `customerAuthService` to use `authService.resetPassword()` instead of non-existent `sendPasswordResetEmail`.  
+  - **Next up:** Customer Billing (Phase 1 schema/endpoints), PayPal webhook signature verification, or additional notification channels (SMS/push).
+
+- **Continue (plan – PayPal webhook + Customer Billing Phase 1)**  
+  - **PayPal webhook:** Added missing `axios` import in `billing-api.js`; signature verification was already implemented via `verifyPayPalWebhook()` calling PayPal's verify-webhook-signature API. Comment updated to state that verification runs when `PAYPAL_WEBHOOK_ID` is set.  
+  - **Customer Billing Phase 1 (schema):** Added `backend-services/models/customer-billing.js` with `CustomerBilling` model: customerId, tenantId, servicePlan (planName, monthlyFee, setupFee, prorationEnabled), billingCycle (type, dayOfMonth, nextBillingDate), paymentMethod (Stripe/PayPal fields), invoices[], paymentHistory[], balance, autoPay. Unique index on (tenantId, customerId).  
+  - **Next up:** Customer Billing API routes (CRUD for customer billing, link from customer), or Stripe/PayPal integration for customer payments.
+
+- **Continue (plan – Customer Billing API)**  
+  - **Customer Billing API:** Added `routes/customer-billing.js` and mounted at `/api/customer-billing`. `GET /` lists billing for tenant (optional `?customerId=`); `GET /:customerId` gets one record; `POST /` creates or updates with body `{ customerId, servicePlan?, billingCycle? }` (validates customer exists); `PUT /:customerId` partial update (servicePlan, billingCycle, balance, autoPay, invoices, paymentHistory). Uses `X-Tenant-ID` and `CustomerBilling` model.  
+  - **Next up:** Customer Portal billing tab or staff UI to view/edit customer billing; Stripe/PayPal integration for customer payments.
+
+- **Continue (plan – Customer Billing staff UI)**  
+  - **Staff UI:** Customers module has a **Billing** button on each customer card. Clicking it opens `CustomerBillingModal`, which loads that customer's billing via `GET /api/customer-billing/:customerId`, shows service plan (plan name, monthly fee, setup fee), billing cycle (monthly/annual, day of month), and balance if present. Save uses `POST` (create) or `PUT` (update) to `/api/customer-billing`. Added `customerBillingService.ts` and `API_CONFIG.PATHS.CUSTOMER_BILLING`.  
+  - **Next up:** Customer Portal billing view for end-users; Stripe/PayPal integration for customer payments.
+
+- **Continue (plan – Entry points for new functions)**  
+  - **Customer Billing:** Dashboard has a **💳 Customer Billing** card (path: `/modules/customers?tab=billing`). Customers module has a **Billing** tab that lists customers with “Open billing” per row; empty state points to the Customers tab and the Billing button on cards. `afterNavigate` sets `activeTab = 'billing'` when URL has `?tab=billing`.  
+  - **Customer Portal:** Dashboard **🌐 Customer Portal** card → `/modules/customers/portal`. Customers module header has “Setup Portal” and “View Portal” links.  
+  - **Wizards:** Monitoring Setup Wizard is opened from `/modules/monitoring` (Get Started with Setup Wizard, module-control button). ACS and CBRS wizards are opened from their modules. First-Time Setup Wizard is shown on the dashboard when onboarding is not completed.
+
+- **Continue (all – wizards, overlay, analytics, deploy)**  
+  - **Project overlay:** Per-project colors in coverage map (`arcgisMapController.renderProjectOverlays`) so multiple projects are distinguishable (palette: green, blue, amber, violet, cyan, red, lime, pink).  
+  - **ACS Performance Analytics:** Wired to TR-069 API; Average RSSI, Signal Quality, Avg. Uptime from `GET /api/tr069/device-metrics`; time selector (1h/6h/24h/7d) refetches.  
+  - **Performance Analytics CTA:** “Per-Device Metrics & Charts” section has Monitoring + Graphs buttons → `/modules/acs-cpe-management/monitoring` and `/modules/acs-cpe-management/graphs`. ACS Overview hint: “Monitoring and Graphs are in the sidebar →”.  
+  - **CPEPerformanceModal:** Empty state when no metrics (“No metrics from device yet” + “Open Monitoring” link); real metrics only when `deviceMetrics.length > 0`.  
+  - **Wizard “What’s next?” links:** All completion steps now use clickable links: ACSSetupWizard, DeviceOnboardingWizard, DeviceRegistrationWizard, PresetCreationWizard, FirmwareUpdateWizard, MonitoringSetupWizard → ACS/Monitoring modules; CBRSSetupWizard → `/modules/cbrs-management`; FirstTimeSetupWizard → coverage-map, customers, work-orders; WorkOrderCreationWizard → work-orders; DeploymentWizard → deploy, inventory; InventoryCheckInWizard → inventory.  
+  - **Plan module:** Bare TODO replaced with documented note (MapLayerManager overlay wired; staging CRUD planned; see `docs/PROJECT_WORKFLOW_STATUS.md`).  
+  - **Notifications API:** Returns 200 + empty when no/invalid auth (optionalAuth) instead of 400.  
+  - **Backend deploy script:** Runner script sent via SRC/DEST positional `gcloud compute scp` (no `--recurse`); when SSH step fails (e.g. plink on Windows), use manual fallback — see `DEPLOY_BACKEND_FALLBACK.md` or script output.
+
+- **Continue (Project Workflow doc)**  
+  - **PROJECT_WORKFLOW_STATUS.md:** §1 Project Overlay marked done (per-project colors + scope polygons). §2 MapContextMenu marked done (sector/CPE "Add to Plan" + modal `planId` wiring). Next-steps list updated: overlay, Deploy filtering, and MapContextMenu enhancement all ✅; remaining priority is Field App integration and optional badges/visual feedback.
+
+- **Continue (Field app – assign on approve + My Projects API)**  
+  - **Backend:** `POST /api/plans/:id/approve` accepts optional `assignedToUserId`, `assignedToName`; stored in `plan.deployment`. `GET /api/plans/mobile/:userId?filter=assigned-to-me` returns only plans where user is in `deployment.assignedTo`, `assignedTeam`, or `fieldTechs.userId`.  
+  - **Deploy:** PlanApprovalModal has optional "Assign to tech" (user ID + display name); planService.approvePlan(planId, notes, { assignedToUserId, assignedToName }).  
+  - **Field app:** apiService.getPlans(userId, role, { filter: 'assigned-to-me' }); PlansScreen has "My Projects" | "All Plans" toggle.  
+  - **Docs:** PROJECT_WORKFLOW_QUICK_START.md, FIELD_APP_MY_PROJECTS.md, PROJECT_WORKFLOW_STATUS §5 updated.
+
+- **Continue (Field app – deployment progress and notes)**  
+  - **Backend:** `PATCH /api/plans/mobile/:userId/:planId/deployment` accepts `deploymentStage`, `notes`, `documentation.notes`; only assigned techs can update. Plan details (GET) include `deployment.deploymentStage`, `deployment.notes`, `deployment.documentation` for tower-crew/installer.  
+  - **Field app:** PlanDetailsScreen "Progress & Notes" for tower-crew/installer — stage buttons (Preparation, In Progress, Testing, Completed, On Hold), field notes input, Save notes; apiService.updatePlanDeployment(userId, planId, body).  
+  - **Optional next:** Photo upload for installation (documentation.installationPhotos).
+
+- **Continue (all – field app complete + doc sync + deploy)**  
+  - **PROJECT_WORKFLOW_STATUS:** Next Steps #4 and #5 marked ✅; §5 Field App "Optional next" updated (photo URLs done; in-app camera/upload optional).  
+  - **Field app:** PlanDetailsScreen "Installation photo URLs" — one URL per line, Save photo URLs; PATCH accepts `documentation.installationPhotos`.  
+  - **Docs:** PROJECT_WORKFLOW_QUICK_START, FIELD_APP_MY_PROJECTS: photo URLs noted where relevant.  
+  - **Deploy:** Run `cd Module_Manager && npm run build` then `firebase deploy --only hosting:app` from repo root to publish frontend.
 
 ---
 
@@ -200,8 +308,7 @@
   - `Module_Manager/docs-site/guides/index.md`
 
 **Back-End Gaps:**
-- ❌ PayPal webhook signature verification not implemented
-  - `backend-services/billing-api.js`
+- ✅ PayPal webhook signature verification implemented in `billing-api.js` via `verifyPayPalWebhook()` (requires `PAYPAL_WEBHOOK_ID`); missing `axios` import fixed.
 - ❌ Daily digest email HTML/text templates missing
   - `backend-services/email-service.js`
 - ❌ Password reset email sending placeholder
@@ -512,11 +619,11 @@
 | Module | Core Features | Setup Wizard | Documentation | Status |
 |--------|--------------|--------------|---------------|--------|
 | **Coverage Map** | ✅ Complete | ⚠️ Basic | ✅ Good | 🟢 95% |
-| **CBRS Management** | ✅ Complete | ❌ Missing | ✅ Good | 🟢 90% |
+| **CBRS Management** | ✅ Complete | ✅ Complete | ✅ Good | 🟢 95% |
 | **ACS/TR-069** | 🔨 75% | ❌ Missing | ✅ Good | 🟡 75% |
 | **PCI Resolution** | ✅ Complete | ⚠️ Basic | ✅ Good | 🟢 95% |
 | **Monitoring** | 🔨 80% | ❌ Missing | ✅ Good | 🟡 80% |
-| **Plan/Deploy** | 🔨 60% | ❌ Missing | ⚠️ Partial | 🟡 60% |
+| **Plan/Deploy** | 🔨 70% | ✅ Overlay+Filter | ⚠️ Partial | 🟡 70% |
 | **Inventory** | ✅ Complete | ⚠️ Basic | ✅ Good | 🟢 90% |
 | **Help Desk** | ✅ Complete | ⚠️ Basic | ✅ Good | 🟢 90% |
 | **Customers** | ✅ Complete | ❌ Missing | ✅ Good | 🟢 85% |

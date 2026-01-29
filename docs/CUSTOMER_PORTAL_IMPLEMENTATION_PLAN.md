@@ -5,6 +5,14 @@
 
 ---
 
+## ✅ Current Status (as of continuation)
+
+- **Routes:** `/modules/customers/portal`, `/portal/login`, `/portal/signup`, `/portal/dashboard`, `/portal/tickets`, `/portal/tickets/new`, `/portal/tickets/[id]`, `/portal/service`, `/portal/faq`, `/portal/knowledge`, `/portal/live-chat` exist with placeholder or partial content.
+- **Dashboard:** A **Customer Portal** card (active) links to `/modules/customers/portal` so staff can open the portal entry; landing redirects to login or dashboard based on customer auth.
+- **Remaining:** Tenant branding (logo/colors) refinements; auth/tickets are wired. **Password reset:** Done – portal login "Forgot password?" opens inline form, calls `customerAuthService.requestPasswordReset(email)` → Firebase reset link to `/reset-password`.
+
+---
+
 ## 📊 Executive Summary
 
 **Overall Difficulty:** **Medium** (3-4 weeks development time)

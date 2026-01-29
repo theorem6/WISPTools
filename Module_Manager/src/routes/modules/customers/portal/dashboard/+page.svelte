@@ -14,6 +14,7 @@
   let featureFlags = {
     faq: true,
     serviceStatus: true,
+    billing: true,
     knowledgeBase: false,
     liveChat: false
   };
@@ -35,10 +36,10 @@
       }
       
       // Load tickets
-      tickets = await customerPortalService.getCustomerTickets();
+      tickets = await customerPortalService.getCustomerTickets(customer.tenantId);
       
       // Load service info
-      serviceInfo = await customerPortalService.getCustomerServiceInfo();
+      serviceInfo = await customerPortalService.getCustomerServiceInfo(customer.tenantId);
       
       // Calculate stats
       stats.totalTickets = tickets.length;
@@ -58,6 +59,7 @@
   $: featureFlags = {
     faq: $portalBranding?.features?.enableFAQ !== false,
     serviceStatus: $portalBranding?.features?.enableServiceStatus !== false,
+    billing: $portalBranding?.features?.enableBilling !== false,
     knowledgeBase: !!$portalBranding?.features?.enableKnowledgeBase,
     liveChat: !!$portalBranding?.features?.enableLiveChat
   };
@@ -114,8 +116,15 @@
       </a>
     </div>
     
-    {#if featureFlags.faq || featureFlags.serviceStatus || featureFlags.knowledgeBase || featureFlags.liveChat}
+    {#if featureFlags.faq || featureFlags.serviceStatus || featureFlags.billing || featureFlags.knowledgeBase || featureFlags.liveChat}
       <div class="support-tools">
+        {#if featureFlags.billing}
+          <div class="support-card">
+            <h3>Billing &amp; Account</h3>
+            <p>View your plan, billing cycle, balance, and next billing date.</p>
+            <a class="support-link" href="/modules/customers/portal/billing">View Billing</a>
+          </div>
+        {/if}
         {#if featureFlags.serviceStatus}
           <div class="support-card">
             <h3>Service Status &amp; Outages</h3>

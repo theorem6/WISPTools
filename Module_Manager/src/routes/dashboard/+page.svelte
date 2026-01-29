@@ -8,6 +8,7 @@
   import { isCurrentUserPlatformAdmin, isPlatformAdminByUid, getCurrentUserUid, isPlatformAdmin } from '$lib/services/adminService';
   import ThemeSwitcher from '$lib/components/ThemeSwitcher.svelte';
   import SettingsButton from '$lib/components/SettingsButton.svelte';
+  import NotificationCenter from '$lib/components/common/NotificationCenter.svelte';
   import FirstTimeSetupWizard from '$lib/components/wizards/FirstTimeSetupWizard.svelte';
 
   interface Module {
@@ -66,12 +67,12 @@
             {
               id: 'customers',
               name: '👥 Customers',
-              description: 'Manage tenant customers, subscribers, and service accounts',
+              description: 'Manage customers, billing, and the customer portal (tabs: Customers, Billing, Portal)',
               icon: '👥',
               color: 'var(--info)', // Blue
               status: 'active',
               path: '/modules/customers',
-              features: ['Customer Database', 'Service Management', 'Billing Information', 'Installation History', 'Customer Support', 'Service Plans']
+              features: ['Customer Database', 'Billing & Service Plans', 'Customer Portal', 'Service Management', 'Installation History', 'Customer Support']
             },
             {
               id: 'hardware',
@@ -233,6 +234,7 @@
           {/if}
           <ThemeSwitcher />
           {#if isLoggedIn && currentUser}
+            <NotificationCenter />
             <div class="user-status">
               {#if isAdmin}
                 <span class="admin-indicator">Admin</span>
@@ -271,6 +273,7 @@
               on:keydown={(e) => e.key === 'Enter' && handleModuleClick(module)}
               role="button"
               tabindex="0"
+              aria-label="Open {module.name}. {module.description}"
             >
               <div class="module-header">
                 <h3 class="module-name">{module.name}</h3>
@@ -308,6 +311,7 @@
                 on:keydown={(e) => e.key === 'Enter' && handleModuleClick(module)}
                 role="button"
                 tabindex="0"
+                aria-label="Open {module.name}. {module.description}"
               >
                 <div class="admin-icon" style="background-color: {module.color}20; color: {module.color}">
                   {module.icon}

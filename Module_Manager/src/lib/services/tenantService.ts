@@ -372,7 +372,9 @@ export class TenantService {
   async getUserTenants(userId: string): Promise<Tenant[]> {
     try {
       const headers = await this.getAuthHeaders();
-      const url = `${this.apiBaseUrl}/user-tenants/${userId}`;
+      // Use direct Cloud Function URL so path is not lost (Hosting/custom domain can strip path)
+      const userTenantsBase = API_CONFIG.CLOUD_FUNCTIONS?.USER_TENANTS || this.apiBaseUrl;
+      const url = `${userTenantsBase}/api/user-tenants/${userId}`;
       
       console.log('[TenantService] getUserTenants request:', {
         url,
@@ -422,15 +424,19 @@ export class TenantService {
           } : { hasToken: false }
         });
         
-        throw new Error(`Failed to get user tenants: ${response.statusText} - ${errorData.message || errorData.error} (code: ${errorData.code || 'unknown'})`);
+        const err = new Error(`Failed to get user tenants: ${response.statusText} - ${errorData.message || errorData.error} (code: ${errorData.code || 'unknown'})`) as Error & { status?: number };
+        err.status = response.status;
+        throw err;
       }
 
       const tenants = await response.json();
       
       // Backend already returns full tenant details with user role
       return tenants;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error getting user tenants:', error);
+      // Rethrow 5xx (e.g. 503 Service Unavailable / INTERNAL_API_KEY not set) so callers can show an error instead of redirecting to tenant-setup
+      if (error?.status >= 500) throw error;
       return [];
     }
   }

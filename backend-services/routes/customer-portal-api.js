@@ -9,6 +9,7 @@ const { auth } = require('../config/firebase');
 const { Customer } = require('../models/customer');
 const { UserTenant } = require('../models/user');
 const { WorkOrder } = require('../models/work-order');
+const { CustomerBilling } = require('../models/customer-billing');
 const { requireAuth } = require('../middleware/admin-auth');
 
 const router = express.Router();
@@ -42,9 +43,9 @@ const requireCustomerAuth = async (req, res, next) => {
       });
     }
     
-    // Verify customer belongs to tenant
+    // Verify customer belongs to tenant when X-Tenant-ID is provided (allow auth/me without it)
     const tenantId = req.headers['x-tenant-id'] || req.tenantId;
-    if (customer.tenantId !== tenantId) {
+    if (tenantId != null && tenantId !== '' && customer.tenantId !== tenantId) {
       return res.status(403).json({ error: 'Forbidden', message: 'Tenant mismatch' });
     }
     
@@ -520,6 +521,28 @@ router.get('/service', requireCustomerAuth, async (req, res) => {
   } catch (error) {
     console.error('Error fetching service info:', error);
     res.status(500).json({ error: 'Failed to fetch service information' });
+  }
+});
+
+/**
+ * GET /api/customer-portal/billing
+ * Get logged-in customer's billing (read-only for portal)
+ */
+router.get('/billing', requireCustomerAuth, async (req, res) => {
+  try {
+    const customerId = req.customer?.customerId || req.customerId;
+    const tenantId = req.customer?.tenantId;
+    if (!customerId || !tenantId) {
+      return res.status(400).json({ error: 'Customer context missing' });
+    }
+    const doc = await CustomerBilling.findOne({ tenantId, customerId });
+    if (!doc) {
+      return res.status(200).json(null);
+    }
+    res.json(doc);
+  } catch (error) {
+    console.error('Error fetching portal billing:', error);
+    res.status(500).json({ error: 'Failed to fetch billing' });
   }
 });
 

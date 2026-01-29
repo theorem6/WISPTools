@@ -76,10 +76,16 @@
     if (!targetWindow) return;
 
     try {
+      // Ensure mapState exists before accessing its properties
+      if (!mapState) {
+        console.warn('[SharedMap] mapState is not available');
+        return;
+      }
+
       const activePlan = mapState.activePlan;
       const activePlanSummary = activePlan
         ? {
-            id: activePlan.id ?? activePlan._id ?? null,
+            id: activePlan.id ?? (activePlan as any)._id ?? null,
             name: activePlan.name ?? null,
             status: activePlan.status ?? null,
             tenantId: activePlan.tenantId ?? null
@@ -117,11 +123,15 @@
               activePlanId: mapState.activePlan?.id ?? null,
               activePlan: activePlanSummary,
               activePlanMarketing,
-              stagedSummary: mapState.stagedSummary,
-              stagedFeatures: mapState.stagedFeatures,
-              productionHardware: mapState.productionHardware,
-              visibleProjects: mapState.visibleProjects,
-              projectOverlays: Array.from(mapState.projectOverlays.entries()),
+              stagedSummary: mapState.stagedSummary ?? { total: 0, byType: {}, byStatus: {} },
+              stagedFeatures: mapState.stagedFeatures ?? [],
+              productionHardware: mapState.productionHardware ?? [],
+              visibleProjects: mapState.visibleProjects ?? [],
+              projectOverlays: mapState.projectOverlays instanceof Map
+                ? Array.from(mapState.projectOverlays.entries())
+                : Array.isArray(mapState.projectOverlays)
+                  ? mapState.projectOverlays
+                  : [],
               lastUpdated: mapState.lastUpdated,
               capabilities: mapState.capabilities
             }

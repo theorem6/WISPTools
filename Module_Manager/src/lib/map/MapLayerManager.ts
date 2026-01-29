@@ -701,6 +701,8 @@ mapLayerManager.subscribe(state => {
     stagedFeatures: state.stagedFeatures,
     stagedSummary: state.summary,
     productionHardware: state.productionHardware,
+    visibleProjects: state.visibleProjects,
+    projectOverlays: state.projectOverlays,
     isLoading: state.isLoading,
     lastUpdated: new Date(),
     error: state.error

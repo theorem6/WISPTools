@@ -343,27 +343,27 @@
             
             <div class="next-steps">
               <h4>What's Next?</h4>
-              <div class="next-step-item">
+              <a href="/modules/cbrs-management" class="next-step-item">
                 <span class="icon">📱</span>
                 <div>
                   <strong>Add Your First Device</strong>
                   <p>Register a CBRS device to start using spectrum</p>
                 </div>
-              </div>
-              <div class="next-step-item">
+              </a>
+              <a href="/modules/cbrs-management" class="next-step-item">
                 <span class="icon">📊</span>
                 <div>
                   <strong>Request Spectrum Grants</strong>
                   <p>Request spectrum grants for your devices</p>
                 </div>
-              </div>
-              <div class="next-step-item">
+              </a>
+              <a href="/modules/cbrs-management" class="next-step-item">
                 <span class="icon">🔍</span>
                 <div>
                   <strong>Monitor Grant Status</strong>
                   <p>Track your grant requests and device status</p>
                 </div>
-              </div>
+              </a>
             </div>
           </div>
         {/if}
@@ -754,6 +754,16 @@
     color: var(--text-primary, #1a1a1a);
   }
   
+  a.next-step-item {
+    text-decoration: none;
+    color: inherit;
+  }
+
+  a.next-step-item:hover {
+    background: var(--hover-bg, #f0f0f0);
+    border-color: var(--primary-color, #007bff);
+  }
+
   .next-step-item {
     display: flex;
     align-items: start;
@@ -762,8 +772,9 @@
     margin: 0.5rem 0;
     background: var(--bg-secondary, #f9f9f9);
     border-radius: 0.5rem;
+    border: 1px solid transparent;
   }
-  
+
   .next-step-item .icon {
     font-size: 1.5rem;
   }

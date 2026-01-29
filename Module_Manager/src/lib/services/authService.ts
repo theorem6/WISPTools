@@ -11,6 +11,7 @@ import {
   confirmPasswordReset,
   applyActionCode,
   GoogleAuthProvider,
+  signInWithRedirect,
   getRedirectResult,
   type User,
   type UserCredential,
@@ -264,26 +265,25 @@ export class AuthService {
   }
 
   /**
-   * Sign in with Google using direct OAuth 2.0 flow
-   * Redirects directly to Google (not through Firebase auth handler)
-   * Works like standard OAuth implementations
+   * Sign in with Google using Firebase's signInWithRedirect.
+   * Uses Firebase's OAuth client (no custom client_id), so "OAuth client was not found" is avoided.
+   * User is redirected to Google, then back to this app; checkRedirectResult() handles the return.
    */
   async signInWithGoogle(context: 'login' | 'signup' = 'login'): Promise<AuthResult<UserProfile>> {
+    if (!browser) {
+      return { success: false, error: 'Google sign-in requires browser' };
+    }
     try {
-      // Import the Google auth service dynamically to avoid circular dependencies
-      const { initiateGoogleSignIn } = await import('./googleAuthService');
-      
-      // Initiate OAuth flow - this will redirect to Google
-      await initiateGoogleSignIn(context);
-      
-      // This code won't execute because redirect happens
-      // Return pending result - actual result handled in callback
-      return {
-        success: true,
-        data: null as any // Will be set after redirect
-      };
+      const auth = getAuth();
+      sessionStorage.setItem('google_auth_context', context);
+      sessionStorage.setItem('google_auth_return_url', window.location.pathname + window.location.search);
+      const provider = new GoogleAuthProvider();
+      await signInWithRedirect(auth, provider);
+      return { success: true, data: null as any };
     } catch (error: any) {
       console.error('[AuthService] ❌ Error initiating Google sign-in:', error);
+      sessionStorage.removeItem('google_auth_context');
+      sessionStorage.removeItem('google_auth_return_url');
       return {
         success: false,
         error: this.getAuthErrorMessage(error)

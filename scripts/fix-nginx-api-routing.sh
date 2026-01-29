@@ -1,5 +1,6 @@
 #!/bin/bash
-# Fix nginx to properly route /api/ requests to backend on port 3001
+# Fix nginx to properly route /api/ requests to backend on port 3001.
+# Updates both hss-api and hss.wisptools.io so whichever is enabled gets the fix.
 # Run on GCE server: sudo bash fix-nginx-api-routing.sh
 
 set -e
@@ -11,71 +12,45 @@ if [ "$EUID" -ne 0 ]; then
     exit 1
 fi
 
-# Backup hss-api config
-if [ -f /etc/nginx/sites-available/hss-api ]; then
-    cp /etc/nginx/sites-available/hss-api /etc/nginx/sites-available/hss-api.backup.$(date +%Y%m%d%H%M%S)
-fi
+STAMP=$(date +%Y%m%d%H%M%S)
+for name in hss-api hss.wisptools.io; do
+  if [ -f /etc/nginx/sites-available/"$name" ]; then
+    cp /etc/nginx/sites-available/"$name" /etc/nginx/sites-available/"$name".backup."$STAMP"
+  fi
+done
 
-# Update hss-api config to add /api/ location block
-cat > /tmp/hss-api-updated.conf << 'EOF'
-server {
-    listen 443 ssl http2;
-    server_name _;
-
-    ssl_certificate /etc/letsencrypt/live/hss.wisptools.io/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/hss.wisptools.io/privkey.pem;
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_ciphers HIGH:!aNULL:!MD5;
-
-    # API routes - MUST come before catch-all location
-    location /api/ {
-        proxy_pass http://localhost:3001;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_cache_bypass $http_upgrade;
-        
-        # Timeout settings
-        proxy_connect_timeout 60s;
-        proxy_send_timeout 60s;
-        proxy_read_timeout 60s;
-
-        add_header 'Access-Control-Allow-Origin' '*' always;
-        add_header 'Access-Control-Allow-Methods' 'GET, POST, PUT, DELETE, OPTIONS' always;
-        add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization' always;
-
-        if ($request_method = 'OPTIONS') {
-            add_header 'Access-Control-Allow-Origin' '*';
-            add_header 'Access-Control-Allow-Methods' 'GET, POST, PUT, DELETE, OPTIONS';
-            add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization';
-            add_header 'Access-Control-Max-Age' 1728000;
-            add_header 'Content-Type' 'text/plain; charset=utf-8';
-            add_header 'Content-Length' 0;
-            return 204;
+# Patch existing configs: ensure proxy_pass to backend has NO trailing slash (so path is preserved).
+# "proxy_pass http://localhost:3001/" would strip /api/ and send wrong path; "proxy_pass http://localhost:3001" is correct.
+for name in hss-api hss.wisptools.io; do
+  if [ -f /etc/nginx/sites-available/"$name" ]; then
+    if grep -q 'location /api/' /etc/nginx/sites-available/"$name"; then
+      sed -i 's|proxy_pass http://localhost:3001/;|proxy_pass http://localhost:3001;|g' /etc/nginx/sites-available/"$name"
+      sed -i 's|proxy_pass http://127.0.0.1:3001/;|proxy_pass http://127.0.0.1:3001;|g' /etc/nginx/sites-available/"$name"
+      echo "Patched $name: removed trailing slash from proxy_pass in /api/ block"
+    else
+      echo "Inserting location /api/ block in $name (before location /)"
+      # Insert location /api/ block before the first "location /" so path is preserved (no trailing slash on proxy_pass)
+      f="/etc/nginx/sites-available/$name"
+      awk '
+        /^\s*location \/ \{\s*$/ && !done {
+          print "    location /api/ {"
+          print "        proxy_pass http://localhost:3001;"
+          print "        proxy_http_version 1.1;"
+          print "        proxy_set_header Host \\$host;"
+          print "        proxy_set_header X-Real-IP \\$remote_addr;"
+          print "        proxy_set_header X-Forwarded-For \\$proxy_add_x_forwarded_for;"
+          print "        proxy_set_header X-Forwarded-Proto \\$scheme;"
+          print "    }"
+          print ""
+          done=1
         }
-    }
-
-    # Catch-all for other routes
-    location / {
-        proxy_pass http://localhost:3001;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_cache_bypass $http_upgrade;
-    }
-}
-EOF
-
-# Install the updated config
-mv /tmp/hss-api-updated.conf /etc/nginx/sites-available/hss-api
+        { print }
+      ' "$f" > "$f.new" && mv "$f.new" "$f"
+      echo "Inserted location /api/ block in $name"
+    fi
+  fi
+done
+rm -f /tmp/nginx-ssl-config.conf 2>/dev/null || true
 
 # Test configuration
 echo ""
@@ -83,8 +58,11 @@ echo "Testing nginx configuration..."
 if nginx -t; then
     echo "✅ Configuration is valid"
 else
-    echo "❌ Configuration test failed - restoring backup"
-    find /etc/nginx/sites-available -name "hss-api.backup.*" -type f | sort | tail -1 | xargs -I {} sh -c 'mv {} /etc/nginx/sites-available/hss-api'
+    echo "❌ Configuration test failed - restoring backups"
+    for name in hss-api hss.wisptools.io; do
+      bak=$(find /etc/nginx/sites-available -name "${name}.backup.${STAMP}" -type f 2>/dev/null | head -1)
+      [ -n "$bak" ] && mv "$bak" /etc/nginx/sites-available/"$name"
+    done
     exit 1
 fi
 

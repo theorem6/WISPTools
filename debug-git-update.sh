@@ -15,15 +15,21 @@ log "========================================="
 log "Starting git update debug script"
 log "========================================="
 
-# Configuration
-GITHUB_TOKEN="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"
+# Configuration - GITHUB_TOKEN must be set in env or /opt/wisptools/.env
+if [ -z "$GITHUB_TOKEN" ] && [ -f /opt/wisptools/.env ]; then
+  source /opt/wisptools/.env 2>/dev/null || true
+fi
+if [ -z "$GITHUB_TOKEN" ]; then
+  log "ERROR: GITHUB_TOKEN not set. Set in env or /opt/wisptools/.env"
+  exit 1
+fi
 GIT_REPO_BRANCH="main"
 GIT_REPO_DIR="/opt/wisptools/repo"
 SCRIPTS_SOURCE_DIR="${GIT_REPO_DIR}/backend-services/scripts"
-GIT_REPO_URL="https://${GITHUB_TOKEN}@github.com/theorem6/lte-pci-mapper.git"
+GIT_REPO_URL="https://${GITHUB_TOKEN}@github.com/theorem6/WISPTools.git"
 
 log "Configuration:"
-log "  GIT_REPO_URL: https://***@github.com/theorem6/lte-pci-mapper.git"
+log "  GIT_REPO_URL: https://***@github.com/theorem6/WISPTools.git"
 log "  GIT_REPO_BRANCH: ${GIT_REPO_BRANCH}"
 log "  GIT_REPO_DIR: ${GIT_REPO_DIR}"
 log "  SCRIPTS_SOURCE_DIR: ${SCRIPTS_SOURCE_DIR}"

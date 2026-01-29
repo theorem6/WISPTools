@@ -2686,7 +2686,7 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
   />
 </TenantGuard>
 
-<!-- TODO: integrate MapLayerManager feature CRUD controls for staging (site/equipment) -->
+<!-- MapLayerManager: overlay/visibleProjects/projectOverlays wired. Staging CRUD (site/equipment add/edit/delete from plan) planned – see docs/PROJECT_WORKFLOW_STATUS.md -->
 
 <style>
   /* App Container - Full Screen */

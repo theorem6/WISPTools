@@ -133,7 +133,7 @@ router.get('/configuration', async (req, res) => {
   }
 });
 
-// POST /api/snmp/configuration - Save SNMP configuration for tenant
+// POST /api/snmp/configuration - Save SNMP configuration for tenant (merge with existing)
 router.post('/configuration', async (req, res) => {
   try {
     const tenantId = req.tenantId;
@@ -145,9 +145,18 @@ router.post('/configuration', async (req, res) => {
 
     console.log(`[SNMP API] Saving configuration for tenant ${tenantId}`);
 
+    const tenant = await Tenant.findById(tenantId).lean();
+    const existing = (tenant?.settings?.snmpConfig && typeof tenant.settings.snmpConfig === 'object')
+      ? tenant.settings.snmpConfig
+      : {};
+    const merged = { ...existing };
+    if (config.community !== undefined) merged.defaultCommunity = config.community;
+    if (config.version !== undefined) merged.defaultVersion = config.version;
+    Object.assign(merged, config);
+
     await Tenant.updateOne(
       { _id: tenantId },
-      { $set: { 'settings.snmpConfig': config, 'settings.snmpConfigUpdatedAt': new Date() } }
+      { $set: { 'settings.snmpConfig': merged, 'settings.snmpConfigUpdatedAt': new Date() } }
     );
     
     res.json({

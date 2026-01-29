@@ -829,13 +829,11 @@
               <input type="number" bind:value={formData.servicePlan.qci} min="1" max="9" placeholder="9" />
               <small>1-9 (9 is default best effort)</small>
             </div>
-            
             <div class="form-group">
               <label>Data Quota (bytes)</label>
               <input type="number" bind:value={formData.servicePlan.dataQuota} placeholder="0 = unlimited" />
               <small>0 = unlimited, or specify bytes</small>
             </div>
-            
             <div class="form-group">
               <select bind:value={formData.servicePlan.priorityLevel}>
                 <option value="">Select Priority Level</option>

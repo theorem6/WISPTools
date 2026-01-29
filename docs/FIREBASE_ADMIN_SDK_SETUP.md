@@ -53,10 +53,16 @@ export FIREBASE_PROJECT_ID=wisptools-production
 
 After deployment, check backend logs for:
 ```
-✅ Firebase Admin initialized with service account file: /path/to/key.json
+✅ Firebase Admin: Using FIREBASE_SERVICE_ACCOUNT_JSON (or ..._BASE64 or service account file)
 ✅ Firebase Admin initialized successfully
 ✅ Firebase Admin project: wisptools-production
 ```
 
 If you see these logs, the backend can now verify Firebase tokens from the new `wisptools-production` project.
+
+## Troubleshooting: 401 / auth/insufficient-permission
+
+If production returns **401** on `/api/user-tenants` with error **"Credential implementation ... has insufficient permission"** (`auth/insufficient-permission`), the backend is using Application Default Credentials (ADC) and that identity cannot verify Firebase Auth tokens.
+
+**Fix:** Configure an explicit Firebase Admin service account in production (env var or key file). See **[docs/fixes/AUTH_401_INSUFFICIENT_PERMISSION.md](fixes/AUTH_401_INSUFFICIENT_PERMISSION.md)** for step-by-step options.
 

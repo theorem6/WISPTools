@@ -13,6 +13,8 @@
   
   // Approval/Rejection form
   let approvalNotes = '';
+  let assignedToUserId = ''; // Firebase UID — field app "My Projects" uses this
+  let assignedToName = '';
   let rejectionReason = 'budget'; // Default reason
   let rejectionNotes = '';
   
@@ -28,6 +30,8 @@
   
   function handleClose() {
     approvalNotes = '';
+    assignedToUserId = '';
+    assignedToName = '';
     rejectionReason = 'budget';
     rejectionNotes = '';
     error = '';
@@ -42,7 +46,10 @@
     error = '';
     
     try {
-      await planService.approvePlan(plan.id, approvalNotes);
+      await planService.approvePlan(plan.id, approvalNotes, {
+        assignedToUserId: assignedToUserId.trim() || undefined,
+        assignedToName: assignedToName.trim() || undefined
+      });
       
       // Automatically show approved plan on map
       await planService.updatePlan(plan.id, { showOnMap: true });
@@ -148,6 +155,22 @@
         <!-- Approval Section -->
         <div class="approval-section">
           <h3>✅ Approve Plan</h3>
+          <div class="form-group assign-to">
+            <label for="assignedToUserId">Assign to tech (optional)</label>
+            <p class="hint">User ID or email — field app &quot;My Projects&quot; uses this to show assigned plans.</p>
+            <input
+              type="text"
+              id="assignedToUserId"
+              bind:value={assignedToUserId}
+              placeholder="Firebase UID or email"
+            />
+            <input
+              type="text"
+              id="assignedToName"
+              bind:value={assignedToName}
+              placeholder="Display name (optional)"
+            />
+          </div>
           <div class="form-group">
             <label for="approvalNotes">Approval Notes (Optional)</label>
             <textarea
@@ -351,6 +374,7 @@
     color: var(--text-primary);
   }
   
+  .form-group input,
   .form-group select,
   .form-group textarea {
     width: 100%;
@@ -364,7 +388,22 @@
     font-family: inherit;
   }
   
+  .form-group.assign-to .hint {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin: 0.25rem 0 0.5rem 0;
+  }
+  
+  .form-group.assign-to input {
+    margin-top: 0.35rem;
+  }
+  
+  .form-group.assign-to input + input {
+    margin-top: 0.35rem;
+  }
+  
   .form-group select:focus,
+  .form-group input:focus,
   .form-group textarea:focus {
     outline: none;
     border-color: var(--brand-primary);

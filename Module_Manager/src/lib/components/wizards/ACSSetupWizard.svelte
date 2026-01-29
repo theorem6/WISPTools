@@ -361,27 +361,27 @@
             
             <div class="next-steps">
               <h4>What's Next?</h4>
-              <div class="next-step-item">
+              <a href="/modules/acs-cpe-management" class="next-step-item">
                 <span class="icon">📱</span>
                 <div>
                   <strong>Register CPE Devices</strong>
-                  <p>Configure CPE devices to connect to your GenieACS server</p>
+                  <p>Sync from GenieACS or use Onboard Device to add CPEs</p>
                 </div>
-              </div>
-              <div class="next-step-item">
+              </a>
+              <a href="/modules/acs-cpe-management/devices" class="next-step-item">
                 <span class="icon">⚙️</span>
                 <div>
-                  <strong>Configure Devices</strong>
-                  <p>Set up device parameters and configurations</p>
+                  <strong>Devices & Presets</strong>
+                  <p>Manage devices, presets, and parameters</p>
                 </div>
-              </div>
-              <div class="next-step-item">
+              </a>
+              <a href="/modules/acs-cpe-management/monitoring" class="next-step-item">
                 <span class="icon">📊</span>
                 <div>
-                  <strong>Monitor Performance</strong>
-                  <p>Track device status, metrics, and performance</p>
+                  <strong>Monitoring & Graphs</strong>
+                  <p>Per-device metrics, Performance Analytics, and charts</p>
                 </div>
-              </div>
+              </a>
             </div>
           </div>
         {/if}
@@ -608,5 +608,47 @@
     opacity: 0.5;
     cursor: not-allowed;
   }
-  
+
+  .next-steps {
+    margin-top: 1rem;
+  }
+
+  .next-steps h4 {
+    margin-bottom: 0.75rem;
+    color: var(--text-primary, #1a1a1a);
+  }
+
+  .next-steps a.next-step-item {
+    display: flex;
+    align-items: start;
+    gap: 1rem;
+    padding: 1rem;
+    margin-bottom: 0.5rem;
+    background: var(--bg-secondary, #f9f9f9);
+    border: 1px solid var(--border-color, #e0e0e0);
+    border-radius: 0.5rem;
+    text-decoration: none;
+    color: inherit;
+    transition: background 0.2s, border-color 0.2s;
+  }
+
+  .next-steps a.next-step-item:hover {
+    background: var(--hover-bg, #f0f0f0);
+    border-color: var(--primary-color, #007bff);
+  }
+
+  .next-steps a.next-step-item .icon {
+    font-size: 1.5rem;
+  }
+
+  .next-steps a.next-step-item strong {
+    display: block;
+    color: var(--text-primary, #1a1a1a);
+  }
+
+  .next-steps a.next-step-item p {
+    margin: 0.25rem 0 0 0;
+    font-size: 0.875rem;
+    color: var(--text-secondary, #666);
+  }
 </style>

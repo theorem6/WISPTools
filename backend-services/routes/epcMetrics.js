@@ -148,15 +148,12 @@ router.post('/metrics', async (req, res) => {
     );
 
     console.log(`[EPC Metrics] Received metrics from EPC ${epcId} (Tenant: ${tenantId})`);
-    
-    // Emit metrics event for real-time processing
-    // TODO: Integrate with existing monitoring system
-    
+
     // Check for alerts/thresholds
     const alerts = await checkMetricThresholds(processedMetrics);
     if (alerts.length > 0) {
       console.log(`[EPC Metrics] Generated ${alerts.length} alerts for EPC ${epcId}`);
-      await EPCAlert.insertMany(alerts.map((alert) => ({
+      const alertDocs = alerts.map((alert) => ({
         tenant_id: tenantId,
         epc_id: epcId,
         severity: alert.severity,
@@ -167,7 +164,33 @@ router.post('/metrics', async (req, res) => {
           threshold: alert.threshold,
           raw_type: alert.type
         }
-      })));
+      }));
+      await EPCAlert.insertMany(alertDocs);
+      // Integrate with incident creation for critical/high alerts
+      try {
+        const incidentService = require('../services/incident-creation-service');
+        const epc = await RemoteEPC.findOne({ epc_id: epcId, tenant_id: tenantId }).lean();
+        for (const alert of alerts) {
+          if (['critical', 'high'].includes(alert.severity)) {
+            const rule = { rule_id: 'epc-metrics', name: alert.type || 'EPC Alert', tenant_id: tenantId };
+            await incidentService.createFromMonitoringAlert(
+              {
+                tenant_id: tenantId,
+                message: alert.message,
+                metric_name: alert.type,
+                current_value: alert.value,
+                threshold: alert.threshold,
+                severity: alert.severity,
+                first_triggered: new Date()
+              },
+              rule,
+              { _id: epcId, id: epcId, siteId: epc?.site_id, site_id: epc?.site_id, status: 'alert', type: 'epc' }
+            );
+          }
+        }
+      } catch (incErr) {
+        console.warn('[EPC Metrics] Incident creation failed (non-blocking):', incErr.message);
+      }
     }
     
     res.json({

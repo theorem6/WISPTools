@@ -2,10 +2,10 @@
 // Combines PCI analysis and GenieACS integration
 
 // Import shared Firebase initialization (must be first)
-import { db } from './firebaseInit.js';
+import { db, auth } from './firebaseInit.js';
 
 // Export notification functions
-export { onWorkOrderAssigned } from './notifications.js';
+export { onWorkOrderAssigned, onNotificationCreated } from './notifications.js';
 
 // Export admin setup function
 export { setupAdmin } from './setupAdmin.js';
@@ -166,7 +166,9 @@ export {
   getSASUserIDs,
   getSASInstallations,
   getCBRSAnalytics,
-  cbrsWebhook
+  cbrsWebhook,
+  saveCbrsConfigSecure,
+  loadCbrsConfigSecure
 } from './cbrs/index.js';
 
 // Simple PCI conflict detection function (existing)
@@ -223,14 +225,118 @@ function toRadians(degrees: number): number {
   return degrees * (Math.PI / 180);
 }
 
+// User Tenants - Verifies Firebase token in Cloud Function (has Auth permission), then calls backend internal API.
+// Workaround for backend auth/insufficient-permission when backend uses ADC.
+// invoker: 'public' so Hosting/browser can call this URL; we verify the Bearer token inside the function.
+// INTERNAL_API_KEY: set via "firebase functions:secrets:set INTERNAL_API_KEY" (then set same value on backend).
+export const userTenants = onRequest({
+  region: FUNCTIONS_CONFIG.functions.apiProxy.region,
+  memory: '256MiB',
+  timeoutSeconds: 30,
+  cors: true,
+  invoker: 'public',
+  secrets: ['INTERNAL_API_KEY']
+}, async (req, res) => {
+  const allowedOrigins: string[] = [...FUNCTIONS_CONFIG.cors.origins];
+  const origin = (req.headers.origin as string) || '';
+  const allowedOrigin = allowedOrigins.includes(origin) ? origin : (allowedOrigins[0] || '*');
+  res.set('Access-Control-Allow-Origin', allowedOrigin);
+  res.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.set('Access-Control-Max-Age', '3600');
+  res.set('Vary', 'Origin');
+
+  if (req.method === 'OPTIONS') {
+    res.status(204).send('');
+    return;
+  }
+  if (req.method !== 'GET') {
+    res.status(405).json({ error: 'Method not allowed' });
+    return;
+  }
+
+  const internalKey = process.env.INTERNAL_API_KEY;
+  const backendHost = process.env.BACKEND_HOST || 'https://hss.wisptools.io';
+  if (!internalKey) {
+    console.error('[userTenants] INTERNAL_API_KEY not set');
+    res.status(503).json({ error: 'Service misconfiguration', message: 'INTERNAL_API_KEY not set' });
+    return;
+  }
+
+  // Path: /api/user-tenants/:userId (from Hosting rewrite)
+  let path = (req.url || '').split('?')[0] || (req as any).path || '';
+  if (path.startsWith('http')) {
+    try {
+      path = new URL(path).pathname;
+    } catch {
+      path = '';
+    }
+  }
+  const match = path.match(/\/api\/user-tenants\/([^/]+)/);
+  const userId = match ? match[1] : null;
+  if (!userId) {
+    res.status(400).json({ error: 'Bad Request', message: 'userId required in path' });
+    return;
+  }
+
+  const authHeader = req.headers.authorization || req.headers.Authorization;
+  if (!authHeader || typeof authHeader !== 'string' || !authHeader.startsWith('Bearer ')) {
+    res.status(401).json({ error: 'Unauthorized', message: 'Missing or invalid Authorization header' });
+    return;
+  }
+  const token = authHeader.split('Bearer ')[1];
+  if (!token) {
+    res.status(401).json({ error: 'Unauthorized', message: 'No token' });
+    return;
+  }
+
+  try {
+    const decoded = await auth.verifyIdToken(token, true);
+    if (decoded.uid !== userId) {
+      res.status(403).json({ error: 'Forbidden', message: 'User can only request own tenants' });
+      return;
+    }
+  } catch (e: any) {
+    console.error('[userTenants] Token verification failed:', e?.message);
+    res.status(401).json({
+      error: 'Invalid token',
+      message: e?.message || 'Token verification failed',
+      code: e?.code || 'unknown'
+    });
+    return;
+  }
+
+  try {
+    const path = `/api/internal/user-tenants/${userId}`;
+    const url = `${backendHost}${path}`;
+    const ax = await axios.get(url, {
+      timeout: 15000,
+      headers: {
+        'x-internal-key': internalKey,
+        'x-original-path': path  // workaround when LB/nginx strips path to /
+      },
+      responseType: 'json',
+      validateStatus: () => true
+    });
+    res.status(ax.status).set('Content-Type', 'application/json').send(ax.data);
+  } catch (e: any) {
+    console.error('[userTenants] Backend call failed:', e?.message);
+    res.status(502).json({
+      error: 'Bad Gateway',
+      message: e?.message || 'Backend request failed'
+    });
+  }
+});
+
 // Main API Proxy - Provides HTTPS endpoint for unified backend API (Port 3001)
 // Handles all API routes: customers, work-orders, inventory, plans, HSS, billing, etc.
-// Updated: Improved path handling for Firebase Hosting rewrites
+// Also handles GET /api/user-tenants/:userId when Hosting routes it here (fallback for custom domain).
 export const apiProxy = onRequest({
   region: FUNCTIONS_CONFIG.functions.apiProxy.region,
   memory: FUNCTIONS_CONFIG.functions.apiProxy.memory,
   timeoutSeconds: FUNCTIONS_CONFIG.functions.apiProxy.timeoutSeconds,
-  cors: true
+  cors: true,
+  secrets: ['INTERNAL_API_KEY']
 }, async (req, res) => {
   // Set CORS headers explicitly and reflect origin
   // Allow all authorized Firebase Hosting domains (from centralized config)
@@ -251,7 +357,77 @@ export const apiProxy = onRequest({
     res.status(204).send('');
     return;
   }
-  
+
+  // Get path early (req.url can be '/' when Hosting rewrites to function; try headers)
+  let earlyPath = (req.url || (req as any).originalUrl || '').split('?')[0] || '';
+  if (earlyPath.startsWith('http')) {
+    try {
+      earlyPath = new URL(earlyPath).pathname;
+    } catch {
+      earlyPath = '';
+    }
+  }
+  if ((!earlyPath || earlyPath === '/') && (req.headers['x-original-url'] as string)) {
+    const x = req.headers['x-original-url'] as string;
+    earlyPath = x.startsWith('http') ? (() => { try { return new URL(x).pathname; } catch { return x; } })() : x;
+  }
+  if ((!earlyPath || earlyPath === '/') && (req.headers['x-forwarded-path'] as string)) {
+    earlyPath = (req.headers['x-forwarded-path'] as string).startsWith('/')
+      ? (req.headers['x-forwarded-path'] as string) : `/${req.headers['x-forwarded-path']}`;
+  }
+
+  // Handle GET /api/user-tenants/:userId in apiProxy (when Hosting sends it here instead of userTenants)
+  const userTenantsMatch = earlyPath.match(/^\/api\/user-tenants\/([^/]+)$/);
+  if (req.method === 'GET' && userTenantsMatch) {
+    const userId = userTenantsMatch[1];
+    const internalKey = process.env.INTERNAL_API_KEY;
+    const backendHost = process.env.BACKEND_HOST || 'https://hss.wisptools.io';
+    const authHeader = req.headers.authorization || req.headers.Authorization;
+    if (!internalKey) {
+      res.status(503).json({ error: 'Service misconfiguration', message: 'INTERNAL_API_KEY not set' });
+      return;
+    }
+    if (!authHeader || typeof authHeader !== 'string' || !authHeader.startsWith('Bearer ')) {
+      res.status(401).json({ error: 'Unauthorized', message: 'Missing or invalid Authorization header' });
+      return;
+    }
+    const token = authHeader.split('Bearer ')[1];
+    if (!token) {
+      res.status(401).json({ error: 'Unauthorized', message: 'No token' });
+      return;
+    }
+    try {
+      const decoded = await auth.verifyIdToken(token, true);
+      if (decoded.uid !== userId) {
+        res.status(403).json({ error: 'Forbidden', message: 'User can only request own tenants' });
+        return;
+      }
+    } catch (e: any) {
+      console.error('[apiProxy] user-tenants token verification failed:', e?.message);
+      res.status(401).json({ error: 'Invalid token', message: e?.message || 'Token verification failed' });
+      return;
+    }
+    try {
+      const path = `/api/internal/user-tenants/${userId}`;
+      const url = `${backendHost}${path}`;
+      const ax = await axios.get(url, {
+        timeout: 15000,
+        headers: {
+          'x-internal-key': internalKey,
+          'x-original-path': path
+        },
+        responseType: 'json',
+        validateStatus: () => true
+      });
+      res.status(ax.status).set('Content-Type', 'application/json').send(ax.data);
+      return;
+    } catch (e: any) {
+      console.error('[apiProxy] user-tenants backend call failed:', e?.message);
+      res.status(502).json({ error: 'Bad Gateway', message: e?.message || 'Backend request failed' });
+      return;
+    }
+  }
+
   // Build the full path from originalUrl (falls back to url/path) and strip the function mount if present
   // When called via direct Cloud Function URL, path may be: /apiProxy/api/customers
   // When called via Firebase Hosting rewrite, the original path is preserved in req.url
@@ -259,19 +435,37 @@ export const apiProxy = onRequest({
   // For Firebase Functions v2 onRequest, req.url contains the full path including query string
   // req.path may be just '/' for rewrites, so we prioritize req.url
   let incoming = '';
-  
-  // Priority order for getting the path:
-  // 1. req.url (Firebase Hosting rewrites preserve the original URL here)
-  // 2. originalUrl (if available)
-  // 3. req.path (fallback)
-  if (req.url && req.url !== '/') {
-    incoming = req.url;
-  } else if ((req as any).originalUrl && (req as any).originalUrl !== '/') {
-    incoming = (req as any).originalUrl;
+  const rawUrl = req.url || (req as any).originalUrl || '';
+  // req.url may be path-only (/api/notifications) or full URL (https://wisptools.io/api/notifications)
+  if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://')) {
+    try {
+      const u = new URL(rawUrl);
+      incoming = u.pathname || '';
+    } catch {
+      incoming = rawUrl;
+    }
+  } else if (rawUrl && rawUrl !== '/') {
+    incoming = rawUrl;
   } else if (req.path && req.path !== '/') {
     incoming = req.path;
   }
-  
+  // Fallback: proxy headers (some gateways set X-Original-URL)
+  if (!incoming || incoming === '/') {
+    const xOriginal = req.headers['x-original-url'] as string | undefined;
+    const xForwardedPath = req.headers['x-forwarded-path'] as string | undefined;
+    if (xOriginal?.startsWith('http')) {
+      try {
+        incoming = new URL(xOriginal).pathname || '';
+      } catch {
+        incoming = xOriginal;
+      }
+    } else if (xOriginal?.startsWith('/')) {
+      incoming = xOriginal;
+    } else if (xForwardedPath) {
+      incoming = xForwardedPath.startsWith('/') ? xForwardedPath : `/${xForwardedPath}`;
+    }
+  }
+
   // Strip /apiProxy prefix if present (when called directly via Cloud Function URL)
   if (incoming.startsWith('/apiProxy')) {
     incoming = incoming.substring('/apiProxy'.length);
@@ -292,7 +486,26 @@ export const apiProxy = onRequest({
   }
   
   // Ensure path starts with / for backend URL construction
-  const proxiedPath = incoming.startsWith('/') ? incoming : `/${incoming}`;
+  let proxiedPath = incoming.startsWith('/') ? incoming : (incoming ? `/${incoming}` : '');
+
+  // When path is empty, use ?path= from query (Cloud Run / 2nd gen may not put query in req.url)
+  if (!proxiedPath || proxiedPath === '/') {
+    const qPath = (req as any).query?.path;
+    if (typeof qPath === 'string' && qPath.startsWith('/')) {
+      proxiedPath = qPath.split('?')[0];
+    }
+  }
+  if ((!proxiedPath || proxiedPath === '/') && rawUrl.includes('?')) {
+    try {
+      const u = new URL(rawUrl.startsWith('http') ? rawUrl : `http://host${rawUrl}`);
+      const qPath = u.searchParams.get('path');
+      if (qPath && qPath.startsWith('/')) {
+        proxiedPath = qPath.split('?')[0];
+      }
+    } catch {
+      // ignore
+    }
+  }
 
   // Backend Service Architecture:
   // - Port 3001: Unified Main API Server (backend-services/server.js)

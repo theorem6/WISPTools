@@ -16,6 +16,7 @@ export const deployDocs = `
     <li><a href="#snmp-configuration">🔍 SNMP Configuration</a></li>
     <li><a href="#pci-planning">📐 PCI Planning</a></li>
     <li><a href="#frequency-planning">📻 Frequency Planning</a></li>
+    <li><a href="#deployment-wizard">🧙 Deployment Wizard</a></li>
     <li><a href="#best-practices">💡 Best Practices</a></li>
     <li><a href="#troubleshooting">🔧 Troubleshooting</a></li>
     <li><a href="#next-steps">📚 Next Steps</a></li>
@@ -289,6 +290,79 @@ export const deployDocs = `
   <li>Optimize assignments</li>
   <li>Consider band availability</li>
 </ul>
+
+<h4 id="deployment-wizard">🧙 Deployment Wizard</h4>
+
+<div class="info">
+  <strong>Purpose:</strong> Step-by-step guided workflow for deploying equipment (sectors, radios, CPE) with proper configuration, location assignment, and documentation.
+</div>
+
+<h4>Accessing the Wizard</h4>
+<ol>
+  <li>Navigate to <strong>Deploy</strong> module</li>
+  <li>Click <strong>"📦 Deploy Equipment"</strong> button in module header</li>
+  <li>Wizard opens with welcome screen</li>
+</ol>
+
+<h4>Wizard Overview</h4>
+<p>The Deployment Wizard guides you through:</p>
+<ul>
+  <li>Selecting deployment type (Sector, Radio, or CPE)</li>
+  <li>Choosing location (existing site or GPS coordinates)</li>
+  <li>Selecting equipment from inventory</li>
+  <li>Configuring equipment parameters</li>
+  <li>Completing deployment checklist</li>
+  <li>Uploading photos and documentation</li>
+</ul>
+
+<h4>Deployment Types</h4>
+
+<h4>Sector Deployment</h4>
+<ul>
+  <li>Deploy complete sector (radio + antenna + configuration)</li>
+  <li>Auto-creates sector in Coverage Map</li>
+  <li>Links equipment to sector</li>
+  <li>Configures azimuth, frequency, bandwidth</li>
+</ul>
+
+<h4>Radio Deployment</h4>
+<ul>
+  <li>Deploy radio unit to existing site</li>
+  <li>Links equipment to site</li>
+  <li>Configures radio parameters</li>
+</ul>
+
+<h4>CPE Deployment</h4>
+<ul>
+  <li>Deploy customer premise equipment</li>
+  <li>Links to customer account</li>
+  <li>Assigns service plan</li>
+  <li>Configures CPE settings</li>
+</ul>
+
+<h4>Wizard Steps</h4>
+<ol>
+  <li><strong>Welcome:</strong> Overview of deployment process</li>
+  <li><strong>Type:</strong> Select deployment type</li>
+  <li><strong>Location:</strong> Choose site or enter GPS coordinates</li>
+  <li><strong>Equipment:</strong> Select equipment from inventory</li>
+  <li><strong>Configure:</strong> Set equipment parameters</li>
+  <li><strong>Checklist:</strong> Complete deployment checklist</li>
+  <li><strong>Complete:</strong> Review summary and finish</li>
+</ol>
+
+<h4>Tips for Using the Wizard</h4>
+<ul>
+  <li>Have equipment serial numbers ready</li>
+  <li>Know exact GPS coordinates or select existing site</li>
+  <li>Take photos during deployment for documentation</li>
+  <li>Complete all checklist items before finishing</li>
+  <li>Link to work orders for tracking</li>
+</ul>
+
+<div class="success">
+  <strong>✅ Quick Access:</strong> The Deployment Wizard can also be accessed by right-clicking on a tower site and selecting "Deploy Hardware" from the context menu.
+</div>
 
 <h4 id="best-practices">💡 Best Practices</h4>
 <ul>

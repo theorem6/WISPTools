@@ -30,6 +30,8 @@ import { iframeCommunicationService } from '$lib/services/iframeCommunicationSer
   import TipsModal from '$lib/components/modals/TipsModal.svelte';
   import { getModuleTips } from '$lib/config/moduleTips';
   import { tipsService } from '$lib/services/tipsService';
+  import DeploymentWizard from '$lib/components/wizards/deployment/DeploymentWizard.svelte';
+  import SiteDeploymentWizard from '$lib/components/wizards/deployment/SiteDeploymentWizard.svelte';
 
   let currentUser: any = null;
   let showEPCDeploymentModal = false;
@@ -98,6 +100,12 @@ import { iframeCommunicationService } from '$lib/services/iframeCommunicationSer
   // Add Inventory Modal
   let showAddInventoryModal = false;
   let selectedSiteForAddInventory: any = null;
+  
+  // Deployment Wizard
+  let showDeploymentWizard = false;
+  let showSiteDeploymentWizard = false;
+  let deploymentWizardLocation: { latitude: number; longitude: number } | null = null;
+  let deploymentWizardSiteId: string | null = null;
   
   // Set up global handler IMMEDIATELY - don't wait for onMount
   // This function will be called directly from SharedMap when view-inventory action is received
@@ -1291,6 +1299,29 @@ import { iframeCommunicationService } from '$lib/services/iframeCommunicationSer
           <span class="control-icon">🚀</span>
           <span class="control-label">Deploy Plan</span>
         </button>
+        
+        <button 
+          class="module-control-btn" 
+          onclick={() => {
+            showSiteDeploymentWizard = true;
+          }}
+          title="Add Site Wizard - Create a new tower/NOC/warehouse site"
+        >
+          <span class="control-icon">📍</span>
+          <span class="control-label">Add Site</span>
+        </button>
+        <button 
+          class="module-control-btn" 
+          onclick={() => {
+            showDeploymentWizard = true;
+            deploymentWizardLocation = null;
+            deploymentWizardSiteId = null;
+          }}
+          title="Deploy Equipment Wizard - Step-by-step equipment deployment"
+        >
+          <span class="control-icon">📦</span>
+          <span class="control-label">Deploy Equipment</span>
+        </button>
       </div>
     </div>
 
@@ -1446,19 +1477,43 @@ import { iframeCommunicationService } from '$lib/services/iframeCommunicationSer
     on:close={() => showProjectFilters = false}
     on:visibility-changed={async (event: CustomEvent<{ planId: string; visible: boolean }>) => {
       const { planId, visible } = event.detail;
+      const plan = approvedPlans.find(p => p.id === planId) ?? readyPlans.find(p => p.id === planId);
+      if (visible && plan) {
+        await mapLayerManager.showProjectOverlay(plan);
+      } else if (!visible) {
+        await mapLayerManager.hideProjectOverlay(planId);
+      }
       await loadReadyPlans();
       if (visible) {
         await focusPlanOnMap(planId);
       } else {
-        const nextPlanId = [...visiblePlanIds][0] || null;
-        await focusPlanOnMap(nextPlanId);
+        await focusPlanOnMap([...visiblePlanIds][0] ?? null);
       }
     }}
   />
-
-  <!-- TODO: replace placeholder SharedMap overlay with interactive map layers -->
-  <!-- TODO: integrate deploy task assignment workflow once backend endpoints are ready -->
   
+  <!-- Deployment Wizard -->
+  <DeploymentWizard
+    show={showDeploymentWizard}
+    initialLocation={deploymentWizardLocation}
+    initialSiteId={deploymentWizardSiteId}
+    on:close={() => {
+      showDeploymentWizard = false;
+      deploymentWizardLocation = null;
+      deploymentWizardSiteId = null;
+      loadReadyPlans();
+    }}
+  />
+
+  <!-- Site Deployment Wizard -->
+  <SiteDeploymentWizard
+    show={showSiteDeploymentWizard}
+    on:close={() => {
+      showSiteDeploymentWizard = false;
+      loadReadyPlans();
+    }}
+  />
+
   <!-- Plan Selection Modal (shows list of all plans) -->
   {#if showPlanApprovalModal && !selectedPlan}
     <div class="modal-overlay" onclick={closePlanApprovalModal}>
@@ -1475,6 +1530,7 @@ import { iframeCommunicationService } from '$lib/services/iframeCommunicationSer
             <div class="empty-state">
               <p>No projects available</p>
               <p class="hint">Create projects in the Plan module to see them here</p>
+              <a href="/modules/plan" class="btn-get-started" onclick={(e) => { e.preventDefault(); closePlanApprovalModal(); goto('/modules/plan'); }}>📋 Create first project in Plan →</a>
             </div>
           {:else}
             <div class="plan-list">
@@ -1978,7 +2034,24 @@ import { iframeCommunicationService } from '$lib/services/iframeCommunicationSer
     padding: 2rem;
     color: var(--text-secondary);
   }
-  
+
+  .empty-state .btn-get-started {
+    display: inline-block;
+    margin-top: 1rem;
+    padding: 0.75rem 1.25rem;
+    background: var(--brand-primary, #3b82f6);
+    color: white;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: 600;
+    transition: background 0.2s, transform 0.15s;
+  }
+
+  .empty-state .btn-get-started:hover {
+    background: var(--brand-primary-hover, #2563eb);
+    transform: translateY(-1px);
+  }
+
   /* Add Hardware Dropdown */
   .dropdown-container {
     position: relative;

@@ -10,6 +10,7 @@
   
   const topics = [
     { id: 'overview', title: '📚 Overview', icon: '📚' },
+    { id: 'docs', title: '📖 Documentation & Project Status', icon: '📖', path: '/docs' },
     { id: 'getting-started', title: '🚀 Getting Started', icon: '🚀' },
     { id: 'user-management', title: '👥 User Management', icon: '👥' },
     { id: 'help-desk', title: '🎧 Help Desk', icon: '🎧' },
@@ -28,21 +29,29 @@
 <div class="help-container">
   <div class="help-header">
     <h1>📖 WISP Multitool Documentation</h1>
-    <p class="subtitle">Complete guide to using the platform</p>
+    <p class="subtitle">Complete guide to using the platform. Documentation is integrated into the app.</p>
+    <a href="/docs" class="docs-link">📖 Documentation home & Project Status →</a>
   </div>
   
   <div class="help-layout">
     <aside class="help-sidebar">
       <nav>
         {#each topics as topic}
-          <button
-            class="topic-btn"
-            class:active={selectedTopic === topic.id}
-            on:click={() => selectedTopic = topic.id}
-          >
-            <span class="topic-icon">{topic.icon}</span>
-            <span class="topic-title">{topic.title}</span>
-          </button>
+          {#if topic.path}
+            <a href={topic.path} class="topic-btn topic-link">
+              <span class="topic-icon">{topic.icon}</span>
+              <span class="topic-title">{topic.title}</span>
+            </a>
+          {:else}
+            <button
+              class="topic-btn"
+              class:active={selectedTopic === topic.id}
+              on:click={() => selectedTopic = topic.id}
+            >
+              <span class="topic-icon">{topic.icon}</span>
+              <span class="topic-title">{topic.title}</span>
+            </button>
+          {/if}
         {/each}
       </nav>
     </aside>
@@ -528,6 +537,26 @@
     color: var(--text-secondary);
     font-size: 1.125rem;
     margin: 0;
+  }
+  
+  .docs-link {
+    display: inline-block;
+    margin-top: 0.75rem;
+    padding: 0.5rem 1rem;
+    background: var(--primary);
+    color: white;
+    text-decoration: none;
+    border-radius: var(--radius-md);
+    font-weight: 500;
+  }
+  
+  .docs-link:hover {
+    opacity: 0.9;
+  }
+  
+  .topic-link {
+    text-decoration: none;
+    color: inherit;
   }
   
   .help-layout {

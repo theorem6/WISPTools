@@ -31,6 +31,7 @@
   $: featureFlags = {
     faq: $portalBranding?.features?.enableFAQ !== false,
     serviceStatus: $portalBranding?.features?.enableServiceStatus !== false,
+    billing: $portalBranding?.features?.enableBilling !== false,
     knowledgeBase: !!$portalBranding?.features?.enableKnowledgeBase,
     liveChat: !!$portalBranding?.features?.enableLiveChat
   };
@@ -52,6 +53,9 @@
       <nav class="header-nav">
         <a href="/modules/customers/portal/dashboard" class="nav-link">Dashboard</a>
         <a href="/modules/customers/portal/tickets" class="nav-link">Tickets</a>
+        {#if featureFlags.billing}
+          <a href="/modules/customers/portal/billing" class="nav-link">Billing</a>
+        {/if}
         {#if featureFlags.serviceStatus}
           <a href="/modules/customers/portal/service" class="nav-link">Service Status</a>
         {/if}

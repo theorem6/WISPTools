@@ -13,6 +13,7 @@ export const API_CONFIG = {
     PLANS: '/api/plans',
     NETWORK: '/api/network',
     CUSTOMERS: '/api/customers',
+    CUSTOMER_BILLING: '/api/customer-billing',
     INVENTORY: '/api/inventory',
     BUNDLES: '/api/bundles',
     DEPLOY: '/api/deploy',
@@ -30,6 +31,7 @@ export const API_CONFIG = {
     SNMP_MONITORING: '/api/snmp',
     MONITORING_GRAPHS: '/api/monitoring/graphs',
     DEVICE_ASSIGNMENT: '/api/device-assignment',
+    NOTIFICATIONS: '/api/notifications',
     API: '/api'
   },
   
@@ -37,7 +39,9 @@ export const API_CONFIG = {
   CLOUD_FUNCTIONS: {
     API_PROXY: 'https://us-central1-wisptools-production.cloudfunctions.net/apiProxy',
     ISO_PROXY: 'https://us-central1-wisptools-production.cloudfunctions.net/isoProxy',
-    COVERAGE_MAP_PROXY: 'https://us-central1-wisptools-production.cloudfunctions.net/coverageMapProxy'
+    COVERAGE_MAP_PROXY: 'https://us-central1-wisptools-production.cloudfunctions.net/coverageMapProxy',
+    // Direct URL for user-tenants (bypasses Hosting so path is not lost)
+    USER_TENANTS: 'https://usertenants-nxulhoqnyq-uc.a.run.app'
   },
   
   // Backend services (GCE VM)

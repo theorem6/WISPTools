@@ -5,6 +5,7 @@
   import { onMount, onDestroy } from 'svelte';
   import type { CPEDevice } from '$lib/genieacs/models/cpeDevice';
   import type { CPEPerformanceData } from '$lib/genieacs/mappers/enhancedArcGISMapper';
+  import { apiService } from '$lib/services/apiService';
 
   export let cpeDevice: CPEDevice | null = null;
   export let isOpen: boolean = false;
@@ -34,6 +35,27 @@
     cleanup();
   });
 
+  /** Map GenieACS/TR-069 parameters to CPEPerformanceData */
+  function paramsToPerformanceData(deviceId: string, params: Record<string, unknown>): CPEPerformanceData {
+    const num = (v: unknown): number => (typeof v === 'number' && !Number.isNaN(v)) ? v : (typeof v === 'string' ? parseFloat(v) || 0 : 0);
+    // Common TR-069 / GenieACS parameter paths
+    const ds = num(params['InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.LinkDownstreamMaxBitRate'] ?? params['Device.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.LinkDownstreamMaxBitRate']);
+    const us = num(params['InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.LinkUpstreamMaxBitRate'] ?? params['Device.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.LinkUpstreamMaxBitRate']);
+    const bandwidthMbps = ds > 0 ? ds / 1e6 : (us > 0 ? us / 1e6 : 0);
+    const uptimeSec = num(params['InternetGatewayDevice.DeviceInfo.UpTime'] ?? params['Device.DeviceInfo.UpTime']);
+    const lastInform = params['InternetGatewayDevice.DeviceInfo.LastInform'] ?? params['Device.DeviceInfo.LastInform'];
+    const timestamp = typeof lastInform === 'number' ? new Date(lastInform * 1000) : new Date();
+    return {
+      deviceId,
+      signalStrength: num(params['InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.LinkStatus'] ?? params['Device.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.LinkStatus']) || 0,
+      bandwidth: bandwidthMbps,
+      latency: 0,
+      packetLoss: 0,
+      uptime: uptimeSec,
+      timestamp
+    };
+  }
+
   async function loadPerformanceData() {
     if (!cpeDevice) return;
 
@@ -41,24 +63,38 @@
     error = null;
 
     try {
-      // TODO: Replace with actual API call to get performance data
-      // For now, use the device's current performance metrics
-      performanceData = {
-        deviceId: cpeDevice.id,
-        signalStrength: cpeDevice.performanceMetrics.signalStrength,
-        bandwidth: cpeDevice.performanceMetrics.bandwidth,
-        latency: cpeDevice.performanceMetrics.latency,
-        packetLoss: cpeDevice.performanceMetrics.packetLoss,
-        uptime: cpeDevice.performanceMetrics.uptime,
-        timestamp: cpeDevice.performanceMetrics.lastUpdate
-      };
+      const res = await apiService.getDeviceParameters(cpeDevice.id);
+      if (res.success && res.data?.parameters) {
+        const params = res.data.parameters as Record<string, unknown>;
+        performanceData = paramsToPerformanceData(cpeDevice.id, params);
+      } else {
+        // Fallback to device's current performance metrics
+        performanceData = {
+          deviceId: cpeDevice.id,
+          signalStrength: cpeDevice.performanceMetrics?.signalStrength ?? 0,
+          bandwidth: cpeDevice.performanceMetrics?.bandwidth ?? 0,
+          latency: cpeDevice.performanceMetrics?.latency ?? 0,
+          packetLoss: cpeDevice.performanceMetrics?.packetLoss ?? 0,
+          uptime: cpeDevice.performanceMetrics?.uptime ?? 0,
+          timestamp: cpeDevice.performanceMetrics?.lastUpdate ?? new Date()
+        };
+      }
 
-      // Initialize chart configs
       initializeCharts();
-
     } catch (err) {
       error = err instanceof Error ? err.message : 'Failed to load performance data';
       console.error('Error loading performance data:', err);
+      // Fallback to device metrics on error
+      performanceData = cpeDevice ? {
+        deviceId: cpeDevice.id,
+        signalStrength: cpeDevice.performanceMetrics?.signalStrength ?? 0,
+        bandwidth: cpeDevice.performanceMetrics?.bandwidth ?? 0,
+        latency: cpeDevice.performanceMetrics?.latency ?? 0,
+        packetLoss: cpeDevice.performanceMetrics?.packetLoss ?? 0,
+        uptime: cpeDevice.performanceMetrics?.uptime ?? 0,
+        timestamp: cpeDevice.performanceMetrics?.lastUpdate ?? new Date()
+      } : null;
+      if (performanceData) initializeCharts();
     } finally {
       loading = false;
     }

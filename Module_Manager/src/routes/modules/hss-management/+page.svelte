@@ -15,6 +15,9 @@
   import type { Tenant } from '$lib/models/tenant';
   import HelpModal from '$lib/components/modals/HelpModal.svelte';
   import { hssSubscribersDocs } from '$lib/docs/hss-subscribers-docs';
+  import SubscriberCreationWizard from '$lib/components/wizards/hss/SubscriberCreationWizard.svelte';
+  import BandwidthPlanWizard from '$lib/components/wizards/hss/BandwidthPlanWizard.svelte';
+  import SubscriberGroupWizard from '$lib/components/wizards/hss/SubscriberGroupWizard.svelte';
   
   type HSSManagementTab = 'dashboard' | 'groups' | 'plans' | 'mme' | 'import' | 'remote-epcs';
   
@@ -33,6 +36,12 @@
   // Help
   let showHelpModal = false;
   const helpContent = hssSubscribersDocs;
+  // Subscriber Creation Wizard
+  let showSubscriberWizard = false;
+  // Bandwidth Plan Wizard
+  let showBandwidthPlanWizard = false;
+  // Subscriber Group Wizard
+  let showGroupWizard = false;
   
   // Watch for tenant changes and reload data
   $: if (browser && tenantId) {
@@ -143,9 +152,32 @@
   <div class="header">
     <div class="header-content">
       <div class="header-main">
-        <button class="back-button" onclick={() => window.location.href = '/dashboard'}>
-          ← Back to Dashboard
-        </button>
+        <div class="header-row">
+          <button class="back-button" onclick={() => window.location.href = '/dashboard'}>
+            ← Back to Dashboard
+          </button>
+          <button
+            class="wizard-header-btn"
+            onclick={() => showSubscriberWizard = true}
+            title="Subscriber Creation Wizard"
+          >
+            🧙 Add Subscriber Wizard
+          </button>
+          <button
+            class="wizard-header-btn"
+            onclick={() => showBandwidthPlanWizard = true}
+            title="Bandwidth Plan Wizard"
+          >
+            📶 Add Plan Wizard
+          </button>
+          <button
+            class="wizard-header-btn"
+            onclick={() => showGroupWizard = true}
+            title="Subscriber Group Wizard"
+          >
+            📦 Add Group Wizard
+          </button>
+        </div>
         <div>
           <h1>🔐 HSS & Subscriber Management</h1>
           <p class="subtitle">Home Subscriber Server - Authentication & User Management</p>
@@ -238,6 +270,35 @@
     content={helpContent}
     on:close={() => showHelpModal = false}
   />
+
+  <!-- Subscriber Creation Wizard -->
+  <SubscriberCreationWizard
+    show={showSubscriberWizard}
+    on:close={() => {
+      showSubscriberWizard = false;
+      refreshAll();
+    }}
+  />
+  <BandwidthPlanWizard
+    show={showBandwidthPlanWizard}
+    on:close={() => {
+      showBandwidthPlanWizard = false;
+      refreshAll();
+    }}
+    on:saved={() => {
+      refreshAll();
+    }}
+  />
+  <SubscriberGroupWizard
+    show={showGroupWizard}
+    on:close={() => {
+      showGroupWizard = false;
+      refreshAll();
+    }}
+    on:saved={() => {
+      refreshAll();
+    }}
+  />
 </div>
 </TenantGuard>
 
@@ -308,6 +369,29 @@
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
+  }
+
+  .header-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+
+  .wizard-header-btn {
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .wizard-header-btn:hover {
+    background: var(--hover-bg);
+    border-color: var(--brand-primary);
   }
   
   .header {

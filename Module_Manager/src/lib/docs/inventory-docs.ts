@@ -13,6 +13,7 @@ export const inventoryDocs = `
     <li><a href="#inventory-management">📊 Inventory Management</a></li>
     <li><a href="#maintenance-tracking">🔧 Maintenance Tracking</a></li>
     <li><a href="#bundles-kits">📦 Bundles and Kits</a></li>
+    <li><a href="#checkin-wizard">🧙 Check-in Wizard</a></li>
     <li><a href="#reports">📊 Reports</a></li>
     <li><a href="#mobile-integration">🔍 Mobile App Integration</a></li>
     <li><a href="#best-practices">💡 Best Practices</a></li>
@@ -166,6 +167,84 @@ export const inventoryDocs = `
   <li>Track bundle as single unit</li>
   <li>Individual items still tracked separately</li>
 </ul>
+
+<h4 id="checkin-wizard">🧙 Check-in Wizard</h4>
+
+<div class="info">
+  <strong>Purpose:</strong> Step-by-step guided workflow for checking in received inventory items with proper location assignment, verification, and labeling.
+</div>
+
+<h4>Accessing the Wizard</h4>
+<ol>
+  <li>Navigate to <strong>Inventory</strong> module</li>
+  <li>Click <strong>"📦 Check-in Wizard"</strong> button (primary action button)</li>
+  <li>Wizard opens with welcome screen</li>
+</ol>
+
+<h4>Wizard Overview</h4>
+<p>The Check-in Wizard guides you through:</p>
+<ul>
+  <li>Scanning or entering item serial number</li>
+  <li>Verifying item details</li>
+  <li>Setting storage location</li>
+  <li>Printing asset tag label</li>
+  <li>Completing check-in</li>
+</ul>
+
+<h4>Check-in Methods</h4>
+
+<h4>Barcode Scan</h4>
+<ul>
+  <li>Use camera to scan barcode/QR code</li>
+  <li>Automatic item lookup</li>
+  <li>Fastest method for bulk check-ins</li>
+</ul>
+
+<h4>Manual Entry</h4>
+<ul>
+  <li>Enter serial number manually</li>
+  <li>Enter purchase order ID (optional)</li>
+  <li>Lookup item in system</li>
+</ul>
+
+<h4>Bulk Check-in</h4>
+<ul>
+  <li>Check in multiple items at once</li>
+  <li>Streamlined workflow</li>
+  <li>Efficient for large shipments</li>
+</ul>
+
+<h4>Wizard Steps</h4>
+<ol>
+  <li><strong>Welcome:</strong> Overview of check-in process</li>
+  <li><strong>Scan Item:</strong> Identify item via scan or manual entry</li>
+  <li><strong>Verify:</strong> Review and update item details</li>
+  <li><strong>Set Location:</strong> Choose storage location (warehouse, tower, NOC, vehicle, other)</li>
+  <li><strong>Print Label:</strong> Preview and print asset tag</li>
+  <li><strong>Complete:</strong> Review summary and finish</li>
+</ol>
+
+<h4>Location Types</h4>
+<ul>
+  <li><strong>Warehouse:</strong> Section and shelf</li>
+  <li><strong>Tower Site:</strong> Site, rack, and rack unit</li>
+  <li><strong>NOC:</strong> Room and rack</li>
+  <li><strong>Vehicle:</strong> Vehicle ID and name</li>
+  <li><strong>Other:</strong> Custom description</li>
+</ul>
+
+<h4>Tips for Using the Wizard</h4>
+<ul>
+  <li>Have serial numbers or barcodes ready</li>
+  <li>Know storage location before starting</li>
+  <li>Print labels immediately for easy tracking</li>
+  <li>Link to purchase orders when available</li>
+  <li>Add notes for any special handling requirements</li>
+</ul>
+
+<div class="success">
+  <strong>✅ Quick Access:</strong> The Check-in Wizard can also be accessed from the "Scan Check In" modal by selecting "Wizard Mode" option.
+</div>
 
 <h4 id="reports">📊 Reports</h4>
 

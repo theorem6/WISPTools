@@ -293,14 +293,15 @@ class APIService {
 
   /**
    * Get plans for mobile app user based on their role
-   * @param userId - User ID
+   * @param userId - User ID (e.g. Firebase UID)
    * @param role - User role: 'engineer', 'tower-crew', 'installer', 'manager', 'supervisor'
+   * @param options.filter - 'assigned-to-me' to return only plans assigned to this user
    */
-  async getPlans(userId: string, role: string = 'tower-crew') {
+  async getPlans(userId: string, role: string = 'tower-crew', options?: { filter?: 'assigned-to-me' }) {
     try {
-      const response = await this.client.get(`/api/plans/mobile/${userId}`, {
-        params: { role }
-      });
+      const params: { role: string; filter?: string } = { role };
+      if (options?.filter === 'assigned-to-me') params.filter = 'assigned-to-me';
+      const response = await this.client.get(`/api/plans/mobile/${userId}`, { params });
       return response.data.plans || [];
     } catch (error) {
       console.error('Error fetching plans:', error);
@@ -323,6 +324,106 @@ class APIService {
     } catch (error) {
       console.error('Error fetching plan details:', error);
       return null;
+    }
+  }
+
+  /**
+   * Upload plan deployment photo. Backend stores in MongoDB Atlas (GridFS) when possible, Firebase Storage as fallback.
+   * @param userId - Current user ID (Firebase UID)
+   * @param planId - Plan ID
+   * @param fileUri - Local file URI from image picker
+   * @param filename - Optional filename
+   * @param mimeType - Optional (default image/jpeg)
+   * @returns { url, storage: 'mongodb'|'firebase' }
+   */
+  async uploadPlanDeploymentPhoto(
+    userId: string,
+    planId: string,
+    fileUri: string,
+    filename?: string,
+    mimeType: string = 'image/jpeg'
+  ): Promise<{ url: string; storage: string }> {
+    const form = new FormData();
+    const name = filename || `photo-${Date.now()}.jpg`;
+    form.append('photo', { uri: fileUri, name, type: mimeType } as any);
+    const response = await this.client.post(
+      `/api/plans/mobile/${userId}/${planId}/deployment/photos`,
+      form,
+      {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        maxBodyLength: 15 * 1024 * 1024,
+        maxContentLength: 15 * 1024 * 1024,
+      }
+    );
+    return response.data;
+  }
+
+  /**
+   * Update plan deployment progress/docs (stage, notes, photo URLs). Allowed only for assigned techs.
+   * @param userId - Current user ID (Firebase UID)
+   * @param planId - Plan ID
+   * @param body - { deploymentStage?, notes?, documentation?: { notes?, installationPhotos? } }
+   */
+  async updatePlanDeployment(
+    userId: string,
+    planId: string,
+    body: {
+      deploymentStage?: string;
+      notes?: string;
+      documentation?: { notes?: string; installationPhotos?: string[] };
+    }
+  ) {
+    try {
+      const response = await this.client.patch(
+        `/api/plans/mobile/${userId}/${planId}/deployment`,
+        body
+      );
+      return response.data;
+    } catch (error) {
+      console.error('Error updating plan deployment:', error);
+      throw error;
+    }
+  }
+
+  // ============================================================================
+  // NOTIFICATIONS API (§4 – project approvals, etc.)
+  // ============================================================================
+
+  /**
+   * Get user notifications (recent, read and unread). Returns [] when unauthenticated.
+   */
+  async getNotifications(): Promise<{ id: string; type: string; title: string; message: string; read: boolean; createdAt: string; data?: any }[]> {
+    try {
+      const response = await this.client.get('/api/notifications');
+      return response.data ?? [];
+    } catch (error) {
+      console.error('Error fetching notifications:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get unread notification count.
+   */
+  async getUnreadNotificationCount(): Promise<number> {
+    try {
+      const response = await this.client.get('/api/notifications/count');
+      return response.data?.count ?? 0;
+    } catch (error) {
+      console.error('Error fetching notification count:', error);
+      return 0;
+    }
+  }
+
+  /**
+   * Mark notification as read.
+   */
+  async markNotificationRead(id: string): Promise<void> {
+    try {
+      await this.client.put(`/api/notifications/${id}/read`);
+    } catch (error) {
+      console.error('Error marking notification read:', error);
+      throw error;
     }
   }
 

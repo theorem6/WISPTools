@@ -3,6 +3,8 @@
   import { authService } from '$lib/services/authService';
   import { goto } from '$app/navigation';
   import { page } from '$app/stores';
+  import { currentTenant } from '$lib/stores/tenantStore';
+  import { getTenantAppSettings, saveTenantAppSettings } from '$lib/services/tenantSettingsService';
   
   export let show = false;
   
@@ -54,6 +56,16 @@
     loadSettings();
   });
   
+  $: if (show && $currentTenant?.id) {
+    loadAppSettingsFromBackend();
+  }
+  
+  async function loadAppSettingsFromBackend() {
+    const settings = await getTenantAppSettings($currentTenant?.id);
+    acsSettings = { ...acsSettings, ...settings.acsSettings };
+    companyInfo = { ...companyInfo, ...settings.companyInfo };
+  }
+  
   function loadSettings() {
     // Load theme from localStorage
     const savedTheme = localStorage.getItem('theme') as 'light' | 'dark' | 'system';
@@ -64,23 +76,29 @@
     // Load debug setting
     debugEnabled = isDebugEnabled();
     
-    // Load ACS settings from localStorage (temporary - should be from backend)
-    const savedACS = localStorage.getItem('acs_settings');
-    if (savedACS) {
-      try {
-        acsSettings = JSON.parse(savedACS);
-      } catch (e) {
-        console.error('Failed to parse ACS settings:', e);
+    // Load ACS and company from backend (or localStorage fallback) when tenant is set
+    const tenantId = typeof window !== 'undefined' ? ($currentTenant?.id ?? localStorage.getItem('selectedTenantId') ?? undefined) : undefined;
+    if (tenantId) {
+      getTenantAppSettings(tenantId).then((s) => {
+        acsSettings = { ...acsSettings, ...s.acsSettings };
+        companyInfo = { ...companyInfo, ...s.companyInfo };
+      });
+    } else {
+      const savedACS = localStorage.getItem('acs_settings');
+      if (savedACS) {
+        try {
+          acsSettings = { ...acsSettings, ...JSON.parse(savedACS) };
+        } catch (e) {
+          console.error('Failed to parse ACS settings:', e);
+        }
       }
-    }
-    
-    // Load company info from localStorage (temporary - should be from backend)
-    const savedCompany = localStorage.getItem('company_info');
-    if (savedCompany) {
-      try {
-        companyInfo = JSON.parse(savedCompany);
-      } catch (e) {
-        console.error('Failed to parse company info:', e);
+      const savedCompany = localStorage.getItem('company_info');
+      if (savedCompany) {
+        try {
+          companyInfo = { ...companyInfo, ...JSON.parse(savedCompany) };
+        } catch (e) {
+          console.error('Failed to parse company info:', e);
+        }
       }
     }
   }
@@ -121,16 +139,17 @@
   async function saveACSSettings() {
     loading = true;
     saveError = '';
-    
     try {
-      // TODO: Save to backend when API is ready
-      localStorage.setItem('acs_settings', JSON.stringify(acsSettings));
-      
-      saveSuccess = true;
-      setTimeout(() => saveSuccess = false, 2000);
-    } catch (error: any) {
+      const ok = await saveTenantAppSettings($currentTenant?.id, { acsSettings });
+      if (ok) {
+        saveSuccess = true;
+        setTimeout(() => (saveSuccess = false), 2000);
+      } else {
+        saveError = 'Failed to save ACS settings. Check your connection.';
+      }
+    } catch (error: unknown) {
       console.error('Failed to save ACS settings:', error);
-      saveError = error.message || 'Failed to save ACS settings';
+      saveError = error instanceof Error ? error.message : 'Failed to save ACS settings';
     } finally {
       loading = false;
     }
@@ -139,16 +158,17 @@
   async function saveCompanyInfo() {
     loading = true;
     saveError = '';
-    
     try {
-      // TODO: Save to backend when API is ready
-      localStorage.setItem('company_info', JSON.stringify(companyInfo));
-      
-      saveSuccess = true;
-      setTimeout(() => saveSuccess = false, 2000);
-    } catch (error: any) {
+      const ok = await saveTenantAppSettings($currentTenant?.id, { companyInfo });
+      if (ok) {
+        saveSuccess = true;
+        setTimeout(() => (saveSuccess = false), 2000);
+      } else {
+        saveError = 'Failed to save company info. Check your connection.';
+      }
+    } catch (error: unknown) {
       console.error('Failed to save company info:', error);
-      saveError = error.message || 'Failed to save company info';
+      saveError = error instanceof Error ? error.message : 'Failed to save company info';
     } finally {
       loading = false;
     }
@@ -161,13 +181,51 @@
     saveError = '';
     dispatch('close');
   }
+
+  let panelEl: HTMLDivElement | undefined;
+  let prevShow = false;
+  const FOCUSABLE_SEL = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
+  function getFocusables(container: HTMLElement): HTMLElement[] {
+    return Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE_SEL)).filter((el) => !el.hasAttribute('disabled'));
+  }
+  $: if (show && !prevShow) {
+    prevShow = true;
+    setTimeout(() => panelEl && getFocusables(panelEl)[0]?.focus(), 50);
+  }
+  $: if (!show) prevShow = false;
+  function handlePanelKeydown(e: KeyboardEvent) {
+    if (e.key === 'Escape') {
+      handleClose();
+      return;
+    }
+    if (e.key === 'Tab' && panelEl) {
+      const focusables = getFocusables(panelEl);
+      if (focusables.length === 0) return;
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      const target = e.shiftKey ? (document.activeElement === first ? last : null) : (document.activeElement === last ? first : null);
+      if (target) {
+        e.preventDefault();
+        target.focus();
+      }
+    }
+  }
 </script>
 
 {#if show}
-  <div class="settings-overlay" on:click={handleClose}>
-    <div class="settings-panel" class:plan-deploy-mode={isPlanOrDeploy} on:click|stopPropagation>
+  <div class="settings-overlay" on:click={handleClose} role="presentation">
+    <div
+      class="settings-panel"
+      class:plan-deploy-mode={isPlanOrDeploy}
+      on:click|stopPropagation
+      on:keydown={handlePanelKeydown}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="settings-title"
+      bind:this={panelEl}
+    >
       <div class="settings-header">
-        <h2>⚙️ Settings</h2>
+        <h2 id="settings-title">⚙️ Settings</h2>
         <div class="header-actions">
           <button class="close-btn" on:click={handleClose} title="Close">✕</button>
         </div>

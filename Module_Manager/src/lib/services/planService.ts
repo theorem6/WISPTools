@@ -592,11 +592,22 @@ class PlanService {
   
   /**
    * Approve plan for deployment
+   * @param options.assignedToUserId - Firebase UID of assigned tech (for field app "My Projects")
+   * @param options.assignedToName - Display name of assignee
    */
-  async approvePlan(planId: string, notes?: string): Promise<PlanProject> {
+  async approvePlan(
+    planId: string,
+    notes?: string,
+    options?: { assignedToUserId?: string; assignedToName?: string }
+  ): Promise<PlanProject> {
+    const body: { notes?: string; assignedToUserId?: string; assignedToName?: string } = { notes };
+    if (options?.assignedToUserId) {
+      body.assignedToUserId = options.assignedToUserId;
+      body.assignedToName = options.assignedToName ?? options.assignedToUserId;
+    }
     const result = await this.apiCall(`/${planId}/approve`, {
       method: 'POST',
-      body: JSON.stringify({ notes })
+      body: JSON.stringify(body)
     });
     return this.mapBackendPlanToFrontend(result.plan);
   }

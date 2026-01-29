@@ -5,7 +5,7 @@
 set -e
 
 BACKEND_DIR="/home/david_peterson_consulting_com/lte-wisp-backend"
-REPO_URL="https://github.com/theorem6/lte-pci-mapper.git"
+REPO_URL="https://github.com/theorem6/WISPTools.git"
 TEMP_DIR="/tmp/lte-pci-mapper-deploy"
 
 echo "=== Deploying iso-helpers.js from Git ==="

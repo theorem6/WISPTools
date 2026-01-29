@@ -845,13 +845,21 @@ router.get('/:userId/activity', requireAdmin, async (req, res) => {
       });
     }
     
-    // Query activity logs (if implemented)
-    // For now, return placeholder
+    const { ActivityLog } = require('../services/activityLogService');
+    const activities = await ActivityLog.find({ userId, tenantId })
+      .sort({ createdAt: -1 })
+      .limit(100)
+      .lean();
     res.json({
       userId,
       tenantId,
-      activities: [],
-      message: 'Activity logging not yet implemented'
+      activities: activities.map((a) => ({
+        action: a.action,
+        resource: a.resource,
+        resourceId: a.resourceId,
+        details: a.details,
+        createdAt: a.createdAt
+      }))
     });
   } catch (error) {
     console.error('Error getting user activity:', error);

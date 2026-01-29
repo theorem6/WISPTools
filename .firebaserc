@@ -2,6 +2,17 @@
   "projects": {
     "default": "wisptools-production"
   },
-  "targets": {},
+  "targets": {
+    "hosting": {
+      "app": "wisptools-production"
+    },
+    "wisptools-production": {
+      "hosting": {
+        "app": [
+          "wisptools-production"
+        ]
+      }
+    }
+  },
   "etags": {}
 }

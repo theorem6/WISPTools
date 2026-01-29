@@ -1290,16 +1290,92 @@ router.post('/import/acs', async (req, res) => {
   }
 });
 
-// Import from CBRS (if needed)
+// Import from CBRS - Accept CBRS device/site data and create network equipment
 router.post('/import/cbrs', async (req, res) => {
   try {
     const tenantId = req.tenantId;
-    // CBRS import would go here
-    // This would typically fetch from CBRS API endpoints
+    const { devices, sites } = req.body || {};
+    const results = { imported: 0, failed: 0, errors: [] };
+    const mongoose = require('mongoose');
+
+    if (Array.isArray(sites) && sites.length > 0) {
+      for (const site of sites) {
+        try {
+          const existing = await UnifiedSite.findOne({
+            tenantId,
+            name: site.name || site.displayName
+          });
+          if (existing) {
+            results.errors.push({ site: site.name, message: 'Site already exists' });
+            results.failed++;
+            continue;
+          }
+          await UnifiedSite.create({
+            tenantId,
+            name: site.name || site.displayName || `CBRS Site ${Date.now()}`,
+            location: site.location || { latitude: 0, longitude: 0 },
+            status: 'active',
+            modules: { cbrs: { enabled: true, lastSync: new Date() } }
+          });
+          results.imported++;
+        } catch (e) {
+          results.errors.push({ site: site.name, message: e.message });
+          results.failed++;
+        }
+      }
+    }
+
+    if (Array.isArray(devices) && devices.length > 0) {
+      for (const dev of devices) {
+        try {
+          const serial = dev.serialNumber || dev.deviceId || dev.cbsdId || `cbrs-${Date.now()}-${results.imported}`;
+          const existing = await UnifiedCPE.findOne({
+            tenantId,
+            serialNumber: serial
+          });
+          if (existing) {
+            results.errors.push({ device: dev.deviceId, message: 'Device already exists' });
+            results.failed++;
+            continue;
+          }
+          let siteId = null;
+          if (dev.siteId && mongoose.Types.ObjectId.isValid(dev.siteId)) {
+            siteId = dev.siteId;
+          } else if (dev.deploymentId) {
+            const site = await UnifiedSite.findOne({ tenantId, name: dev.deploymentId }).lean();
+            if (site) siteId = site._id;
+          }
+          await UnifiedCPE.create({
+            tenantId,
+            siteId,
+            name: dev.name || dev.displayName || dev.cbsdId || `CBSD ${serial}`,
+            technology: 'CBRS',
+            manufacturer: dev.manufacturer || 'CBRS',
+            model: dev.model || 'CBSD',
+            serialNumber: serial,
+            status: 'active',
+            modules: { cbrs: { enabled: true, lastSync: new Date() } }
+          });
+          results.imported++;
+        } catch (e) {
+          results.errors.push({ device: dev.deviceId, message: e.message });
+          results.failed++;
+        }
+      }
+    }
+
+    if (results.imported === 0 && results.failed === 0 && !sites?.length && !devices?.length) {
+      return res.status(400).json({
+        error: 'sites or devices array required',
+        message: 'Provide { sites: [...] } and/or { devices: [...] } in request body'
+      });
+    }
+
     res.json({
-      imported: 0,
-      errors: [],
-      message: 'CBRS import not yet implemented'
+      imported: results.imported,
+      failed: results.failed,
+      errors: results.errors,
+      message: `Imported ${results.imported} CBRS items`
     });
   } catch (error) {
     console.error('Error importing from CBRS:', error);

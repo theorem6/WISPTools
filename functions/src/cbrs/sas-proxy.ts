@@ -5,6 +5,7 @@
 
 import { onCall } from 'firebase-functions/v2/https';
 import { db } from '../firebaseInit.js';
+import { getDecryptedCbrsConfig } from './config-secure.js';
 
 /**
  * Proxy SAS requests to Google or Federated Wireless
@@ -24,60 +25,55 @@ export const proxySASRequest = onCall(async (request) => {
     
     console.log(`[SAS Proxy] ${sasProvider} ${method} ${endpoint} for tenant ${tenantId}`);
     
-    // Load configuration
-    const configDoc = await db.collection('cbrs_config').doc(tenantId).get();
+    // Load configuration (decrypted when stored with encryption)
+    const config = await getDecryptedCbrsConfig(tenantId);
     
-    if (!configDoc.exists) {
+    if (!config) {
       throw new Error('CBRS configuration not found. Please configure your SAS API keys.');
     }
-    
-    const config = configDoc.data();
     
     // Try tenant config first, fall back to platform config
     let apiUrl: string;
     let apiKey: string;
     
+    const c = config as Record<string, unknown>;
+    const platformDoc = () => db.collection('platform_config').doc('cbrs').get();
     if (sasProvider === 'google') {
-      // Check if using shared platform config
-      if (config?.deployment_model === 'shared-platform') {
+      if (c?.deployment_model === 'shared-platform') {
         console.log('[SAS Proxy] Using shared platform configuration');
-        const platformConfigDoc = await db.collection('platform_config').doc('cbrs').get();
-        const platformConfig = platformConfigDoc.data();
-        
-        if (!platformConfig?.google_sas_api_key) {
+        const platformConfigDoc = await platformDoc();
+        const platformConfig = platformConfigDoc.data() as Record<string, unknown> | undefined;
+        const key = platformConfig?.google_sas_api_key;
+        if (!key || typeof key !== 'string') {
           throw new Error('Platform Google SAS API key not configured');
         }
-        
-        apiUrl = platformConfig.google_sas_api_url || 'https://wirelessconnectivity.googleapis.com/v1';
-        apiKey = platformConfig.google_sas_api_key;
+        apiUrl = (platformConfig?.google_sas_api_url as string) || 'https://wirelessconnectivity.googleapis.com/v1';
+        apiKey = key;
       } else {
-        // Use tenant-specific configuration
-        apiUrl = config?.google_sas_api_url || 'https://wirelessconnectivity.googleapis.com/v1';
-        apiKey = config?.google_sas_api_key;
-        
-        if (!apiKey) {
+        const key = c?.google_sas_api_key;
+        if (!key || typeof key !== 'string') {
           throw new Error('Google SAS API key not configured for this tenant');
         }
+        apiUrl = (c?.google_sas_api_url as string) || 'https://wirelessconnectivity.googleapis.com/v1';
+        apiKey = key;
       }
     } else if (sasProvider === 'federated') {
-      // Similar logic for Federated Wireless
-      if (config?.deployment_model === 'shared-platform') {
-        const platformConfigDoc = await db.collection('platform_config').doc('cbrs').get();
-        const platformConfig = platformConfigDoc.data();
-        
-        if (!platformConfig?.federated_api_key) {
+      if (c?.deployment_model === 'shared-platform') {
+        const platformConfigDoc = await platformDoc();
+        const platformConfig = platformConfigDoc.data() as Record<string, unknown> | undefined;
+        const key = platformConfig?.federated_api_key;
+        if (!key || typeof key !== 'string') {
           throw new Error('Platform Federated Wireless API key not configured');
         }
-        
-        apiUrl = platformConfig.federated_api_url || 'https://api.federatedwireless.com';
-        apiKey = platformConfig.federated_api_key;
+        apiUrl = (platformConfig?.federated_api_url as string) || 'https://api.federatedwireless.com';
+        apiKey = key;
       } else {
-        apiUrl = config?.federated_api_url || 'https://api.federatedwireless.com';
-        apiKey = config?.federated_api_key;
-        
-        if (!apiKey) {
+        const key = c?.federated_api_key;
+        if (!key || typeof key !== 'string') {
           throw new Error('Federated Wireless API key not configured for this tenant');
         }
+        apiUrl = (c?.federated_api_url as string) || 'https://api.federatedwireless.com';
+        apiKey = key;
       }
     } else {
       throw new Error('Invalid SAS provider');

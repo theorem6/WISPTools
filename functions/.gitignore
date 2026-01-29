@@ -8,3 +8,4 @@ typings/
 # Node.js dependency directory
 node_modules/
 *.local
+.internal-api-key-temp

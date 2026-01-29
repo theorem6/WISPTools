@@ -28,3 +28,8 @@ export {
   cbrsWebhook
 } from './analytics.js';
 
+export {
+  saveCbrsConfigSecure,
+  loadCbrsConfigSecure,
+  getDecryptedCbrsConfig
+} from './config-secure.js';

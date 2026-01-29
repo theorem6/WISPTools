@@ -11,9 +11,10 @@ const API_URL = getApiUrl();
 
 class CustomerPortalService {
   /**
-   * Get customer's tickets (filtered from work orders)
+   * Get customer's tickets (filtered from work orders).
+   * Pass tenantId (e.g. from customer.tenantId) so the backend can scope the request.
    */
-  async getCustomerTickets(customerId?: string): Promise<WorkOrder[]> {
+  async getCustomerTickets(tenantId?: string): Promise<WorkOrder[]> {
     try {
       const token = await this.getIdToken();
       
@@ -21,10 +22,11 @@ class CustomerPortalService {
         throw new Error('Not authenticated');
       }
       
+      const headers: Record<string, string> = { 'Authorization': `Bearer ${token}` };
+      if (tenantId) headers['X-Tenant-ID'] = tenantId;
+      
       const response = await fetch(`${API_URL}/customer-portal/tickets`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+        headers
       });
       
       if (!response.ok) {
@@ -39,7 +41,7 @@ class CustomerPortalService {
   }
 
   /**
-   * Create ticket (customer)
+   * Create ticket (customer). Pass tenantId when available (e.g. from customer.tenantId).
    */
   async createCustomerTicket(ticketData: {
     title: string;
@@ -47,7 +49,7 @@ class CustomerPortalService {
     category?: string;
     priority?: 'low' | 'medium' | 'high' | 'critical';
     attachments?: File[];
-  }): Promise<WorkOrder> {
+  }, tenantId?: string): Promise<WorkOrder> {
     try {
       const token = await this.getIdToken();
       
@@ -55,12 +57,15 @@ class CustomerPortalService {
         throw new Error('Not authenticated');
       }
       
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      };
+      if (tenantId) headers['X-Tenant-ID'] = tenantId;
+      
       const response = await fetch(`${API_URL}/customer-portal/tickets`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
+        headers,
         body: JSON.stringify(ticketData)
       });
       
@@ -78,9 +83,9 @@ class CustomerPortalService {
   }
 
   /**
-   * Get ticket (ensures customer owns it)
+   * Get ticket (ensures customer owns it). Pass tenantId when available.
    */
-  async getCustomerTicket(ticketId: string): Promise<WorkOrder> {
+  async getCustomerTicket(ticketId: string, tenantId?: string): Promise<WorkOrder> {
     try {
       const token = await this.getIdToken();
       
@@ -88,10 +93,11 @@ class CustomerPortalService {
         throw new Error('Not authenticated');
       }
       
+      const headers: Record<string, string> = { 'Authorization': `Bearer ${token}` };
+      if (tenantId) headers['X-Tenant-ID'] = tenantId;
+      
       const response = await fetch(`${API_URL}/customer-portal/tickets/${ticketId}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+        headers
       });
       
       if (!response.ok) {
@@ -109,9 +115,9 @@ class CustomerPortalService {
   }
 
   /**
-   * Add comment to ticket (customer can only comment, not change status)
+   * Add comment to ticket (customer can only comment, not change status). Pass tenantId when available.
    */
-  async addTicketComment(ticketId: string, comment: string): Promise<void> {
+  async addTicketComment(ticketId: string, comment: string, tenantId?: string): Promise<void> {
     try {
       const token = await this.getIdToken();
       
@@ -119,12 +125,15 @@ class CustomerPortalService {
         throw new Error('Not authenticated');
       }
       
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      };
+      if (tenantId) headers['X-Tenant-ID'] = tenantId;
+      
       const response = await fetch(`${API_URL}/customer-portal/tickets/${ticketId}/comments`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
+        headers,
         body: JSON.stringify({ comment })
       });
       
@@ -139,9 +148,9 @@ class CustomerPortalService {
   }
 
   /**
-   * Get customer service information
+   * Get customer service information. Pass tenantId when available.
    */
-  async getCustomerServiceInfo(): Promise<any> {
+  async getCustomerServiceInfo(tenantId?: string): Promise<any> {
     try {
       const token = await this.getIdToken();
       
@@ -149,10 +158,11 @@ class CustomerPortalService {
         throw new Error('Not authenticated');
       }
       
+      const headers: Record<string, string> = { 'Authorization': `Bearer ${token}` };
+      if (tenantId) headers['X-Tenant-ID'] = tenantId;
+      
       const response = await fetch(`${API_URL}/customer-portal/service`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+        headers
       });
       
       if (!response.ok) {
@@ -162,6 +172,36 @@ class CustomerPortalService {
       return await response.json();
     } catch (error: any) {
       console.error('Error fetching service info:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get logged-in customer's billing (read-only). Pass tenantId when available.
+   */
+  async getCustomerBilling(tenantId?: string): Promise<{
+    _id?: string;
+    customerId: string;
+    tenantId: string;
+    servicePlan?: { planName?: string; monthlyFee?: number; setupFee?: number };
+    billingCycle?: { type?: string; dayOfMonth?: number; nextBillingDate?: string };
+    balance?: { current?: number; overdue?: number };
+    autoPay?: { enabled?: boolean };
+    invoices?: unknown[];
+  } | null> {
+    try {
+      const token = await this.getIdToken();
+      if (!token) throw new Error('Not authenticated');
+
+      const headers: Record<string, string> = { Authorization: `Bearer ${token}` };
+      if (tenantId) headers['X-Tenant-ID'] = tenantId;
+
+      const response = await fetch(`${API_URL}/customer-portal/billing`, { headers });
+      if (!response.ok) throw new Error(`Failed to fetch billing: ${response.statusText}`);
+      const data = await response.json();
+      return data ?? null;
+    } catch (error: any) {
+      console.error('Error fetching customer billing:', error);
       throw error;
     }
   }

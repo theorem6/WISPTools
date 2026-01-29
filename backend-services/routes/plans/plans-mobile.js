@@ -12,17 +12,25 @@ const UnifiedTower = UnifiedSite; // Backwards compatibility alias
 
 /**
  * GET /plans/mobile/:userId - Get plans for mobile app user (role-based)
+ * Query: role, filter=assigned-to-me (return only plans assigned to this user)
  */
 router.get('/mobile/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
-    const { role } = req.query; // 'engineer', 'tower-crew', 'manager', etc.
+    const { role, filter } = req.query; // role: 'engineer', 'tower-crew', etc.; filter: 'assigned-to-me'
     
-    // Get all approved/ready plans for the tenant
-    const plans = await PlanProject.find({
+    const query = {
       tenantId: req.tenantId,
       status: { $in: ['approved', 'ready'] }
-    }).lean();
+    };
+    if (filter === 'assigned-to-me') {
+      query.$or = [
+        { 'deployment.assignedTo': userId },
+        { 'deployment.assignedTeam': userId },
+        { 'deployment.fieldTechs.userId': userId }
+      ];
+    }
+    const plans = await PlanProject.find(query).lean();
     
     // Filter and format plans based on user role
     const roleBasedPlans = plans.map(plan => {
@@ -185,12 +193,81 @@ router.get('/mobile/:userId/:planId', async (req, res) => {
       planDetails.equipment = equipment.filter(eq => 
         ['antenna', 'radio', 'mounting-hardware', 'cable'].includes(eq.type)
       );
+      planDetails.deployment = {
+        deploymentStage: plan.deployment?.deploymentStage || 'planning',
+        notes: plan.deployment?.notes,
+        documentation: plan.deployment?.documentation ? {
+          notes: plan.deployment.documentation.notes,
+          installationPhotos: plan.deployment.documentation.installationPhotos || []
+        } : { notes: undefined, installationPhotos: [] }
+      };
     }
     
     res.json(planDetails);
   } catch (error) {
     console.error('Error fetching mobile plan details:', error);
     res.status(500).json({ error: 'Failed to fetch plan details', message: error.message });
+  }
+});
+
+/**
+ * PATCH /plans/mobile/:userId/:planId/deployment - Update deployment progress/docs (field app)
+ * Body: { deploymentStage?, notes?, documentation?: { notes? } }
+ * Allowed only if userId is in deployment.assignedTo, assignedTeam, or fieldTechs[].userId
+ */
+router.patch('/mobile/:userId/:planId/deployment', async (req, res) => {
+  try {
+    const { userId, planId } = req.params;
+    const { deploymentStage, notes, documentation } = req.body;
+
+    const plan = await PlanProject.findOne({
+      _id: planId,
+      tenantId: req.tenantId
+    });
+
+    if (!plan) {
+      return res.status(404).json({ error: 'Plan not found' });
+    }
+
+    const isAssigned =
+      plan.deployment?.assignedTo === userId ||
+      (Array.isArray(plan.deployment?.assignedTeam) && plan.deployment.assignedTeam.includes(userId)) ||
+      (Array.isArray(plan.deployment?.fieldTechs) && plan.deployment.fieldTechs.some((ft) => ft.userId === userId));
+    if (!isAssigned) {
+      return res.status(403).json({ error: 'Only assigned techs can update deployment progress' });
+    }
+
+    if (!plan.deployment) plan.deployment = {};
+    if (deploymentStage != null) {
+      const allowed = ['planning', 'procurement', 'preparation', 'in_progress', 'testing', 'completed', 'on_hold', 'cancelled'];
+      if (allowed.includes(deploymentStage)) {
+        plan.deployment.deploymentStage = deploymentStage;
+        if (deploymentStage === 'in_progress' && !plan.deployment.actualStartDate) {
+          plan.deployment.actualStartDate = new Date();
+        }
+        if (deploymentStage === 'completed') {
+          plan.deployment.actualEndDate = new Date();
+        }
+      }
+    }
+    if (notes !== undefined) plan.deployment.notes = notes;
+    if (documentation && typeof documentation === 'object') {
+      if (!plan.deployment.documentation) plan.deployment.documentation = {};
+      if (documentation.notes !== undefined) plan.deployment.documentation.notes = documentation.notes;
+      if (Array.isArray(documentation.installationPhotos)) {
+        plan.deployment.documentation.installationPhotos = documentation.installationPhotos;
+      }
+    }
+    plan.updatedAt = new Date();
+    await plan.save();
+
+    res.json({
+      plan: plan.toObject ? plan.toObject() : plan,
+      message: 'Deployment updated'
+    });
+  } catch (error) {
+    console.error('Error updating plan deployment:', error);
+    res.status(500).json({ error: 'Failed to update deployment', message: error.message });
   }
 });
 

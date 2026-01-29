@@ -1,63 +1,18 @@
-# WISPTools Documentation Site
+# WISPTools Documentation Site (Deprecated)
 
-This is the interactive documentation site for WISPTools, built with VitePress.
+**Documentation is now integrated into the main app.** Do not deploy this VitePress site.
 
-## Development
+- **In-app docs:** Use **/docs** (Documentation home, Reference, Project Status) and **/help** (topic-based help) in the main WISPTools app.
+- **Dashboard:** Click the 📖 Documentation button (next to Wizards and Settings) to open `/docs`.
+- **Project Status:** `/docs/reference/project-status` summarizes where the project stands and next items.
+
+This folder is kept for reference. Content from `reference/project-status.md` and the docs index has been migrated into the main app at `Module_Manager/src/routes/docs/` and `Module_Manager/src/lib/docs/`. The main app is the single source for in-app documentation; the repo `docs/` folder remains the source of truth for planning and status markdown.
+
+## If you need to run this site locally
 
 ```bash
-# Install dependencies
 npm install
-
-# Start dev server
 npm run dev
-
-# Build for production
-npm run build
-
-# Preview production build
-npm run preview
 ```
 
-## Structure
-
-```
-docs-site/
-├── .vitepress/
-│   └── config.ts          # VitePress configuration
-├── getting-started/        # Getting started guides
-├── guides/                 # User, admin, and developer guides
-├── api/                    # API reference
-├── deployment/             # Deployment documentation
-└── index.md                # Homepage
-```
-
-## Adding Documentation
-
-1. Create or move markdown files to appropriate directories
-2. Add frontmatter with metadata (see template below)
-3. Update sidebar navigation in `.vitepress/config.ts`
-
-### Frontmatter Template
-
-```yaml
----
-title: "Page Title"
-description: "Brief description"
-category: "guides" | "api" | "reference" | "tutorial"
-subcategory: "user-guides" | "admin-guides" | "developer-guides"
-tags: ["tag1", "tag2"]
-last_updated: "2025-12-19"
-difficulty: "beginner" | "intermediate" | "advanced"
-audience: "users" | "administrators" | "developers" | "all"
----
-```
-
-## Deployment
-
-The documentation site can be deployed to:
-- Firebase Hosting (recommended, integrates with main app)
-- GitHub Pages
-- Netlify
-- Vercel
-- Any static hosting service
-
+The Firebase Hosting target for this site has been removed; only the main app is deployed.

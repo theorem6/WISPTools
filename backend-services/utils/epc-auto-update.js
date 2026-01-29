@@ -128,14 +128,17 @@ function generateUpdateCommand(updateInfo, options = {}) {
   // Repository is PRIVATE - uses HTTPS with token authentication
   const GITHUB_TOKEN = process.env.GITHUB_TOKEN || 
                        process.env.GH_TOKEN || 
-                       appConfig?.externalServices?.github?.token || 
-                       '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';
+                       appConfig?.externalServices?.github?.token;
   const GIT_REPO_BRANCH = 'main';
   const GIT_REPO_DIR = '/opt/wisptools/repo';
   const SCRIPTS_SOURCE_DIR = `${GIT_REPO_DIR}/backend-services/scripts`;
   
   // Use HTTPS URL with token for private repository
-  const GIT_REPO_URL = `https://${GITHUB_TOKEN}@github.com/theorem6/lte-pci-mapper.git`;
+  if (!GITHUB_TOKEN) {
+    console.error('[EPC Auto-Update] GITHUB_TOKEN not set - cannot fetch from private repo');
+    return;
+  }
+  const GIT_REPO_URL = `https://${GITHUB_TOKEN}@github.com/theorem6/WISPTools.git`;
   console.log('[EPC Auto-Update] Using HTTPS with token authentication for private repository');
   
   // Sort scripts by priority (lower number = higher priority)
@@ -233,8 +236,8 @@ else
     git config --global credential.helper '' 2>&1 | while read line; do log "$line"; done
     git config --global http.sslVerify true 2>&1 | while read line; do log "$line"; done
     git config --global --add safe.directory "${GIT_REPO_DIR}" 2>&1 | while read line; do log "$line"; done
-    git config --global url."${GIT_REPO_URL}".insteadOf "git@github.com:theorem6/lte-pci-mapper.git" 2>&1 | while read line; do log "$line"; done
-    git config --global url."${GIT_REPO_URL}".insteadOf "https://github.com/theorem6/lte-pci-mapper.git" 2>&1 | while read line; do log "$line"; done
+    git config --global url."${GIT_REPO_URL}".insteadOf "git@github.com:theorem6/WISPTools.git" 2>&1 | while read line; do log "$line"; done
+    git config --global url."${GIT_REPO_URL}".insteadOf "https://github.com/theorem6/WISPTools.git" 2>&1 | while read line; do log "$line"; done
     
     # Check current remote - if it's SSH or wrong, force recreate
     CURRENT_REMOTE=$(git remote get-url origin 2>/dev/null || echo "none")

@@ -457,16 +457,19 @@ print_header "Setting Up Metrics Agent"
 print_status "Creating metrics collection agent..."
 
 # Download metrics agent from GitHub (private repo)
-GITHUB_TOKEN="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"
-print_status "Downloading metrics agent from GitHub..."
-curl -H "Authorization: token \${GITHUB_TOKEN}" \\
-  -o /opt/open5gs-metrics-agent.js \\
-  https://raw.githubusercontent.com/theorem6/lte-pci-mapper/main/deployment-files/open5gs-metrics-agent.js
-
-if [ $? -eq 0 ]; then
+# GITHUB_TOKEN must be set in env - do not hardcode
+DOWNLOAD_OK=0
+if [ -n "\${GITHUB_TOKEN}" ]; then
+  print_status "Downloading metrics agent from GitHub..."
+  curl -sSf -H "Authorization: token \${GITHUB_TOKEN}" \\
+    -o /opt/open5gs-metrics-agent.js \\
+    https://raw.githubusercontent.com/theorem6/WISPTools/main/deployment-files/open5gs-metrics-agent.js
+  DOWNLOAD_OK=$?
+fi
+if [ $DOWNLOAD_OK -eq 0 ] && [ -s /opt/open5gs-metrics-agent.js ]; then
     print_success "Metrics agent downloaded"
 else
-    print_warning "Download failed, using embedded version..."
+    print_warning "Download failed or GITHUB_TOKEN not set, using embedded version..."
     # Fallback to embedded version
     cat > /opt/open5gs-metrics-agent.js <<'EOFAGENT'
 #!/usr/bin/env node

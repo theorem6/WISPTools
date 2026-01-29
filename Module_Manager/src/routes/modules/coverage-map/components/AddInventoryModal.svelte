@@ -1,13 +1,14 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
-  import { inventoryService } from '$lib/services/inventoryService';
+  import { inventoryService, type InventoryItem } from '$lib/services/inventoryService';
   import { mapLayerManager } from '$lib/map/MapLayerManager';
   import type { TowerSite, NetworkEquipment } from '../lib/models';
   
   export let show = false;
   export let site: TowerSite | null = null;
   export let planId: string | null = null;
-  
+  export let tenantId = '';
+
   const dispatch = createEventDispatcher();
   
   let isSaving = false;
@@ -310,7 +311,7 @@
           notes: formData.notes || undefined
         };
 
-        await inventoryService.createItem(inventoryData);
+        await inventoryService.createItem(inventoryData as unknown as Partial<InventoryItem>);
         dispatch('saved', { message: 'Hardware added to inventory.' });
       }
 

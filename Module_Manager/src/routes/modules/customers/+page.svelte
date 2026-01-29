@@ -1,16 +1,19 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { browser } from '$app/environment';
+  import { afterNavigate } from '$app/navigation';
   import { currentTenant } from '$lib/stores/tenantStore';
   import TenantGuard from '$lib/components/admin/TenantGuard.svelte';
   import { customerService, type Customer } from '$lib/services/customerService';
   import AddEditCustomerModal from './components/AddEditCustomerModal.svelte';
+  import CustomerBillingModal from './components/CustomerBillingModal.svelte';
+  import CustomerOnboardingWizard from '$lib/components/wizards/customers/CustomerOnboardingWizard.svelte';
   import { goto } from '$app/navigation';
   import GroupManagement from '../hss-management/components/GroupManagement.svelte';
   import BandwidthPlans from '../hss-management/components/BandwidthPlans.svelte';
   import { API_CONFIG } from '$lib/config/api';
   
-  type CustomerTab = 'customers' | 'service-plans' | 'customer-groups';
+  type CustomerTab = 'customers' | 'service-plans' | 'customer-groups' | 'billing' | 'portal';
   
   let activeTab: CustomerTab = 'customers';
   const HSS_API = API_CONFIG.PATHS.HSS;
@@ -24,7 +27,10 @@
   // Modals
   let showAddModal = false;
   let showEditModal = false;
+  let showBillingModal = false;
+  let showOnboardingWizard = false;
   let selectedCustomer: Customer | null = null;
+  let customerForBilling: Customer | null = null;
   
   // Search & Filters
   let searchQuery = '';
@@ -44,10 +50,13 @@
   
   let loadTimeout: ReturnType<typeof setTimeout> | null = null;
   
+  afterNavigate(({ to }) => {
+    const tab = to?.url.searchParams.get('tab');
+    if (tab === 'billing') activeTab = 'billing';
+    else if (tab === 'portal') activeTab = 'portal';
+  });
   onMount(() => {
-    if (tenantId) {
-      loadCustomers();
-    }
+    if (tenantId) loadCustomers();
   });
   
   // Only reload when tenantId changes, not on every render
@@ -163,7 +172,21 @@
   function handleModalClose() {
     showAddModal = false;
     showEditModal = false;
+    showBillingModal = false;
     selectedCustomer = null;
+    customerForBilling = null;
+  }
+
+  function handleOpenBilling(customer: Customer) {
+    customerForBilling = customer;
+    showBillingModal = true;
+  }
+
+  function handleBillingSaved() {
+    showBillingModal = false;
+    customerForBilling = null;
+    success = 'Billing saved.';
+    setTimeout(() => { success = ''; }, 3000);
   }
   
   async function handleCustomerSaved() {
@@ -210,24 +233,15 @@
       </div>
       <div class="header-actions">
         {#if activeTab === 'customers'}
-          <a 
-            href="/modules/customers/portal-setup" 
-            class="btn-secondary"
-            title="Setup Customer Portal"
-          >
-            🌐 Setup Portal
-          </a>
-          <a 
-            href="/modules/customers/portal/login" 
-            target="_blank" 
-            class="btn-secondary"
-            title="Open Customer Portal"
-          >
-            👁️ View Portal
-          </a>
+          <button class="btn-secondary" on:click={() => showOnboardingWizard = true} title="Guided customer onboarding">
+            🧙 Onboarding Wizard
+          </button>
           <button class="btn-primary" on:click={handleAdd}>
             ➕ Add Customer
           </button>
+        {:else if activeTab === 'portal'}
+          <a href="/modules/customers/portal-setup" class="btn-secondary" title="Setup Customer Portal">🌐 Setup Portal</a>
+          <a href="/modules/customers/portal/login" target="_blank" class="btn-secondary" title="Open Customer Portal">👁️ View Portal</a>
         {/if}
       </div>
     </div>
@@ -251,6 +265,18 @@
         on:click={() => activeTab = 'customer-groups'}
       >
         📦 Customer Groups
+      </button>
+      <button 
+        class:active={activeTab === 'billing'} 
+        on:click={() => activeTab = 'billing'}
+      >
+        💳 Billing
+      </button>
+      <button 
+        class:active={activeTab === 'portal'} 
+        on:click={() => activeTab = 'portal'}
+      >
+        🌐 Portal
       </button>
     </div>
     
@@ -405,6 +431,9 @@
                 <button class="btn-secondary btn-sm" on:click={() => handleEdit(customer)}>
                   ✏️ Edit
                 </button>
+                <button class="btn-secondary btn-sm" on:click={() => handleOpenBilling(customer)} title="View or edit billing">
+                  💳 Billing
+                </button>
                 <button class="btn-danger btn-sm" on:click={() => handleDelete(customer)}>
                   🗑️ Delete
                 </button>
@@ -431,6 +460,48 @@
       {:else if activeTab === 'customer-groups'}
         <!-- Customer Groups Tab -->
         <GroupManagement {tenantId} {HSS_API} />
+      {:else if activeTab === 'billing'}
+        <!-- Billing Tab: open customer billing from here or from customer cards -->
+        <div class="billing-tab">
+          <div class="billing-tab-header">
+            <p class="billing-tab-desc">View or edit per-customer billing (service plan, fees, billing cycle). You can also click <strong>Billing</strong> on any customer card in the Customers tab.</p>
+          </div>
+          {#if customers.length === 0}
+            <div class="empty-state">
+              <p>No customers yet.</p>
+              <p class="empty-sub">Add customers in the <strong>Customers</strong> tab, then open billing from their card or from this list.</p>
+              <button class="btn-primary" on:click={() => activeTab = 'customers'}>Go to Customers</button>
+            </div>
+          {:else}
+            <div class="billing-list">
+              {#each customers as customer (customer._id || customer.customerId)}
+                <div class="billing-row">
+                  <span class="billing-name">{customer.fullName || `${customer.firstName} ${customer.lastName}`}</span>
+                  <span class="billing-id">{customer.customerId}</span>
+                  <button class="btn-secondary btn-sm" on:click={() => handleOpenBilling(customer)} title="Open billing">
+                    💳 Open billing
+                  </button>
+                </div>
+              {/each}
+            </div>
+          {/if}
+        </div>
+      {:else if activeTab === 'portal'}
+        <!-- Portal Tab: setup and view customer portal -->
+        <div class="portal-tab">
+          <div class="portal-tab-header">
+            <h2>Customer Portal</h2>
+            <p class="portal-tab-desc">The customer portal lets your subscribers log in to view tickets, service status, billing, and support. Use <strong>Setup Portal</strong> to configure branding and options; use <strong>View Portal</strong> to open the portal in a new tab.</p>
+          </div>
+          <div class="portal-actions">
+            <a href="/modules/customers/portal-setup" class="btn-primary" title="Configure portal branding and options">
+              🌐 Setup Portal
+            </a>
+            <a href="/modules/customers/portal/login" target="_blank" rel="noopener noreferrer" class="btn-secondary" title="Open portal login in new tab">
+              👁️ View Portal
+            </a>
+          </div>
+        </div>
       {/if}
     </div>
   </div>
@@ -452,6 +523,21 @@
       on:close={handleModalClose}
     />
   {/if}
+
+  {#if showBillingModal && customerForBilling}
+    <CustomerBillingModal
+      show={showBillingModal}
+      customer={customerForBilling}
+      on:saved={handleBillingSaved}
+      on:close={handleModalClose}
+    />
+  {/if}
+
+  <CustomerOnboardingWizard
+    show={showOnboardingWizard}
+    on:close={() => { showOnboardingWizard = false; loadCustomers(); }}
+    on:saved={() => loadCustomers()}
+  />
 </TenantGuard>
 
 <style>
@@ -645,6 +731,73 @@
     color: var(--text-secondary);
   }
   
+  .billing-tab {
+    padding: 1rem 0;
+  }
+  .billing-tab-header {
+    margin-bottom: 1.5rem;
+  }
+  .billing-tab-desc {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+    max-width: 640px;
+  }
+  .billing-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  .billing-row {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.75rem 1rem;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    flex-wrap: wrap;
+  }
+  .billing-name {
+    flex: 1;
+    min-width: 140px;
+    font-weight: 500;
+    color: var(--text-primary);
+  }
+  .billing-id {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+  }
+  .portal-tab {
+    padding: 1rem 0;
+  }
+  .portal-tab-header {
+    margin-bottom: 1.5rem;
+  }
+  .portal-tab-header h2 {
+    margin: 0 0 0.5rem 0;
+    font-size: 1.25rem;
+    color: var(--text-primary);
+  }
+  .portal-tab-desc {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+    max-width: 640px;
+  }
+  .portal-actions {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+  .portal-actions a {
+    text-decoration: none;
+  }
+  .empty-sub {
+    margin: 0.5rem 0 0 0;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+  }
   .empty-state {
     text-align: center;
     padding: 4rem 2rem;

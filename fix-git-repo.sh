@@ -21,8 +21,15 @@ log "Fixing Git Repository"
 log "========================================="
 
 GIT_REPO_DIR="/opt/wisptools/repo"
-GITHUB_TOKEN="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"
-GIT_REPO_URL="https://${GITHUB_TOKEN}@github.com/theorem6/lte-pci-mapper.git"
+# GITHUB_TOKEN must be set in env or /opt/wisptools/.env - do not hardcode
+if [ -z "$GITHUB_TOKEN" ] && [ -f /opt/wisptools/.env ]; then
+  source /opt/wisptools/.env 2>/dev/null || true
+fi
+if [ -z "$GITHUB_TOKEN" ]; then
+  log "ERROR: GITHUB_TOKEN not set. Set in env or /opt/wisptools/.env"
+  exit 1
+fi
+GIT_REPO_URL="https://${GITHUB_TOKEN}@github.com/theorem6/WISPTools.git"
 GIT_REPO_BRANCH="main"
 
 # Check if directory exists and if it's a VALID git repository

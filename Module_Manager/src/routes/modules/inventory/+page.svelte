@@ -12,6 +12,8 @@
   import { barcodeService } from '$lib/services/barcodeService';
   import AssetTagViewer from './components/AssetTagViewer.svelte';
   import ScanModal from './components/ScanModal.svelte';
+  import InventoryCheckInWizard from '$lib/components/wizards/inventory/InventoryCheckInWizard.svelte';
+  import RMATrackingWizard from '$lib/components/wizards/inventory/RMATrackingWizard.svelte';
   import { goto } from '$app/navigation';
   import { page } from '$app/stores';
   import HelpModal from '$lib/components/modals/HelpModal.svelte';
@@ -33,6 +35,11 @@
   // Scanning
   let showScanModal = false;
   let scanMode: 'check-in' | 'check-out' | 'lookup' = 'lookup';
+  
+  // Check-in Wizard
+  let showCheckInWizard = false;
+  // RMA Tracking Wizard
+  let showRMAWizard = false;
   
   // Asset Tag
   let showAssetTag = false;
@@ -319,6 +326,12 @@
       </button>
       <button class="btn-secondary" onclick={() => { scanMode = 'check-in'; showScanModal = true; }}>
         📥 Scan Check In
+      </button>
+      <button class="btn-primary" onclick={() => showCheckInWizard = true}>
+        📦 Check-in Wizard
+      </button>
+      <button class="btn-secondary" onclick={() => showRMAWizard = true}>
+        📋 Track RMA
       </button>
       <button class="btn-secondary" onclick={() => { scanMode = 'check-out'; showScanModal = true; }}>
         📤 Scan Check Out
@@ -614,6 +627,27 @@
       on:checked-out={() => { loadData(); }}
     />
   {/if}
+  
+  <!-- Check-in Wizard -->
+  <InventoryCheckInWizard
+    show={showCheckInWizard}
+    on:close={() => {
+      showCheckInWizard = false;
+      loadData(); // Refresh inventory after check-in
+    }}
+  />
+  <!-- RMA Tracking Wizard -->
+  <RMATrackingWizard
+    show={showRMAWizard}
+    on:close={() => {
+      showRMAWizard = false;
+      loadData();
+    }}
+    on:saved={() => {
+      loadData();
+      loadStats();
+    }}
+  />
 </div>
 
 <!-- Help Button - Fixed Position -->

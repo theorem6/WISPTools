@@ -11,8 +11,15 @@
   import { loadCPEDevices, syncCPEDevices as syncCPEDevicesService } from './lib/cpeDataService';
   import { syncACSCPEToInventory } from '$lib/services/acsInventorySync';
   import ACSSetupWizard from '$lib/components/wizards/ACSSetupWizard.svelte';
+  import TroubleshootingWizard from '$lib/components/wizards/acs/TroubleshootingWizard.svelte';
+  import DeviceOnboardingWizard from '$lib/components/wizards/acs/DeviceOnboardingWizard.svelte';
+  import PresetCreationWizard from '$lib/components/wizards/acs/PresetCreationWizard.svelte';
+  import BulkOperationsWizard from '$lib/components/wizards/acs/BulkOperationsWizard.svelte';
+  import FirmwareUpdateWizard from '$lib/components/wizards/acs/FirmwareUpdateWizard.svelte';
+  import DeviceRegistrationWizard from '$lib/components/wizards/acs/DeviceRegistrationWizard.svelte';
   import CPEPerformanceModal from './components/CPEPerformanceModal.svelte';
-  
+  import { formatUptime } from './lib/tr069MetricsService';
+
   // Module data
   let moduleData = {
     title: 'ACS CPE Management',
@@ -34,10 +41,39 @@
   let isSyncingInventory = false;
   let inventorySyncMessage = '';
   let showSetupWizard = false;
-  
+  let showTroubleshootingWizard = false;
+  let showDeviceOnboardingWizard = false;
+  let showPresetWizard = false;
+  let showBulkWizard = false;
+  let showFirmwareWizard = false;
+  let showDeviceRegistrationWizard = false;
+  let showWizardsDropdown = false;
+  let selectedDeviceForTroubleshooting: { id: string; serial: string } | null = null;
+  $: bulkSelectedDeviceIds = selectedCPE ? [(selectedCPE.id || selectedCPE._id)].filter(Boolean) : [];
+  $: firmwareDeviceIds = selectedCPE ? [(selectedCPE.id || selectedCPE._id)].filter(Boolean) : [];
+
+  // Performance analytics (wired to TR-069 metrics API)
+  let analyticsHoursStr = '6h';
+  let performanceSummary: { averageRSSI: number; signalQuality: number; averageUptime: string } | null = null;
+  let performanceLoading = false;
+
   // Multi-tenant state - use tenant store
   $: tenantName = $currentTenant?.displayName || 'No Tenant Selected';
   $: tenantId = $currentTenant?.id || '';
+  
+  // Track if we've loaded devices for this tenant to prevent duplicate loads
+  let loadedTenantId: string | null = null;
+  
+  // Reactive: reload devices when tenant becomes available or changes
+  $: if (tenantId && browser && tenantId !== loadedTenantId) {
+    loadedTenantId = tenantId;
+    if (!isLoading) {
+      loadDevices();
+      if (mapContainer && !map) {
+        initializeMap();
+      }
+    }
+  }
   
   // Documentation content
   const helpContent = acsCpeDocs;
@@ -47,6 +83,13 @@
       if (browser) {
         console.log('[ACS Module] Initializing...');
         console.log('[ACS Module] Tenant:', tenantName);
+      }
+      
+      // Wait for tenant to be available - reactive statement will handle loading
+      if (!tenantId) {
+        console.log('[ACS Module] Waiting for tenant selection...');
+        isLoading = false;
+        return;
       }
       
       // Load CPE devices using authenticated multi-tenant service
@@ -71,6 +114,12 @@
 
   async function loadDevices() {
     try {
+      // Don't load if no tenant selected
+      if (!tenantId) {
+        console.log('[ACS Module] Skipping device load - no tenant selected');
+        return;
+      }
+      
       console.log(`Loading devices for tenant: ${tenantName} (${tenantId})`);
       
       // Use multi-tenant authenticated service
@@ -155,6 +204,61 @@
     } finally {
       isSyncingInventory = false;
     }
+  }
+
+  async function loadPerformanceSummary() {
+    if (!cpeDevices.length) {
+      performanceSummary = null;
+      return;
+    }
+    performanceLoading = true;
+    performanceSummary = null;
+    try {
+      const online = cpeDevices.filter((d: any) => d.status === 'Online');
+      const toQuery = (online.length ? online : cpeDevices).slice(0, 10);
+      const h: number = { '1h': 1, '6h': 6, '24h': 24, '7d': 168 }[analyticsHoursStr] ?? 6;
+
+      const latest: { rssi: number; rsrp: number; uptime: number }[] = [];
+      for (const dev of toQuery) {
+        const id = dev.id || dev._id;
+        if (!id) continue;
+        const res = await fetch(`/api/tr069/device-metrics?deviceId=${encodeURIComponent(id)}&hours=${h}`);
+        if (!res.ok) continue;
+        const data = await res.json();
+        const metrics = data?.metrics;
+        if (Array.isArray(metrics) && metrics.length > 0) {
+          const m = metrics[metrics.length - 1];
+          if (typeof m.rssi === 'number' && typeof m.uptime === 'number') {
+            latest.push({
+              rssi: m.rssi,
+              rsrp: typeof m.rsrp === 'number' ? m.rsrp : m.rssi - 10,
+              uptime: m.uptime
+            });
+          }
+        }
+      }
+      if (latest.length === 0) {
+        performanceSummary = null;
+        return;
+      }
+      const avgRssi = latest.reduce((s, x) => s + x.rssi, 0) / latest.length;
+      const avgRsrp = latest.reduce((s, x) => s + x.rsrp, 0) / latest.length;
+      const signalQualityPct = Math.round(Math.min(100, Math.max(0, ((avgRsrp + 140) / 96) * 100)));
+      const avgUptimeSec = latest.reduce((s, x) => s + x.uptime, 0) / latest.length;
+      performanceSummary = {
+        averageRSSI: Math.round(avgRssi * 10) / 10,
+        signalQuality: signalQualityPct,
+        averageUptime: formatUptime(avgUptimeSec)
+      };
+    } catch (_) {
+      performanceSummary = null;
+    } finally {
+      performanceLoading = false;
+    }
+  }
+
+  $: if (browser && cpeDevices.length > 0 && analyticsHoursStr) {
+    loadPerformanceSummary();
   }
 
   // Removed loadFallbackSampleData() - no hardcoded test data
@@ -361,14 +465,12 @@
   }
 
   // Reactive statements for performance analytics
-  $: onlineCount = cpeDevices.filter(d => d.status === 'Online').length;
+  $: onlineCount = cpeDevices.filter((d: any) => d.status === 'Online').length;
   $: totalCount = cpeDevices.length;
   $: uptimePercentage = totalCount > 0 ? ((onlineCount / totalCount) * 100).toFixed(0) : '0';
-
-  // Calculate average RSSI from devices (placeholder - would need actual metrics)
-  $: averageRSSI = -62.3; // Placeholder - in real implementation would calculate from device metrics
-  $: signalQuality = 94.2; // Placeholder - in real implementation would calculate from device metrics
-  $: averageUptime = '2.3h'; // Placeholder - in real implementation would calculate from device metrics
+  $: averageRSSI = performanceSummary?.averageRSSI ?? null;
+  $: signalQuality = performanceSummary?.signalQuality ?? null;
+  $: averageUptime = performanceSummary?.averageUptime ?? null;
 </script>
 
 <svelte:head>
@@ -376,6 +478,7 @@
   <meta name="description" content="TR-069 device management and CPE monitoring with GPS mapping" />
 </svelte:head>
 
+<svelte:window on:click={(e) => { if (showWizardsDropdown && e.target instanceof Element && !(e.target as Element).closest('.wizards-dropdown')) showWizardsDropdown = false; }} />
 <TenantGuard>
 <div class="acs-module">
   <!-- Main Navigation -->
@@ -452,6 +555,53 @@
         >
           ⚙️ Setup ACS
         </button>
+        
+        <button
+          class="btn btn-primary"
+          onclick={() => {
+            showDeviceOnboardingWizard = true;
+          }}
+          disabled={isLoading}
+          title="Onboard a new CPE device"
+        >
+          👋 Onboard Device
+        </button>
+        
+        <button
+          class="btn btn-secondary"
+          onclick={() => {
+            if (selectedCPE) {
+              selectedDeviceForTroubleshooting = {
+                id: selectedCPE.id || selectedCPE._id,
+                serial: selectedCPE.serialNumber || selectedCPE._deviceId?.SerialNumber || ''
+              };
+            }
+            showTroubleshootingWizard = true;
+          }}
+          disabled={isLoading || !selectedCPE}
+          title={selectedCPE ? `Troubleshoot ${selectedCPE.serialNumber || 'device'}` : 'Select a device to troubleshoot'}
+        >
+          🔍 Troubleshoot
+        </button>
+
+        <div class="wizards-dropdown">
+          <button
+            class="btn btn-secondary"
+            onclick={() => showWizardsDropdown = !showWizardsDropdown}
+            disabled={isLoading}
+            title="Open preset, bulk, firmware, or registration wizards"
+          >
+            🧙 More wizards ▼
+          </button>
+          {#if showWizardsDropdown}
+            <div class="wizards-dropdown-menu" role="menu">
+              <button type="button" role="menuitem" onclick={() => { showPresetWizard = true; showWizardsDropdown = false; }}>⚙️ Preset Creation</button>
+              <button type="button" role="menuitem" onclick={() => { showBulkWizard = true; showWizardsDropdown = false; }}>📦 Bulk Operations</button>
+              <button type="button" role="menuitem" onclick={() => { showFirmwareWizard = true; showWizardsDropdown = false; }}>💾 Firmware Update</button>
+              <button type="button" role="menuitem" onclick={() => { showDeviceRegistrationWizard = true; showWizardsDropdown = false; }}>📱 Device Registration</button>
+            </div>
+          {/if}
+        </div>
         
         <button 
           class="btn btn-primary" 
@@ -577,11 +727,14 @@
     <!-- Performance Analytics Section -->
     <div class="performance-analytics-section">
       <div class="section-header">
-        <h3>📊 Performance Analytics</h3>
+        <div class="section-title-block">
+          <h3>📊 Performance Analytics</h3>
+          <p class="section-hint">Monitoring and Graphs are in the sidebar →</p>
+        </div>
         <div class="analytics-controls">
-          <select class="time-select">
+          <select class="time-select" bind:value={analyticsHoursStr} disabled={performanceLoading}>
             <option value="1h">Last Hour</option>
-            <option value="6h" selected>Last 6 Hours</option>
+            <option value="6h">Last 6 Hours</option>
             <option value="24h">Last 24 Hours</option>
             <option value="7d">Last 7 Days</option>
           </select>
@@ -589,14 +742,16 @@
       </div>
 
       <div class="analytics-content">
-        <!-- Performance Summary Cards -->
+        <!-- Performance Summary Cards (from TR-069 metrics API) -->
         <div class="analytics-grid">
           <div class="analytics-card">
             <div class="analytics-icon">📶</div>
             <div class="analytics-metric">
-              <div class="metric-value">{averageRSSI} dBm</div>
+              <div class="metric-value">{averageRSSI != null ? `${averageRSSI} dBm` : (performanceLoading ? '…' : '—')}</div>
               <div class="metric-label">Average RSSI</div>
-              <div class="metric-trend positive">↗️ +2.1 dBm</div>
+              {#if averageRSSI != null && !performanceLoading}
+                <div class="metric-trend neutral">From device metrics</div>
+              {/if}
             </div>
           </div>
 
@@ -612,37 +767,35 @@
           <div class="analytics-card">
             <div class="analytics-icon">⚡</div>
             <div class="analytics-metric">
-              <div class="metric-value">{signalQuality}%</div>
+              <div class="metric-value">{signalQuality != null ? `${signalQuality}%` : (performanceLoading ? '…' : '—')}</div>
               <div class="metric-label">Signal Quality</div>
-              <div class="metric-trend positive">↗️ +1.8%</div>
+              {#if signalQuality != null && !performanceLoading}
+                <div class="metric-trend neutral">RSRP-based</div>
+              {/if}
             </div>
           </div>
 
           <div class="analytics-card">
             <div class="analytics-icon">🔄</div>
             <div class="analytics-metric">
-              <div class="metric-value">{averageUptime}</div>
+              <div class="metric-value">{averageUptime ?? (performanceLoading ? '…' : '—')}</div>
               <div class="metric-label">Avg. Uptime</div>
-              <div class="metric-trend neutral">⟷ Stable</div>
+              {#if averageUptime && !performanceLoading}
+                <div class="metric-trend neutral">From device metrics</div>
+              {/if}
             </div>
           </div>
         </div>
 
-        <!-- Performance Charts Placeholder -->
+        <!-- Per-device metrics & charts (link to dedicated pages) -->
         <div class="performance-charts">
-          <div class="chart-placeholder">
+          <div class="chart-placeholder chart-cta">
             <div class="chart-icon">📈</div>
-            <h4>Network Performance Trends</h4>
-            <p>Aggregated performance charts across all CPE devices will be displayed here</p>
-            <div class="chart-preview">
-              <div class="chart-bars">
-                <div class="bar" style="height: 60%"></div>
-                <div class="bar" style="height: 80%"></div>
-                <div class="bar" style="height: 70%"></div>
-                <div class="bar" style="height: 90%"></div>
-                <div class="bar" style="height: 75%"></div>
-                <div class="bar" style="height: 85%"></div>
-              </div>
+            <h4>Per-Device Metrics & Charts</h4>
+            <p>View time-series RSSI, SINR, throughput, and uptime for individual CPE devices.</p>
+            <div class="chart-actions">
+              <a href="/modules/acs-cpe-management/monitoring" class="btn btn-primary">📊 Monitoring</a>
+              <a href="/modules/acs-cpe-management/graphs" class="btn btn-secondary">📈 Graphs</a>
             </div>
           </div>
         </div>
@@ -748,6 +901,53 @@
       on:complete={() => { showSetupWizard = false; loadDevices(); }}
     />
   {/if}
+  
+  <!-- Device Onboarding Wizard -->
+  <DeviceOnboardingWizard
+    show={showDeviceOnboardingWizard}
+    on:close={() => {
+      showDeviceOnboardingWizard = false;
+      loadDevices(); // Refresh device list after onboarding
+    }}
+  />
+  
+  <!-- Troubleshooting Wizard -->
+  <TroubleshootingWizard
+    show={showTroubleshootingWizard}
+    deviceId={selectedDeviceForTroubleshooting?.id || null}
+    deviceSerial={selectedDeviceForTroubleshooting?.serial || null}
+    on:close={() => {
+      showTroubleshootingWizard = false;
+      selectedDeviceForTroubleshooting = null;
+      loadDevices(); // Refresh device list after troubleshooting
+    }}
+  />
+
+  <!-- Preset Creation Wizard -->
+  <PresetCreationWizard
+    show={showPresetWizard}
+    on:close={() => { showPresetWizard = false; loadDevices(); }}
+  />
+
+  <!-- Bulk Operations Wizard -->
+  <BulkOperationsWizard
+    show={showBulkWizard}
+    selectedDevices={bulkSelectedDeviceIds}
+    on:close={() => { showBulkWizard = false; loadDevices(); }}
+  />
+
+  <!-- Firmware Update Wizard -->
+  <FirmwareUpdateWizard
+    show={showFirmwareWizard}
+    deviceIds={firmwareDeviceIds}
+    on:close={() => { showFirmwareWizard = false; loadDevices(); }}
+  />
+
+  <!-- Device Registration Wizard -->
+  <DeviceRegistrationWizard
+    show={showDeviceRegistrationWizard}
+    on:close={() => { showDeviceRegistrationWizard = false; loadDevices(); }}
+  />
 </div>
 </TenantGuard>
 
@@ -807,6 +1007,41 @@
   
   .help-button:active {
     transform: translateY(0);
+  }
+
+  .wizards-dropdown {
+    position: relative;
+    display: inline-block;
+  }
+
+  .wizards-dropdown-menu {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    margin-top: 0.25rem;
+    min-width: 12rem;
+    padding: 0.25rem 0;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 0.375rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    z-index: 100;
+  }
+
+  .wizards-dropdown-menu button {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 0.5rem 1rem;
+    border: none;
+    background: transparent;
+    color: var(--text-primary);
+    cursor: pointer;
+    font-size: 0.875rem;
+  }
+
+  .wizards-dropdown-menu button:hover {
+    background: var(--bg-secondary);
   }
   
   .help-button svg {
@@ -1155,6 +1390,12 @@
     align-items: center;
   }
 
+  .section-title-block .section-hint {
+    margin: 0.25rem 0 0 0;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+  }
+
   .search-input {
     padding: 0.5rem;
     border: 1px solid var(--border-color);
@@ -1440,6 +1681,33 @@
     margin: 0;
     color: var(--text-secondary);
     max-width: 400px;
+  }
+
+  .chart-cta .chart-actions {
+    display: flex;
+    gap: 0.75rem;
+    margin-top: 0.5rem;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .chart-cta .chart-actions a {
+    text-decoration: none;
+    padding: 0.5rem 1rem;
+    border-radius: 0.375rem;
+    font-weight: 600;
+    font-size: 0.9rem;
+  }
+
+  .chart-cta .chart-actions .btn-primary {
+    background: var(--primary-color, var(--accent-color));
+    color: var(--text-inverse, #fff);
+  }
+
+  .chart-cta .chart-actions .btn-secondary {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
   }
 
   .chart-preview {

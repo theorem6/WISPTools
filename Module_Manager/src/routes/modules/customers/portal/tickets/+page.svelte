@@ -18,7 +18,7 @@
         return;
       }
       
-      tickets = await customerPortalService.getCustomerTickets();
+      tickets = await customerPortalService.getCustomerTickets(customer.tenantId);
     } catch (err: any) {
       error = err.message || 'Failed to load tickets';
     } finally {

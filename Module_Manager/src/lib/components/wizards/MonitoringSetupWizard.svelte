@@ -36,6 +36,7 @@
   let genieacsUrl = '';
   let genieacsApiUrl = '';
   let acsLoaded = false;
+  let snmpLoaded = false;
 
   $: if (show && autoStart) {
     currentStep = 0;
@@ -48,8 +49,14 @@
   $: if (show && !acsLoaded) {
     loadAcsConfiguration();
   }
+
+  $: if (show && !snmpLoaded && $currentTenant?.id) {
+    loadSnmpConfiguration();
+  }
   
   function handleClose() {
+    snmpLoaded = false;
+    acsLoaded = false;
     dispatch('close');
   }
   
@@ -164,6 +171,29 @@
     } catch (err) {
       console.warn('[MonitoringSetupWizard] Failed to load ACS configuration', err);
       acsLoaded = true;
+    }
+  }
+
+  async function loadSnmpConfiguration() {
+    const tenantId = $currentTenant?.id;
+    if (!tenantId) return;
+
+    try {
+      const response = await fetch('/api/snmp/configuration', {
+        headers: {
+          'Content-Type': 'application/json',
+          'x-tenant-id': tenantId
+        }
+      });
+      const data = await response.json();
+      if (response.ok && data && typeof data === 'object') {
+        snmpCommunity = data.defaultCommunity ?? data.community ?? snmpCommunity;
+        snmpVersion = (data.defaultVersion ?? data.version ?? snmpVersion).toString().replace(/^v/, '') || '2c';
+      }
+      snmpLoaded = true;
+    } catch (err) {
+      console.warn('[MonitoringSetupWizard] Failed to load SNMP configuration', err);
+      snmpLoaded = true;
     }
   }
 </script>
@@ -379,27 +409,27 @@
             
             <div class="next-steps">
               <h4>What's Next?</h4>
-              <div class="next-step-item">
+              <a href="/modules/monitoring" class="next-step-item">
                 <span class="icon">📊</span>
                 <div>
                   <strong>View Device Monitoring</strong>
-                  <p>See device status and metrics in the Monitoring module</p>
+                  <p>See device status, SNMP/TR-069 metrics, and topology</p>
                 </div>
-              </div>
-              <div class="next-step-item">
+              </a>
+              <a href="/modules/acs-cpe-management/monitoring" class="next-step-item">
                 <span class="icon">📈</span>
                 <div>
-                  <strong>Monitor Performance</strong>
-                  <p>Track CPU, memory, and network usage over time</p>
+                  <strong>ACS CPE Metrics</strong>
+                  <p>Per-device TR-069 metrics and Performance Analytics</p>
                 </div>
-              </div>
-              <div class="next-step-item">
+              </a>
+              <a href="/modules/acs-cpe-management/alerts" class="next-step-item">
                 <span class="icon">🔔</span>
                 <div>
-                  <strong>Set Up Alerts</strong>
-                  <p>Configure alerts for device outages and performance issues</p>
+                  <strong>ACS Alert Rules</strong>
+                  <p>Configure alerts for CPE outages and performance</p>
                 </div>
-              </div>
+              </a>
             </div>
           </div>
         {/if}
@@ -438,12 +468,13 @@
 {/if}
 
 <style>
-  /* Reuse styles from CBRSSetupWizard - same CSS structure */
+  /* Use app theme (app.css, theme.css) */
   .wizard-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.6);
-    backdrop-filter: blur(4px);
+    background: var(--modal-backdrop-color, rgba(15, 23, 42, 0.55));
+    backdrop-filter: blur(var(--modal-backdrop-blur, 6px));
+    -webkit-backdrop-filter: blur(var(--modal-backdrop-blur, 6px));
     display: flex;
     align-items: center;
     justify-content: center;
@@ -452,14 +483,16 @@
   }
   
   .wizard-modal {
-    background: var(--card-bg, #ffffff);
-    border-radius: 1rem;
+    background: var(--card-bg);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg, 1rem);
     max-width: 700px;
     width: 100%;
     max-height: 90vh;
     display: flex;
     flex-direction: column;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    box-shadow: var(--modal-surface-shadow, var(--shadow-lg));
     animation: slideUp 0.3s ease-out;
   }
   
@@ -479,14 +512,14 @@
     align-items: center;
     justify-content: space-between;
     padding: 1.5rem;
-    border-bottom: 1px solid var(--border-color, #e0e0e0);
+    border-bottom: 1px solid var(--border-color);
   }
   
   .wizard-header h2 {
     margin: 0;
     font-size: 1.5rem;
     font-weight: 600;
-    color: var(--text-primary, #1a1a1a);
+    color: var(--text-primary);
   }
   
   .close-btn {
@@ -494,27 +527,27 @@
     border: none;
     font-size: 1.5rem;
     cursor: pointer;
-    color: var(--text-secondary, #666);
+    color: var(--text-secondary);
     padding: 0.25rem;
     width: 2rem;
     height: 2rem;
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 0.25rem;
+    border-radius: var(--radius-md);
     transition: all 0.2s;
   }
   
   .close-btn:hover {
-    background: var(--hover-bg, #f5f5f5);
-    color: var(--text-primary, #1a1a1a);
+    background: var(--hover-bg);
+    color: var(--text-primary);
   }
   
   .wizard-steps {
     display: flex;
     gap: 0.5rem;
     padding: 1rem 1.5rem;
-    border-bottom: 1px solid var(--border-color, #e0e0e0);
+    border-bottom: 1px solid var(--border-color);
     overflow-x: auto;
   }
   
@@ -523,9 +556,10 @@
     align-items: center;
     gap: 0.5rem;
     padding: 0.5rem 1rem;
-    border: 1px solid var(--border-color, #e0e0e0);
-    background: var(--bg-secondary, #f9f9f9);
-    border-radius: 0.5rem;
+    border: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border-radius: var(--radius-md);
     cursor: pointer;
     transition: all 0.2s;
     white-space: nowrap;
@@ -533,14 +567,15 @@
   }
   
   .wizard-step.active {
-    background: var(--primary-color, #007bff);
-    color: white;
-    border-color: var(--primary-color, #007bff);
+    background: var(--primary-color);
+    color: var(--text-inverse);
+    border-color: var(--primary-color);
   }
   
   .wizard-step.complete {
-    background: var(--success-bg, #d4edda);
-    border-color: var(--success-color, #28a745);
+    background: var(--success-light);
+    border-color: var(--success-color);
+    color: var(--text-primary);
   }
   
   .wizard-step:disabled {
@@ -556,16 +591,18 @@
     flex: 1;
     overflow-y: auto;
     padding: 2rem;
+    background: var(--card-bg);
+    color: var(--text-primary);
   }
   
   .wizard-panel h3 {
     margin: 0 0 0.5rem 0;
     font-size: 1.5rem;
-    color: var(--text-primary, #1a1a1a);
+    color: var(--text-primary);
   }
   
   .wizard-panel p {
-    color: var(--text-secondary, #666);
+    color: var(--text-secondary);
     line-height: 1.6;
     margin: 0.5rem 0;
   }
@@ -575,8 +612,9 @@
     align-items: center;
     justify-content: space-between;
     padding: 1.5rem;
-    border-top: 1px solid var(--border-color, #e0e0e0);
+    border-top: 1px solid var(--border-color);
     gap: 1rem;
+    background: color-mix(in srgb, var(--card-bg) 94%, var(--bg-secondary) 6%);
   }
   
   .footer-actions {
@@ -586,7 +624,7 @@
   
   .btn-primary, .btn-secondary {
     padding: 0.75rem 1.5rem;
-    border-radius: 0.5rem;
+    border-radius: var(--radius-md);
     border: none;
     font-size: 0.875rem;
     font-weight: 500;
@@ -595,12 +633,12 @@
   }
   
   .btn-primary {
-    background: var(--primary-color, #007bff);
-    color: white;
+    background: var(--primary-color);
+    color: var(--text-inverse);
   }
   
   .btn-primary:hover:not(:disabled) {
-    background: var(--primary-hover, #0056b3);
+    background: var(--primary-hover);
   }
   
   .btn-primary:disabled {
@@ -609,14 +647,56 @@
   }
   
   .btn-secondary {
-    background: var(--bg-secondary, #f9f9f9);
-    color: var(--text-primary, #1a1a1a);
-    border: 1px solid var(--border-color, #e0e0e0);
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
   }
   
   .btn-secondary:disabled {
     opacity: 0.5;
     cursor: not-allowed;
   }
-  
+
+  .next-steps {
+    margin-top: 1rem;
+  }
+
+  .next-steps h4 {
+    margin-bottom: 0.75rem;
+    color: var(--text-primary);
+  }
+
+  .next-steps a.next-step-item {
+    display: flex;
+    align-items: start;
+    gap: 1rem;
+    padding: 1rem;
+    margin-bottom: 0.5rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    text-decoration: none;
+    color: var(--text-primary);
+    transition: background 0.2s, border-color 0.2s;
+  }
+
+  .next-steps a.next-step-item:hover {
+    background: var(--hover-bg);
+    border-color: var(--primary-color);
+  }
+
+  .next-steps a.next-step-item .icon {
+    font-size: 1.5rem;
+  }
+
+  .next-steps a.next-step-item strong {
+    display: block;
+    color: var(--text-primary);
+  }
+
+  .next-steps a.next-step-item p {
+    margin: 0.25rem 0 0 0;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+  }
 </style>

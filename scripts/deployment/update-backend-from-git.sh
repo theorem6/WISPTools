@@ -11,9 +11,19 @@ BACKEND_DIR="$REPO_DIR/backend-services"
 echo "🔄 Updating backend from GitHub..."
 echo ""
 
-# GitHub token for private repository access
-GITHUB_TOKEN="${GITHUB_TOKEN:-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}"
-GIT_REPO_URL="https://${GITHUB_TOKEN}@github.com/theorem6/lte-pci-mapper.git"
+# GitHub token for private repository access (required – set in env or .env)
+# Do not commit tokens. Use: export GITHUB_TOKEN=ghp_... or add to /opt/lte-pci-mapper/.env
+if [ -z "$GITHUB_TOKEN" ]; then
+  if [ -f "$REPO_DIR/.env" ]; then
+    source "$REPO_DIR/.env" 2>/dev/null || true
+  fi
+fi
+if [ -z "$GITHUB_TOKEN" ]; then
+  echo "❌ GITHUB_TOKEN is not set. Set it in the environment or in $REPO_DIR/.env"
+  echo "   Example: export GITHUB_TOKEN=ghp_xxxxxxxx"
+  exit 1
+fi
+GIT_REPO_URL="https://${GITHUB_TOKEN}@github.com/theorem6/WISPTools.git"
 
 # Check if repo exists
 if [ ! -d "$REPO_DIR/.git" ]; then

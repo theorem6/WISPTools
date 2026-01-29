@@ -2670,14 +2670,17 @@ export class CoverageMapController {
         import('@arcgis/core/geometry/Polygon.js')
       ]);
 
-      // Render features from all visible projects
-      for (const [projectId, features] of this.projectOverlays.entries()) {
-        const projectInfo = Array.from(this.projectOverlays.keys()).find(id => id === projectId);
-        if (!projectInfo) continue;
+      // Per-project colors so multiple overlays are distinguishable
+      const projectPalette = ['#10b981', '#3b82f6', '#f59e0b', '#8b5cf6', '#06b6d4', '#ef4444', '#84cc16', '#ec4899'];
+      const getProjectColor = (index: number) => projectPalette[index % projectPalette.length];
+
+      const projectEntries = Array.from(this.projectOverlays.entries());
+      for (let pIdx = 0; pIdx < projectEntries.length; pIdx++) {
+        const [projectId, features] = projectEntries[pIdx];
+        const color = getProjectColor(pIdx);
 
         for (const feature of features) {
           const normalized = this.normalizePlanFeature(feature);
-          const color = '#10b981'; // Green for project overlays
           const status = normalized.status || 'overlay';
 
           let esriGeometry: any = null;

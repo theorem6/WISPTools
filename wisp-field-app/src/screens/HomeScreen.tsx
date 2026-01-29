@@ -118,6 +118,26 @@ export default function HomeScreen() {
           <Text style={styles.menuSubtext}>Scan equipment tags</Text>
         </TouchableOpacity>
 
+        {/* §4 §5 – Deployment Plans & Notifications (always reachable) */}
+        <View style={styles.menuRow}>
+          <TouchableOpacity
+            style={[styles.menuButton, styles.halfWidth]}
+            onPress={() => navigation.navigate('Plans' as never)}
+          >
+            <Text style={styles.menuIcon}>📋</Text>
+            <Text style={styles.menuTextSmall}>Deployment Plans</Text>
+            <Text style={styles.menuSubtextSmall}>My Projects</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.menuButton, styles.halfWidth]}
+            onPress={() => navigation.navigate('Notifications' as never)}
+          >
+            <Text style={styles.menuIcon}>🔔</Text>
+            <Text style={styles.menuTextSmall}>Notifications</Text>
+            <Text style={styles.menuSubtextSmall}>Project approvals</Text>
+          </TouchableOpacity>
+        </View>
+
         {isLoadingTasks ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={colors.primary} />

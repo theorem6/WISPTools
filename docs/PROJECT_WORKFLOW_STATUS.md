@@ -11,54 +11,75 @@
 ## 🔨 Needs Implementation
 
 ### 1. Project Overlay System
-**Status**: Partial - projects can group objects but no visual overlay yet
+**Status**: ✅ Visual overlay done; badge/indicator optional
 
-**Needed**:
-- Visual overlay/highlighting for objects in project scope
-- Project badge/indicator on objects
-- Project scope visualization on map
+**Done**:
+- Per-project color overlay on coverage map (`arcgisMapController.renderProjectOverlays()` uses palette: green, blue, amber, violet, cyan, red, lime, pink) so multiple projects are visually distinct
+- Project scope polygons rendered when project overlay is shown (Deploy filter / MapLayerManager)
+
+**Optional next**:
+- Project badge/indicator on individual objects (sectors/CPE) in list or map popup
 
 ### 2. Right-Click Context Menu Enhancement
-**Status**: Basic support exists, needs enhancement
+**Status**: ✅ Sector/CPE options in plan mode done
 
-**Needed**:
-- Add "Create Sector" and "Create CPE" options to context menu in plan mode
-- Ensure all created objects get `planId` set
-- Add visual feedback when creating project-specific objects
+**Done**:
+- "Add Sector to Plan" and "Add CPE Device to Plan" shown in MapContextMenu when `planMode` is true; coverage-map `handleContextMenuAction` opens AddSectorModal / AddCPEModal with `planId={effectivePlanId}` and `initialLatitude={contextMenuLat}` so created objects are plan-scoped
+
+**Optional next**:
+- Visual feedback (e.g. toast or highlight) when a project-specific object is created from the map
 
 ### 3. Deploy Module Integration
-**Status**: Partial - deploy can see plans but filtering needs work
+**Status**: ✅ Complete for overlay + filter
 
-**Needed**:
+**Done**:
 - Show approved/ready projects in Deploy module
-- Add project filter toggle in Deploy module
-- Projects visible in Deploy should filter on/off map
-- Approve/reject workflow from Deploy
+- Project filter panel (Approved) toggles project visibility on map
+- Visibility toggle calls `mapLayerManager.showProjectOverlay` / `hideProjectOverlay`; map updates immediately
+- MapLayerManager syncs `visibleProjects` and `projectOverlays` to mapContext for iframe
+- Approve/reject workflow from Deploy (Plan list modal)
 
 ### 4. Notification System
-**Status**: Not implemented
+**Status**: ✅ In-app complete; Cloud/push/field app optional
 
-**Needed**:
-- Cloud Function to send notifications when project approved
-- Firestore notifications collection
-- Field app notification polling
-- Notification UI in field app
+**Done**:
+- Firestore `notifications` collection (created when plan is approved via `createProjectApprovalNotification`)
+- Firestore composite index on `notifications`: (userId ASC, createdAt DESC) — defined in `firestore.indexes.json`; run `firebase deploy --only firestore:indexes` if needed
+- Backend GET /api/notifications, GET /count, PUT /:id/read with Firebase auth
+- In-app NotificationCenter (bell + dropdown) on dashboard; project approvals appear there
+- NotificationCenter refreshes only when the panel is opened (no reactive loop)
+
+**Done (field app §4):**
+- apiService.getNotifications(), getUnreadNotificationCount(), markNotificationRead(id)
+- NotificationsScreen lists notifications, "Open My Projects" for project_approved; HomeScreen has Deployment Plans + Notifications buttons (when navigator registers Plans + Notifications)
+
+**Optional next**:
+- Cloud Function to send push/email when project approved (SendGrid already optional)
 
 ### 5. Field App Workflow
-**Status**: Not implemented
+**Status**: ✅ My Projects + deployment progress/notes done
 
-**Needed**:
-- Project assignment to field techs
-- Field app project view
-- Deployment documentation interface
-- Progress tracking
-- Finalize project workflow
+**Done**:
+- Assign on approve: Deploy PlanApprovalModal accepts optional "Assign to tech" (user ID + name); backend stores in `plan.deployment.assignedTo` / `assignedToName` / `assignedTeam`
+- `GET /api/plans/mobile/:userId?filter=assigned-to-me` returns plans assigned to that user
+- Field app PlansScreen: "My Projects" | "All Plans" toggle; "My Projects" uses `filter=assigned-to-me`
+- Backend `PATCH /api/plans/mobile/:userId/:planId/deployment`: update `deploymentStage`, `notes`, `documentation.notes` (assigned techs only); plan details include `deployment` for tower-crew/installer
+- Field app PlanDetailsScreen: "Progress & Notes" for tower-crew/installer — stage buttons, field notes, Save notes; installation photos: "Take photo" / "Choose from library" upload via backend (MongoDB Atlas GridFS when possible, Firebase Storage fallback), or paste URLs and Save photo URLs — PATCH accepts `documentation.installationPhotos` (§5 in-app camera/upload done)
+
+**Storage:** Backend `POST /api/plans/mobile/:userId/:planId/deployment/photos` (multipart) stores in **MongoDB Atlas (GridFS)** when connected; falls back to **Firebase Storage** if GridFS fails. `GET /api/plans/deployment-photos/:planId/:fileId` serves from GridFS.
+
+**Done (navigator):** Field app uses React Navigation in `src/navigation/AppNavigator.tsx`; Plans, Notifications, PlanDetails and all HomeScreen routes (QRScanner, Checkin, Checkout, etc.) are wired. App.tsx shows Login or Home based on auth, then navigator handles Plans/Notifications/PlanDetails.
 
 ## Next Steps (Priority Order)
 
-1. **Enhance MapContextMenu** - Add sector/CPE creation options in plan mode
-2. **Project Overlay Visualization** - Add visual indicators for project objects
-3. **Deploy Module Filtering** - Add project filter controls
-4. **Notification System** - Cloud Function + Firestore
-5. **Field App Integration** - Project workflow UI
+1. **Enhance MapContextMenu** - ✅ Done (sector/CPE "Add to Plan" + modal wiring; see §2)
+2. **Project Overlay Visualization** - ✅ Done (per-project colors in coverage map; see §1)
+3. **Deploy Module Filtering** - ✅ Done (project filter panel, MapLayerManager overlay sync; see §3)
+4. **Notification System** - ✅ In-app complete; Cloud Function + Firestore optional (see §4)
+5. **Field App Integration** - ✅ Done (My Projects, assign on approve, deployment progress/notes, photo URLs; see §5)
+
+## Optional follow-ups
+
+- **Backend deploy:** Use `DEPLOY_BACKEND_FALLBACK.md` (or `docs/deployment/DEPLOY_BACKEND_MANUAL.md`) when SSH from Windows fails; run the manual `gcloud compute ssh` steps from Cloud Shell or a host with working IAP.
+- **API_BASE_URL:** Set in backend env (see `backend-services/.env.example`) so deployment photo URLs (GridFS) use the correct public base URL when served behind a load balancer or Cloud Run.
 

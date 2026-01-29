@@ -42,6 +42,7 @@
   import SettingsMenu from '$lib/components/navigation/SettingsMenu.svelte';
   import BasemapSwitcher from '$lib/components/maps/BasemapSwitcher.svelte';
   import HelpModal from '$lib/components/modals/HelpModal.svelte';
+  import ConflictResolutionWizard from '$lib/components/wizards/pci/ConflictResolutionWizard.svelte';
   import { pciResolutionDocs } from '$lib/docs/pci-resolution-docs';
   import type { CellSite } from '$lib/models/cellSite';
   import { convertLegacyToCellSite, convertCellSiteToLegacy } from '$lib/models/cellSite';
@@ -60,6 +61,7 @@
   let showTowerManager = false;
   let showExportModal = false;
   let showHelpModal = false;
+  let showConflictResolutionWizard = false;
   let contextMenuX = 0;
   let contextMenuY = 0;
   let selectedCell: Cell | null = null;
@@ -328,12 +330,11 @@
       // Pass conflicts to renderCells for color-coding
       mapInstance.renderCells(cells, conflicts);
     }
-    
-        if (conflicts.length > 0) {
-          mapInstance.renderConflicts(conflicts);
-        }
-      }
-      
+    if (conflicts.length > 0) {
+      mapInstance.renderConflicts(conflicts);
+    }
+  }
+  
   // Reactive statement to update map when cells or conflicts change
   $: if (mapInstance && $cellsStore.items.length > 0) {
     updateMapVisualization();
@@ -560,6 +561,7 @@
     on:towers={() => showTowerManager = true}
     on:analyze={() => performAnalysis(true)}
     on:optimize={optimizePCIAssignments}
+    on:wizard={() => showConflictResolutionWizard = true}
     on:analysis={() => uiActions.openModal('showAnalysisModal')}
     on:conflicts={() => uiActions.openModal('showConflictsModal')}
     on:recommendations={() => uiActions.openModal('showRecommendationsModal')}
@@ -707,6 +709,15 @@
     title="PCI Resolution & Network Optimization Help"
     content={helpContent}
     on:close={() => showHelpModal = false}
+  />
+  
+  <ConflictResolutionWizard
+    show={showConflictResolutionWizard}
+    on:close={() => showConflictResolutionWizard = false}
+    on:saved={() => {
+      showConflictResolutionWizard = false;
+      performAnalysis(false);
+    }}
   />
   
         </div>

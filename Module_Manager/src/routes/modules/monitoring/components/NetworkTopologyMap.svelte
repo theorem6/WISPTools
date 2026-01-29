@@ -146,17 +146,33 @@
   
   async function initializeTopology() {
     try {
+      // Wait for container to be available and mounted (avoids "hasChildNodes" on null)
+      if (!topologyContainer) {
+        console.warn('[Network Topology] Container not ready, retrying...');
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+      const container = topologyContainer;
+      if (
+        !container ||
+        typeof container !== 'object' ||
+        !(container instanceof HTMLElement) ||
+        !document.body?.contains(container)
+      ) {
+        console.warn('[Network Topology] Container not available or not in DOM, skipping init');
+        return;
+      }
+
       // Initialize vis.js network
       const vis = await import('vis-network/standalone');
-      
+
       // Create empty datasets
       nodes = new vis.DataSet([]);
       edges = new vis.DataSet([]);
-      
+
       const data = { nodes, edges };
       const options = getNetworkOptions();
-      
-      network = new vis.Network(topologyContainer, data, options);
+
+      network = new vis.Network(container, data, options);
       
       // Add event listeners
       network.on('selectNode', handleNodeSelect);
@@ -234,14 +250,19 @@
     nodes.add(processedNodes);
     edges.add(processedEdges);
     
-    // Fit network to show all nodes
+    // Fit network to show all nodes (guard in case network was destroyed before timeout)
     setTimeout(() => {
-      network.fit({
-        animation: {
-          duration: 1000,
-          easingFunction: 'easeInOutQuad'
-        }
-      });
+      if (!network) return;
+      try {
+        network.fit({
+          animation: {
+            duration: 1000,
+            easingFunction: 'easeInOutQuad'
+          }
+        });
+      } catch (e) {
+        console.warn('[Network Topology] fit failed:', e);
+      }
     }, 100);
   }
   

@@ -17,11 +17,12 @@ const { requireTenant } = require('./plans-middleware');
 router.use(verifyAuth);
 router.use(requireTenant);
 
-// Import and mount all plan route modules
+// Import and mount all plan route modules (deployment-photos before mobile so GET /deployment-photos/... matches first)
 router.use(require('./plans-core'));          // Core CRUD operations
 router.use(require('./plans-marketing'));     // Marketing discovery routes
 router.use(require('./plans-approval'));      // Approval/authorization routes
 router.use(require('./plans-features'));      // Plan layer features routes
+router.use(require('./plans-deployment-photos')); // Deployment photo upload/serve (GridFS or Firebase)
 router.use(require('./plans-mobile'));        // Mobile API routes
 router.use(require('./plans-hardware'));      // Hardware requirements routes
 

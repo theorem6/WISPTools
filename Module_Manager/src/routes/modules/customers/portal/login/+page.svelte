@@ -9,6 +9,10 @@
   let loading = false;
   let error = '';
   let branding: any = null;
+  let showForgotPassword = false;
+  let forgotEmail = '';
+  let forgotSent = false;
+  let forgotError = '';
   
   async function loadBranding() {
     if ($currentTenant) {
@@ -35,6 +39,21 @@
       }
     } catch (err: any) {
       error = err.message || 'Login failed';
+    } finally {
+      loading = false;
+    }
+  }
+  
+  async function handleForgotSubmit(e: Event) {
+    e.preventDefault();
+    if (!forgotEmail?.trim()) return;
+    forgotError = '';
+    loading = true;
+    try {
+      await customerAuthService.requestPasswordReset(forgotEmail.trim());
+      forgotSent = true;
+    } catch (err: any) {
+      forgotError = err.message || 'Failed to send reset email. Use the email tied to your account.';
     } finally {
       loading = false;
     }
@@ -87,10 +106,33 @@
       </button>
       
       <div class="login-links">
-        <a href="/modules/customers/portal/signup" class="link">Don't have an account? Sign up</a>
-        <button type="button" class="link" onclick={() => alert('Password reset coming soon')}>
-          Forgot password?
-        </button>
+        {#if showForgotPassword}
+          <div class="forgot-section">
+            <h3 class="forgot-title">Reset password</h3>
+            <p class="forgot-desc">Enter the email for your account and we'll send a reset link.</p>
+            {#if forgotSent}
+              <p class="success-message">Password reset email sent. Check your inbox and use the link to set a new password.</p>
+              <button type="button" class="link" onclick={() => { showForgotPassword = false; forgotSent = false; forgotEmail = ''; forgotError = ''; }}>Back to sign in</button>
+            {:else}
+              <form onsubmit={handleForgotSubmit} class="forgot-form">
+                {#if forgotError}
+                  <div class="error-message">{forgotError}</div>
+                {/if}
+                <div class="form-group">
+                  <label for="forgot-email">Email</label>
+                  <input id="forgot-email" type="email" bind:value={forgotEmail} placeholder="Your account email" required disabled={loading} />
+                </div>
+                <div class="forgot-actions">
+                  <button type="submit" class="btn-primary" disabled={loading}>Send reset link</button>
+                  <button type="button" class="link" disabled={loading} onclick={() => { showForgotPassword = false; forgotEmail = ''; forgotError = ''; }}>Cancel</button>
+                </div>
+              </form>
+            {/if}
+          </div>
+        {:else}
+          <a href="/modules/customers/portal/signup" class="link">Don't have an account? Sign up</a>
+          <button type="button" class="link" onclick={() => { showForgotPassword = true; forgotError = ''; forgotSent = false; }}>Forgot password?</button>
+        {/if}
       </div>
     </form>
   </div>
@@ -227,6 +269,18 @@
     opacity: 0.8;
     text-decoration: underline;
   }
+  
+  .forgot-section {
+    margin-top: 0.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid #e5e7eb;
+    width: 100%;
+  }
+  .forgot-title { font-size: 1rem; color: var(--brand-text, #111827); margin: 0 0 0.25rem 0; }
+  .forgot-desc { font-size: 0.875rem; color: var(--brand-text-secondary, #6b7280); margin: 0 0 1rem 0; }
+  .forgot-form { display: flex; flex-direction: column; gap: 1rem; }
+  .forgot-actions { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+  .success-message { color: #059669; font-size: 0.875rem; margin-bottom: 0.75rem; }
   
   @media (max-width: 768px) {
     .login-container {

@@ -13,7 +13,7 @@
   },
   "hosting": [
     {
-      "site": "wisptools-production",
+      "target": "app",
       "public": "Module_Manager/build/client",
       "ignore": [
         "firebase.json",
@@ -96,6 +96,14 @@
           "function": "handleCWMPMultitenant"
         },
         {
+          "source": "/api/user-tenants/tenant/**",
+          "function": "apiProxy"
+        },
+        {
+          "source": "/api/user-tenants/**",
+          "function": "userTenants"
+        },
+        {
           "source": "/api/**",
           "function": "apiProxy"
         },
@@ -105,43 +113,6 @@
         }
       ],
       "cleanUrls": false,
-      "trailingSlash": false
-    },
-    {
-      "site": "wisptools-docs",
-      "public": "Module_Manager/docs-site/.vitepress/dist",
-      "ignore": [
-        "firebase.json",
-        "**/.*",
-        "**/node_modules/**"
-      ],
-      "headers": [
-        {
-          "source": "**/*.@(css|js)",
-          "headers": [
-            {
-              "key": "Cache-Control",
-              "value": "public, max-age=31536000, immutable"
-            }
-          ]
-        },
-        {
-          "source": "**/*.@(jpg|jpeg|gif|png|svg|webp|ico)",
-          "headers": [
-            {
-              "key": "Cache-Control",
-              "value": "public, max-age=31536000, immutable"
-            }
-          ]
-        }
-      ],
-      "rewrites": [
-        {
-          "source": "**",
-          "destination": "/index.html"
-        }
-      ],
-      "cleanUrls": true,
       "trailingSlash": false
     }
   ]

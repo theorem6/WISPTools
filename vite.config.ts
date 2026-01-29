@@ -1,62 +1,10 @@
-import { sveltekit } from '@sveltejs/kit/vite';
-import { defineConfig } from 'vite';
-
-export default defineConfig({
-  plugins: [sveltekit()],
-  optimizeDeps: {
-    exclude: ['@firebase/app', '@arcgis/core']
-  },
-  define: {
-    global: 'globalThis',
-  },
-  resolve: {
-    alias: {
-      process: 'process/browser',
-    },
-  },
-  server: {
-    fs: {
-      allow: ['..']
-    }
-  },
-  build: {
-    target: 'esnext',
-    minify: 'esbuild',
-    sourcemap: false,
-    chunkSizeWarningLimit: 2000,
-    rollupOptions: {
-      output: {
-        // Split large dependencies into separate chunks to reduce memory usage
-        manualChunks(id) {
-          // Keep ArcGIS as external chunks loaded on demand
-          if (id.includes('@arcgis/core')) {
-            // Split ArcGIS into smaller sub-chunks by feature area
-            if (id.includes('/views/')) return 'arcgis-views';
-            if (id.includes('/layers/')) return 'arcgis-layers';
-            if (id.includes('/widgets/')) return 'arcgis-widgets';
-            if (id.includes('/geometry/')) return 'arcgis-geometry';
-            return 'arcgis-core';
-          }
-          // Split Firebase into its own chunk
-          if (id.includes('firebase')) {
-            return 'firebase';
-          }
-          // Split Svelte framework into its own chunk
-          if (id.includes('node_modules') && (id.includes('svelte') || id.includes('@sveltejs'))) {
-            return 'svelte-framework';
-          }
-          // All other node_modules
-          if (id.includes('node_modules')) {
-            return 'vendor';
-          }
-        },
-        // Increase max chunk size for large libraries
-        experimentalMinChunkSize: 5000
-      }
-    }
-  },
-  ssr: {
-    // Don't bundle ArcGIS in SSR - it's client-side only and dynamically imported
-    noExternal: []
-  }
-});
+/**
+ * Workspace root – delegates to the Svelte app in Module_Manager.
+ * The app root is Module_Manager; build and dev must run from there:
+ *   cd Module_Manager && npm run build
+ *   cd Module_Manager && npm run dev
+ * This file re-exports Module_Manager's config so tooling that starts from
+ * repo root can resolve vite config without needing @sveltejs/kit at root.
+ */
+// @ts-expect-error – resolved from Module_Manager when this file is used
+export { default } from './Module_Manager/vite.config';

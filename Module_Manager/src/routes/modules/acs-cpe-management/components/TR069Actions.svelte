@@ -1,10 +1,12 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
   import { currentTenant } from '$lib/stores/tenantStore';
-  
+  import ParameterEditorModal from './ParameterEditorModal.svelte';
+
   export let device: any;
   export let show: boolean = false;
-  
+
+  let showParameterEditor = false;
   const dispatch = createEventDispatcher();
   
   let actionInProgress = false;
@@ -22,7 +24,6 @@
     
     actionInProgress = true;
     try {
-      // TODO: Call GenieACS API
       const response = await fetch(`/api/tr069/tasks`, {
         method: 'POST',
         headers: {
@@ -180,6 +181,14 @@
           </div>
           
           <div class="action-card">
+            <div class="action-icon">✏️</div>
+            <h3>Edit Parameters</h3>
+            <p>Edit TR-069 parameters (FriendlyName, Location, etc.)</p>
+            <button class="btn btn-primary" on:click={() => showParameterEditor = true} disabled={actionInProgress}>
+              Edit Parameters
+            </button>
+          </div>
+          <div class="action-card">
             <div class="action-icon">📈</div>
             <h3>Monitoring</h3>
             <p>View real-time TR-069 metrics and graphs</p>
@@ -191,6 +200,12 @@
       </div>
     </div>
   </div>
+  <ParameterEditorModal
+    device={device}
+    show={showParameterEditor}
+    on:close={() => showParameterEditor = false}
+    on:saved={() => showParameterEditor = false}
+  />
 {/if}
 
 <style>

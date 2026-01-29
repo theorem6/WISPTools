@@ -175,8 +175,9 @@ class CustomerAuthService {
    */
   async requestPasswordReset(identifier: string): Promise<void> {
     try {
-      // Use Firebase Auth password reset
-      await authService.sendPasswordResetEmail(identifier);
+      // Use Firebase Auth password reset (email required)
+      const result = await authService.resetPassword(identifier);
+      if (!result.success) throw new Error(result.error);
       
       // Also notify backend (optional)
       await fetch(`${API_URL}/customer-portal/auth/reset-password`, {

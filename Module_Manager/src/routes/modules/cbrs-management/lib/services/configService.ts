@@ -58,26 +58,35 @@ export interface CBRSConfig {
 }
 
 /**
- * Save CBRS configuration to Firestore
+ * Save CBRS configuration (prefer encrypted callable, fallback to Firestore)
  */
 export async function saveCBRSConfig(config: CBRSConfig): Promise<void> {
   try {
     if (!browser) return;
-    
+
     console.log('[CBRS Config] Saving configuration for tenant:', config.tenantId);
-    
-    // Import Firebase dynamically
+
+    try {
+      const { functions } = await import('$lib/firebase');
+      const { httpsCallable } = await import('firebase/functions');
+      const saveSecure = httpsCallable<{ config: CBRSConfig }, { success: boolean }>(functions(), 'saveCbrsConfigSecure');
+      const result = await saveSecure({ config });
+      if (result.data?.success) {
+        console.log('[CBRS Config] Configuration saved securely (encrypted)');
+        return;
+      }
+    } catch (secureErr) {
+      console.warn('[CBRS Config] Secure save not available, using Firestore:', secureErr);
+    }
+
     const { db } = await import('$lib/firebase');
     const { doc, setDoc } = await import('firebase/firestore');
-    
-    // Call db() as a function to get Firestore instance
     const configDoc = doc(db(), 'cbrs_config', config.tenantId);
-    
     await setDoc(configDoc, {
       ...config,
       updatedAt: new Date().toISOString()
     }, { merge: true });
-    
+
     console.log('[CBRS Config] Configuration saved successfully');
   } catch (error) {
     console.error('[CBRS Config] Failed to save configuration:', error);
@@ -86,34 +95,53 @@ export async function saveCBRSConfig(config: CBRSConfig): Promise<void> {
 }
 
 /**
- * Load CBRS configuration from Firestore
+ * Load CBRS configuration (prefer encrypted callable, fallback to Firestore)
  */
 export async function loadCBRSConfig(tenantId: string): Promise<CBRSConfig | null> {
   try {
     if (!browser) return null;
-    
+
     console.log('[CBRS Config] Loading configuration for tenant:', tenantId);
-    
-    // Import Firebase dynamically
+
+    try {
+      const { functions } = await import('$lib/firebase');
+      const { httpsCallable } = await import('firebase/functions');
+      const loadSecure = httpsCallable<{ tenantId: string }, { success: boolean; config: CBRSConfig | null }>(functions(), 'loadCbrsConfigSecure');
+      const result = await loadSecure({ tenantId });
+      if (result.data?.success && result.data.config != null) {
+        const data = result.data.config;
+        const config: CBRSConfig = {
+          ...data,
+          tenantId,
+          updatedAt: (data as any).updatedAt ? new Date((data as any).updatedAt) : undefined
+        } as CBRSConfig;
+        console.log('[CBRS Config] Configuration loaded securely (decrypted)');
+        return config;
+      }
+      if (result.data?.success && result.data.config === null) {
+        return getDefaultConfig(tenantId);
+      }
+    } catch (secureErr) {
+      console.warn('[CBRS Config] Secure load not available, using Firestore:', secureErr);
+    }
+
     const { db } = await import('$lib/firebase');
     const { doc, getDoc } = await import('firebase/firestore');
-    
-    // Call db() as a function to get Firestore instance
     const configDoc = doc(db(), 'cbrs_config', tenantId);
     const snapshot = await getDoc(configDoc);
-    
+
     if (!snapshot.exists()) {
       console.log('[CBRS Config] No configuration found, using defaults');
       return getDefaultConfig(tenantId);
     }
-    
+
     const data = snapshot.data();
     const config: CBRSConfig = {
       ...data,
       tenantId,
       updatedAt: data.updatedAt ? new Date(data.updatedAt) : undefined
     } as CBRSConfig;
-    
+
     console.log('[CBRS Config] Configuration loaded successfully');
     return config;
   } catch (error) {
@@ -262,22 +290,19 @@ export function validatePlatformConfig(config: PlatformCBRSConfig): { valid: boo
 }
 
 /**
- * Encrypt sensitive configuration data before storing
- * Note: In production, this should use proper encryption
+ * Encrypt sensitive configuration data before storing.
+ * When using saveCbrsConfigSecure/loadCbrsConfigSecure, encryption is done in Firebase Functions (AES-256-GCM).
+ * These helpers are no-ops for any code path that doesn't use the secure callables.
  */
 export function encryptConfig(config: CBRSConfig): CBRSConfig {
-  // In a real implementation, encrypt API keys here
-  // For now, we just return the config as-is
-  // TODO: Implement proper encryption using Firebase Functions
   return config;
 }
 
 /**
- * Decrypt sensitive configuration data after loading
+ * Decrypt sensitive configuration data after loading.
+ * When using loadCbrsConfigSecure, decryption is done in Firebase Functions.
  */
 export function decryptConfig(config: CBRSConfig): CBRSConfig {
-  // In a real implementation, decrypt API keys here
-  // For now, we just return the config as-is
   return config;
 }
 

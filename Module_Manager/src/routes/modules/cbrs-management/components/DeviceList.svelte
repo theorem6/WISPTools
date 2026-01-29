@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { createEventDispatcher } from 'svelte';
   import type { CBSDDevice } from '../lib/models/cbsdDevice';
   
   export let devices: CBSDDevice[] = [];
@@ -6,6 +7,7 @@
   export let onRegister: (device: CBSDDevice) => void;
   export let onDeregister: (device: CBSDDevice) => void;
   
+  const dispatch = createEventDispatcher();
   let searchTerm = '';
   let filterState = 'all';
   
@@ -119,8 +121,13 @@
     {#if filteredDevices.length === 0}
       <div class="empty-state">
         <div class="empty-icon">📡</div>
-        <p class="empty-text">No devices found</p>
-        <p class="empty-subtext">Try adjusting your search or filters</p>
+        <p class="empty-text">{devices.length === 0 ? 'No CBSD devices yet' : 'No devices match your filters'}</p>
+        <p class="empty-subtext">{devices.length === 0 ? 'Run the Setup Wizard or add your first CBSD device above.' : 'Try adjusting your search or filters.'}</p>
+        {#if devices.length === 0}
+          <button type="button" class="btn-get-started" on:click={() => dispatch('getstarted')}>
+            📡 Get Started with CBRS Setup
+          </button>
+        {/if}
       </div>
     {/if}
   </div>
@@ -323,6 +330,23 @@
   .empty-subtext {
     color: var(--text-secondary);
     font-size: 0.875rem;
+  }
+
+  .btn-get-started {
+    margin-top: 1rem;
+    padding: 0.75rem 1.25rem;
+    background: var(--accent-color, #3b82f6);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.15s;
+  }
+
+  .btn-get-started:hover {
+    background: var(--accent-hover, #2563eb);
+    transform: translateY(-1px);
   }
   
   @media (max-width: 768px) {

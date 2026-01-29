@@ -75,6 +75,15 @@ export default defineConfig({
             { text: 'Infrastructure Setup', link: '/deployment/infrastructure' }
           ]
         }
+      ],
+      '/reference/': [
+        {
+          text: 'Reference',
+          items: [
+            { text: 'Overview', link: '/reference/' },
+            { text: 'Project Status & Next Steps', link: '/reference/project-status' }
+          ]
+        }
       ]
     },
     

@@ -6,6 +6,7 @@
  */
 
 const express = require('express');
+const axios = require('axios');
 const mongoose = require('mongoose');
 const paypal = require('@paypal/checkout-server-sdk');
 const { 
@@ -223,12 +224,10 @@ router.post('/subscription/create', authenticateUser, async (req, res) => {
 /**
  * Handle PayPal webhook for subscription updates
  * Webhook URL: https://your-domain.com/api/billing/webhook/paypal
- * Configure this URL in PayPal Developer Dashboard
- * 
- * Note: PayPal webhook signature verification should be implemented for production
- * See: https://developer.paypal.com/docs/api-basics/notifications/webhooks/notification-messages/
+ * Configure this URL and set PAYPAL_WEBHOOK_ID in PayPal Developer Dashboard.
+ * Signature verification is performed via PayPal's verify-webhook-signature API when PAYPAL_WEBHOOK_ID is set.
  */
-// PayPal webhook - needs raw body for signature verification
+// PayPal webhook - uses express.raw so body can be passed to verification; verification requires PayPal headers
 router.post('/webhook/paypal', express.raw({ type: 'application/json' }), async (req, res) => {
   try {
     // Parse JSON from raw body

@@ -8,10 +8,9 @@ export class ApiService {
   private baseUrl: string;
 
   constructor() {
-    // Use Firebase Functions URL or local dev
-    this.baseUrl = browser ? 
-      (import.meta.env.VITE_FUNCTIONS_URL || 'https://us-central1-wisptools-production.cloudfunctions.net') : 
-      '';
+    // Use relative URLs that go through Firebase Hosting rewrites to backend
+    // This routes /api/* to the backend API via apiProxy function
+    this.baseUrl = browser ? '/api' : '';
   }
 
   /**
@@ -63,25 +62,14 @@ export class ApiService {
       headers.set('Authorization', `Bearer ${token}`);
     }
 
-    // Add tenant ID to body or query params
+    // Add tenant ID to headers (backend expects X-Tenant-ID header)
+    if (tenantId) {
+      headers.set('X-Tenant-ID', tenantId);
+    }
+
+    // Build URL
     let url = `${this.baseUrl}${endpoint}`;
     let body = options.body;
-
-    if (tenantId) {
-      if (options.method === 'GET' || !options.method) {
-        // Add to query params for GET requests
-        const separator = url.includes('?') ? '&' : '?';
-        url += `${separator}tenantId=${tenantId}`;
-      } else {
-        // Add to body for POST/PUT requests
-        if (body) {
-          const bodyObj = typeof body === 'string' ? JSON.parse(body) : body;
-          body = JSON.stringify({ ...bodyObj, tenantId });
-        } else {
-          body = JSON.stringify({ tenantId });
-        }
-      }
-    }
 
     return fetch(url, {
       ...options,

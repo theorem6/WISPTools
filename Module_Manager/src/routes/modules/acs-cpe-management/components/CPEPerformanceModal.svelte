@@ -197,9 +197,43 @@
       return;
     }
 
-    linkedCustomer = null;
-    // Note: Backend doesn't have unlink endpoint yet, but we can clear the UI
-    // In a full implementation, you'd call DELETE /api/tr069/devices/:deviceId/customer
+    if (!$currentTenant?.id || !device?.id) return;
+
+    customerLinkError = '';
+    customerLinkSuccess = '';
+    isLinkingCustomer = true;
+
+    try {
+      const { authService } = await import('$lib/services/authService');
+      const user = authService.getCurrentUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const token = await user.getIdToken();
+      const response = await fetch(`/api/tr069/devices/${device.id}/customer`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'X-Tenant-ID': $currentTenant.id,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        linkedCustomer = null;
+        device._customerId = undefined;
+        device.customerId = undefined;
+        customerLinkSuccess = 'Customer unlinked.';
+        setTimeout(() => customerLinkSuccess = '', 2000);
+      } else {
+        customerLinkError = data.error || 'Failed to unlink customer';
+      }
+    } catch (err: any) {
+      console.error('Failed to unlink customer:', err);
+      customerLinkError = err.message || 'Failed to unlink customer';
+    } finally {
+      isLinkingCustomer = false;
+    }
   }
 
   $: rssiQuality = getRSSIQuality(currentSignal.rssi);
@@ -321,53 +355,60 @@
             </div>
           {/if}
 
-          <!-- Real-Time TR-069 Metrics -->
+          <!-- Real-Time TR-069 Metrics (API-backed; show empty state when no data) -->
           <div class="info-section">
             <h3>Real-Time TR-069 Cellular Metrics</h3>
-            <div class="metrics-grid">
-              <div class="metric-card">
-                <div class="metric-label">RSSI</div>
-                <div class="metric-value" style="color: {rssiQuality.color}">
-                  {currentSignal.rssi.toFixed(1)} dBm
+            {#if deviceMetrics.length > 0}
+              <div class="metrics-grid">
+                <div class="metric-card">
+                  <div class="metric-label">RSSI</div>
+                  <div class="metric-value" style="color: {rssiQuality.color}">
+                    {currentSignal.rssi.toFixed(1)} dBm
+                  </div>
+                  <div class="metric-quality">{rssiQuality.label}</div>
+                  <div class="metric-path">Device.Cellular.Interface.1.RSSI</div>
                 </div>
-                <div class="metric-quality">{rssiQuality.label}</div>
-                <div class="metric-path">Device.Cellular.Interface.1.RSSI</div>
-              </div>
-              <div class="metric-card">
-                <div class="metric-label">RSRP</div>
-                <div class="metric-value" style="color: {rsrpQuality.color}">
-                  {currentSignal.rsrp.toFixed(1)} dBm
+                <div class="metric-card">
+                  <div class="metric-label">RSRP</div>
+                  <div class="metric-value" style="color: {rsrpQuality.color}">
+                    {currentSignal.rsrp.toFixed(1)} dBm
+                  </div>
+                  <div class="metric-quality">{rsrpQuality.label}</div>
+                  <div class="metric-path">Device.Cellular.Interface.1.RSRP</div>
                 </div>
-                <div class="metric-quality">{rsrpQuality.label}</div>
-                <div class="metric-path">Device.Cellular.Interface.1.RSRP</div>
-              </div>
-              <div class="metric-card">
-                <div class="metric-label">SINR</div>
-                <div class="metric-value" style="color: {sinrQuality.color}">
-                  {currentSignal.sinr.toFixed(1)} dB
+                <div class="metric-card">
+                  <div class="metric-label">SINR</div>
+                  <div class="metric-value" style="color: {sinrQuality.color}">
+                    {currentSignal.sinr.toFixed(1)} dB
+                  </div>
+                  <div class="metric-quality">{sinrQuality.label}</div>
+                  <div class="metric-path">Device.Cellular.Interface.1.SINR</div>
                 </div>
-                <div class="metric-quality">{sinrQuality.label}</div>
-                <div class="metric-path">Device.Cellular.Interface.1.SINR</div>
+                <div class="metric-card">
+                  <div class="metric-label">Physical Cell ID</div>
+                  <div class="metric-value">{currentSignal.pci}</div>
+                  <div class="metric-quality">Mod3: {currentSignal.pci % 3}</div>
+                  <div class="metric-path">X_VENDOR_PhysicalCellID</div>
+                </div>
+                <div class="metric-card">
+                  <div class="metric-label">EARFCN</div>
+                  <div class="metric-value">{currentSignal.earfcn}</div>
+                  <div class="metric-quality">Frequency Channel</div>
+                  <div class="metric-path">X_VENDOR_EARFCN</div>
+                </div>
+                <div class="metric-card">
+                  <div class="metric-label">Uptime</div>
+                  <div class="metric-value">{formatUptime(currentSignal.uptime)}</div>
+                  <div class="metric-quality">Connection Time</div>
+                  <div class="metric-path">Device.DeviceInfo.UpTime</div>
+                </div>
               </div>
-              <div class="metric-card">
-                <div class="metric-label">Physical Cell ID</div>
-                <div class="metric-value">{currentSignal.pci}</div>
-                <div class="metric-quality">Mod3: {currentSignal.pci % 3}</div>
-                <div class="metric-path">X_VENDOR_PhysicalCellID</div>
+            {:else}
+              <div class="metrics-empty">
+                <p>No metrics from device yet. Values appear after the device reports to GenieACS.</p>
+                <a href="/modules/acs-cpe-management/monitoring?deviceId={device?.id}" class="btn btn-primary">Open Monitoring</a>
               </div>
-              <div class="metric-card">
-                <div class="metric-label">EARFCN</div>
-                <div class="metric-value">{currentSignal.earfcn}</div>
-                <div class="metric-quality">Frequency Channel</div>
-                <div class="metric-path">X_VENDOR_EARFCN</div>
-              </div>
-              <div class="metric-card">
-                <div class="metric-label">Uptime</div>
-                <div class="metric-value">{formatUptime(currentSignal.uptime)}</div>
-                <div class="metric-quality">Connection Time</div>
-                <div class="metric-path">Device.DeviceInfo.UpTime</div>
-              </div>
-            </div>
+            {/if}
           </div>
 
           <!-- TR-069 Performance Charts -->
@@ -731,6 +772,24 @@
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
     gap: 1rem;
+  }
+
+  .metrics-empty {
+    padding: 1.5rem;
+    text-align: center;
+    background: var(--bg-secondary);
+    border: 1px dashed var(--border-color);
+    border-radius: 0.5rem;
+  }
+
+  .metrics-empty p {
+    margin: 0 0 1rem 0;
+    color: var(--text-secondary);
+  }
+
+  .metrics-empty .btn {
+    text-decoration: none;
+    display: inline-block;
   }
 
   .metric-card {

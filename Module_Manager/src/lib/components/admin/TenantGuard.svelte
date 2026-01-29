@@ -124,7 +124,13 @@
                   isChecking = false;
                   return;
                 }
-                // Other errors - redirect to tenant selector anyway
+                // 503 / service misconfiguration (e.g. INTERNAL_API_KEY not set) - show clear error, do NOT redirect to tenant-setup
+                if (err?.status === 503 || err.message?.includes('INTERNAL_API_KEY') || err.message?.includes('Service Unavailable')) {
+                  error = 'We couldn\'t load your organizations (service configuration issue). Please try again later or contact support.';
+                  isChecking = false;
+                  return;
+                }
+                // Other errors - treat as no tenants and redirect to tenant selector/setup
                 tenants = [];
               }
               

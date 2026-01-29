@@ -1,9 +1,10 @@
 /**
  * Plans Screen - Mobile App
- * Displays deployment plans based on user role
+ * Displays deployment plans based on user role.
+ * "My Projects" shows only plans assigned to this user (from Deploy approval).
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -14,7 +15,6 @@ import {
   RefreshControl,
   Alert
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
 import auth from '@react-native-firebase/auth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiService } from '../services/apiService';
@@ -33,6 +33,8 @@ interface Plan {
   installationSites?: any[];
 }
 
+type ViewMode = 'all' | 'mine';
+
 interface PlansScreenProps {
   navigation: any;
 }
@@ -41,36 +43,35 @@ const PlansScreen: React.FC<PlansScreenProps> = ({ navigation }) => {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [userRole, setUserRole] = useState<string>('tower-crew'); // Default to tower crew
+  const [userRole, setUserRole] = useState<string>('tower-crew');
   const [userId, setUserId] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>('mine'); // Default to My Projects for field techs
 
   useEffect(() => {
-    loadUserInfo();
-    loadPlans();
+    let mounted = true;
+    (async () => {
+      try {
+        const user = auth().currentUser;
+        if (user && mounted) {
+          setUserId(user.uid);
+          const storedRole = await AsyncStorage.getItem('userRole');
+          if (storedRole) setUserRole(storedRole);
+        }
+      } catch (e) {
+        console.error('Error loading user info:', e);
+      }
+    })();
+    return () => { mounted = false; };
   }, []);
 
-  const loadUserInfo = async () => {
-    try {
-      const user = auth().currentUser;
-      if (user) {
-        setUserId(user.uid);
-        // Get user role from storage or Firestore (default to tower-crew)
-        const storedRole = await AsyncStorage.getItem('userRole');
-        if (storedRole) {
-          setUserRole(storedRole);
-        }
-      }
-    } catch (error) {
-      console.error('Error loading user info:', error);
-    }
-  };
+  const loadPlans = useCallback(async () => {
+    const uid = userId ?? auth().currentUser?.uid;
+    if (!uid) return;
 
-  const loadPlans = async () => {
-    if (!userId) return;
-    
     setLoading(true);
     try {
-      const plansData = await apiService.getPlans(userId, userRole);
+      const options = viewMode === 'mine' ? { filter: 'assigned-to-me' as const } : undefined;
+      const plansData = await apiService.getPlans(uid, userRole, options);
       setPlans(plansData);
     } catch (error) {
       console.error('Error loading plans:', error);
@@ -78,7 +79,11 @@ const PlansScreen: React.FC<PlansScreenProps> = ({ navigation }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [userId, userRole, viewMode]);
+
+  useEffect(() => {
+    if (userId ?? auth().currentUser?.uid) loadPlans();
+  }, [userId, viewMode, loadPlans]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -86,11 +91,17 @@ const PlansScreen: React.FC<PlansScreenProps> = ({ navigation }) => {
     setRefreshing(false);
   };
 
+  const switchViewMode = (mode: ViewMode) => {
+    if (mode === viewMode) return;
+    setViewMode(mode);
+  };
+
   const handlePlanPress = async (plan: Plan) => {
-    if (!userId) return;
-    
+    const uid = userId ?? auth().currentUser?.uid;
+    if (!uid) return;
+
     try {
-      const planDetails = await apiService.getPlanDetails(userId, plan.id, userRole);
+      const planDetails = await apiService.getPlanDetails(uid, plan.id, userRole);
       if (planDetails) {
         navigation.navigate('PlanDetails', { plan: planDetails, role: userRole });
       } else {
@@ -142,12 +153,34 @@ const PlansScreen: React.FC<PlansScreenProps> = ({ navigation }) => {
       <View style={styles.header}>
         <Text style={styles.headerTitle}>📋 Deployment Plans</Text>
         <Text style={styles.headerSubtitle}>
-          {userRole === 'tower-crew' || userRole === 'installer' 
-            ? 'Installation tasks assigned to you'
+          {viewMode === 'mine'
+            ? 'Plans assigned to you from the office'
+            : userRole === 'tower-crew' || userRole === 'installer'
+            ? 'All deployment plans'
             : userRole === 'engineer'
             ? 'Technical deployment plans'
             : 'Plan overview'}
         </Text>
+        <View style={styles.segmentRow}>
+          <TouchableOpacity
+            style={[styles.segmentBtn, viewMode === 'mine' && styles.segmentBtnActive]}
+            onPress={() => switchViewMode('mine')}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.segmentText, viewMode === 'mine' && styles.segmentTextActive]}>
+              My Projects
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.segmentBtn, viewMode === 'all' && styles.segmentBtnActive]}
+            onPress={() => switchViewMode('all')}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.segmentText, viewMode === 'all' && styles.segmentTextActive]}>
+              All Plans
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView
@@ -158,10 +191,14 @@ const PlansScreen: React.FC<PlansScreenProps> = ({ navigation }) => {
       >
         {plans.length === 0 ? (
           <View style={styles.emptyContainer}>
-            <Text style={styles.emptyEmoji}>📭</Text>
-            <Text style={styles.emptyTitle}>No Plans Available</Text>
+            <Text style={styles.emptyEmoji}>{viewMode === 'mine' ? '📋' : '📭'}</Text>
+            <Text style={styles.emptyTitle}>
+              {viewMode === 'mine' ? 'No Projects Assigned to You' : 'No Plans Available'}
+            </Text>
             <Text style={styles.emptyText}>
-              There are no deployment plans available for your role at this time.
+              {viewMode === 'mine'
+                ? 'When the office assigns you a project in Deploy, it will show up here.'
+                : 'There are no deployment plans available for your role at this time.'}
             </Text>
           </View>
         ) : (
@@ -265,6 +302,32 @@ const styles = StyleSheet.create({
   headerSubtitle: {
     fontSize: 14,
     color: '#a0a0b8',
+    marginBottom: 12,
+  },
+  segmentRow: {
+    flexDirection: 'row',
+    backgroundColor: '#0f0f23',
+    borderRadius: 10,
+    padding: 4,
+    gap: 4,
+  },
+  segmentBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  segmentBtnActive: {
+    backgroundColor: '#8b5cf6',
+  },
+  segmentText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#a0a0b8',
+  },
+  segmentTextActive: {
+    color: '#ffffff',
   },
   scrollView: {
     flex: 1,

@@ -787,6 +787,22 @@ export const moduleTips: ModuleTipsConfig = {
   ],
   'cbrs-management': [
     {
+      id: 'cbrs-0',
+      title: '📡 Get Started with CBRS',
+      icon: '📡',
+      content: `
+        <h4>First-time setup</h4>
+        <p>Configure Google SAS access for your tenant:</p>
+        <ol>
+          <li>Run the <strong>Setup Wizard</strong> (or use the banner link when config is incomplete)</li>
+          <li>Sign in with Google and select your User ID / network</li>
+          <li>Complete the connection test step</li>
+          <li>Add your first CBSD device using <strong>"+ Add CBSD Device"</strong></li>
+        </ol>
+        <p><strong>💡 Tip:</strong> CBRS Management uses Google SAS in shared-platform mode. Ensure your Google account is registered for SAS access.</p>
+      `
+    },
+    {
       id: 'cbrs-1',
       title: '📡 Registering CBSD Devices',
       icon: '📡',

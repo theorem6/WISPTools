@@ -6,6 +6,7 @@
   import TenantGuard from '$lib/components/admin/TenantGuard.svelte';
   import { workOrderService, type WorkOrder, type WorkOrderFilters } from '$lib/services/workOrderService';
   import CreateWorkOrderModal from './components/CreateWorkOrderModal.svelte';
+  import WorkOrderCreationWizard from '$lib/components/wizards/workorders/WorkOrderCreationWizard.svelte';
   import WorkOrderCard from './components/WorkOrderCard.svelte';
   import APKDownload from '$lib/components/common/APKDownload.svelte';
   
@@ -15,6 +16,7 @@
   let success = '';
   
   let showCreateModal = false;
+  let showWorkOrderWizard = false;
   
   let filters: WorkOrderFilters = {
     status: '',
@@ -122,8 +124,11 @@
       <button class="btn-secondary" on:click={() => loadData()}>
         🔄 Refresh
       </button>
-      <button class="btn-primary" on:click={() => showCreateModal = true}>
-        ➕ Create Work Order
+      <button class="btn-secondary" on:click={() => showCreateModal = true}>
+        ➕ Quick Create
+      </button>
+      <button class="btn-primary" on:click={() => showWorkOrderWizard = true}>
+        📋 Create Work Order Wizard
       </button>
     </div>
   </div>
@@ -248,6 +253,15 @@
     bind:show={showCreateModal}
     {tenantId}
     on:saved={handleWorkOrderSaved}
+  />
+  
+  <!-- Work Order Creation Wizard -->
+  <WorkOrderCreationWizard
+    show={showWorkOrderWizard}
+    on:close={() => {
+      showWorkOrderWizard = false;
+      loadData(); // Refresh work orders after creation
+    }}
   />
 </div>
 </TenantGuard>

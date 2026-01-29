@@ -7,6 +7,7 @@
   import type { WorkOrder } from '$lib/services/workOrderService';
   
   let ticket: WorkOrder | null = null;
+  let currentCustomer: { tenantId?: string } | null = null;
   let loading = true;
   let error = '';
   let comment = '';
@@ -16,13 +17,19 @@
   
   onMount(async () => {
     try {
+      const id = ticketId;
+      if (!id) {
+        error = 'Invalid ticket';
+        loading = false;
+        return;
+      }
       const customer = await customerAuthService.getCurrentCustomer();
       if (!customer) {
         goto('/modules/customers/portal/login');
         return;
       }
-      
-      ticket = await customerPortalService.getCustomerTicket(ticketId);
+      currentCustomer = customer;
+      ticket = await customerPortalService.getCustomerTicket(id, customer.tenantId);
     } catch (err: any) {
       error = err.message || 'Failed to load ticket';
     } finally {
@@ -36,10 +43,12 @@
     
     submittingComment = true;
     try {
-      await customerPortalService.addTicketComment(ticket._id!, comment);
+      const id = ticketId ?? ticket?._id;
+      const tenantId = currentCustomer?.tenantId;
+      if (!id) return;
+      await customerPortalService.addTicketComment(ticket._id!, comment, tenantId);
       comment = '';
-      // Reload ticket
-      ticket = await customerPortalService.getCustomerTicket(ticketId);
+      ticket = await customerPortalService.getCustomerTicket(id, tenantId);
     } catch (err: any) {
       error = err.message || 'Failed to add comment';
     } finally {

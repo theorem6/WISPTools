@@ -85,6 +85,28 @@ app.get('/api/debug/token', async (req, res) => {
 });
 
 
+// Path rewrite: when LB/nginx strips path to /, use X-Original-Path from Cloud Function (internal key required)
+const INTERNAL_API_KEY_ENV = process.env.INTERNAL_API_KEY || '';
+app.use((req, res, next) => {
+  if (req.path !== '/' || !INTERNAL_API_KEY_ENV) return next();
+  const key = req.headers['x-internal-key'] || req.headers['X-Internal-Key'];
+  if (key !== INTERNAL_API_KEY_ENV) return next();
+  const originalPath = req.headers['x-original-path'];
+  if (!originalPath || typeof originalPath !== 'string') return next();
+  if (!originalPath.startsWith('/api/internal/')) return next();
+  req.url = originalPath;
+  req.originalUrl = originalPath;
+  next();
+});
+
+// Internal API (Cloud Function calls with INTERNAL_API_KEY - no Firebase token verification)
+try {
+  app.use('/api/internal', require('./routes/internal'));
+  console.log('[Server] ✅ Internal API route loaded');
+} catch (error) {
+  console.error('[Server] ❌ Failed to load internal route:', error.message);
+}
+
 // Use existing route files - ALL MODULES
 app.use('/api/auth', require('./routes/auth')); // Authentication routes
 app.use('/api/users', require('./routes/users')); // Includes auto-assign routes
@@ -110,7 +132,9 @@ try {
   });
 }
 app.use('/api/notifications', require('./routes/notifications'));
+app.use('/api/tenant-settings', require('./routes/tenant-settings'));
 app.use('/api/customers', require('./routes/customers'));
+app.use('/api/customer-billing', require('./routes/customer-billing'));
 app.use('/api/inventory', require('./routes/inventory'));
 app.use('/api/bundles', require('./routes/hardwareBundles'));
 app.use('/api/work-orders', require('./routes/work-orders'));

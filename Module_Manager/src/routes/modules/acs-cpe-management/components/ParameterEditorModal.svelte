@@ -1,180 +1,142 @@
+<!-- ACS Parameter Editor - Edit TR-069 parameters per device -->
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
   import { currentTenant } from '$lib/stores/tenantStore';
+  import { apiService } from '$lib/services/apiService';
 
+  export let device: { id: string } | null = null;
   export let show = false;
-  export let device: any = null;
 
   const dispatch = createEventDispatcher();
 
-  let parameters: { id: string; parameter: string; value: string }[] = [];
+  let parameters: Record<string, unknown> = {};
   let loading = false;
+  let saving = false;
   let error = '';
   let success = '';
+  let editedParams: Record<string, string> = {};
 
   $: if (show && device) {
-    const entries = device.parameters ? Object.entries(device.parameters) : [];
-    parameters = entries.map(([key, val], index) => ({
-      id: `${key}-${index}`,
-      parameter: key,
-      value: typeof val === 'string' ? val : JSON.stringify(val)
-    }));
-    if (parameters.length === 0) {
-      parameters = [{ id: `new-${Date.now()}`, parameter: '', value: '' }];
-    }
-    error = '';
-    success = '';
+    loadParameters();
   }
 
-  function addParameterRow() {
-    parameters = [
-      ...parameters,
-      { id: `new-${Date.now()}-${parameters.length}`, parameter: '', value: '' }
-    ];
-  }
-
-  function removeParameterRow(id: string) {
-    parameters = parameters.filter(row => row.id !== id);
-    if (parameters.length === 0) {
-      addParameterRow();
-    }
-  }
-
-  function close() {
-    dispatch('close');
-  }
-
-  function parseValue(raw: string) {
-    const trimmed = raw.trim();
-    if (trimmed === '') return '';
-    if (trimmed === 'true') return true;
-    if (trimmed === 'false') return false;
-    if (!Number.isNaN(Number(trimmed)) && trimmed !== '') return Number(trimmed);
-    try {
-      return JSON.parse(trimmed);
-    } catch {
-      return trimmed;
-    }
-  }
-
-  async function saveParameters() {
-    if (!device?.id) return;
-    if (!$currentTenant?.id) {
-      error = 'No tenant selected';
-      return;
-    }
-
-    const filtered = parameters
-      .map(row => ({ parameter: row.parameter.trim(), value: row.value }))
-      .filter(row => row.parameter.length > 0);
-
-    if (filtered.length === 0) {
-      error = 'Add at least one parameter to update.';
-      return;
-    }
-
+  async function loadParameters() {
+    if (!device?.id || !$currentTenant?.id) return;
     loading = true;
     error = '';
-    success = '';
-
     try {
-      const response = await fetch('/api/tr069/tasks', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-tenant-id': $currentTenant?.id || ''
-        },
-        body: JSON.stringify({
-          deviceId: device.id,
-          action: 'setParameterValues',
-          parameters: filtered.map(row => ({
-            parameter: row.parameter,
-            value: parseValue(row.value)
-          }))
-        })
-      });
-
-      const data = await response.json();
-      if (!response.ok || !data.success) {
-        throw new Error(data.error || data.details || 'Failed to update parameters');
+      const res = await apiService.getDeviceParameters(device.id);
+      if (res.success && res.data?.parameters) {
+        parameters = res.data.parameters as Record<string, unknown>;
+        editedParams = {};
+      } else {
+        error = res.error || 'Failed to load parameters';
       }
-
-      success = 'Parameters queued for update.';
-      setTimeout(() => {
-        dispatch('saved', { deviceId: device.id });
-        close();
-      }, 1200);
-    } catch (e: any) {
-      console.error('Failed to save parameters:', e);
-      error = e.message || 'Failed to update parameters';
+    } catch (e) {
+      error = e instanceof Error ? e.message : 'Failed to load';
     } finally {
       loading = false;
     }
   }
+
+  function setEdited(path: string, value: string) {
+    editedParams = { ...editedParams, [path]: value };
+  }
+
+  async function saveParameters() {
+    if (!device?.id || !$currentTenant?.id || Object.keys(editedParams).length === 0) return;
+    saving = true;
+    error = '';
+    success = '';
+    try {
+      const params = Object.entries(editedParams).map(([parameter, value]) => ({ parameter, value }));
+      const data = await apiService.post('/tr069/tasks', {
+        deviceId: device.id,
+        action: 'setParameterValues',
+        parameters: params
+      });
+      const ok = data.success || (data as { data?: { success?: boolean } }).data?.success;
+      if (ok) {
+        success = `✅ ${params.length} parameter(s) updated`;
+        editedParams = {};
+        loadParameters();
+        setTimeout(() => dispatch('saved'), 1500);
+      } else {
+        error = (data as { error?: string }).error || 'Failed to save';
+      }
+    } catch (e) {
+      error = e instanceof Error ? e.message : 'Failed to save';
+    } finally {
+      saving = false;
+    }
+  }
+
+  function formatValue(v: unknown): string {
+    if (v == null) return '';
+    if (typeof v === 'object' && '_value' in (v as object)) return String((v as { _value: unknown })._value);
+    return String(v);
+  }
+
+  const EDITABLE_PREFIXES = [
+    'Device.DeviceInfo.FriendlyName',
+    'Device.DeviceInfo.Location',
+    'Device.ManagementServer.',
+    'Device.WANDevice.',
+    'InternetGatewayDevice.DeviceInfo.FriendlyName',
+    'InternetGatewayDevice.DeviceInfo.Location'
+  ];
+
+  $: displayParams = Object.entries(parameters)
+    .filter(([path]) => EDITABLE_PREFIXES.some((p) => path === p || path.startsWith(p)))
+    .slice(0, 25);
+
+  function handleClose() {
+    dispatch('close');
+  }
 </script>
 
-{#if show && device}
-  <div class="modal-overlay" on:click={close} on:keydown={(e) => e.key === 'Escape' && close()}>
-    <div class="modal-content" role="dialog" aria-modal="true" on:click|stopPropagation>
+{#if show}
+  <div class="modal-overlay" on:click={handleClose} on:keydown={(e) => e.key === 'Escape' && handleClose()}>
+    <div class="modal-content" on:click|stopPropagation role="dialog" aria-modal="true" aria-labelledby="param-editor-title">
       <div class="modal-header">
-        <h2>✏️ Edit TR-069 Parameters</h2>
-        <button class="close-btn" on:click={close} aria-label="Close">×</button>
+        <h2 id="param-editor-title">Edit Parameters - {device?.id}</h2>
+        <button type="button" class="close-btn" on:click={handleClose} aria-label="Close">×</button>
       </div>
-
       <div class="modal-body">
-        <div class="device-summary">
-          <strong>{device.id}</strong>
-          <span>{device.model || device.manufacturer || 'CPE Device'}</span>
-        </div>
-
-        {#if error}
-          <div class="alert alert-error">{error}</div>
-        {/if}
-
-        {#if success}
-          <div class="alert alert-success">{success}</div>
-        {/if}
-
-        <div class="parameters-table">
-          <div class="parameters-header">
-            <span>Parameter Path</span>
-            <span>Value</span>
-            <span></span>
+        {#if loading}
+          <p>Loading parameters…</p>
+        {:else if error}
+          <p class="error">{error}</p>
+          <button type="button" class="btn" on:click={loadParameters}>Retry</button>
+        {:else if success}
+          <p class="success">{success}</p>
+        {:else}
+          <p class="hint">Edit writable parameters. Changes are sent to the device via TR-069.</p>
+          <div class="params-list">
+            {#each displayParams as [path, rawValue]}
+              {@const value = formatValue(rawValue)}
+              {@const displayPath = path.split('.').slice(-2).join('.')}
+              <div class="param-row">
+                <label for="param-{path}">{displayPath}</label>
+                <input
+                  id="param-{path}"
+                  type="text"
+                  value={editedParams[path] ?? value}
+                  on:input={(e) => setEdited(path, e.currentTarget.value)}
+                  placeholder={value}
+                />
+              </div>
+            {/each}
           </div>
-
-          {#each parameters as row (row.id)}
-            <div class="parameter-row">
-              <input
-                type="text"
-                placeholder="InternetGatewayDevice.DeviceInfo.Manufacturer"
-                bind:value={row.parameter}
-                disabled={loading}
-              />
-              <input
-                type="text"
-                placeholder="Value"
-                bind:value={row.value}
-                disabled={loading}
-              />
-              <button class="remove-btn" on:click={() => removeParameterRow(row.id)} disabled={loading}>
-                ✕
+          {#if Object.keys(editedParams).length > 0}
+            <div class="actions">
+              <button type="button" class="btn btn-primary" on:click={saveParameters} disabled={saving}>
+                {saving ? 'Saving…' : 'Save Changes'}
               </button>
+              <button type="button" class="btn" on:click={() => editedParams = {}}>Reset</button>
             </div>
-          {/each}
-        </div>
-
-        <button class="btn btn-secondary" on:click={addParameterRow} disabled={loading}>
-          ➕ Add Parameter
-        </button>
-      </div>
-
-      <div class="modal-footer">
-        <button class="btn btn-secondary" on:click={close} disabled={loading}>
-          Cancel
-        </button>
-        <button class="btn btn-primary" on:click={saveParameters} disabled={loading}>
-          {loading ? 'Saving...' : 'Save Changes'}
-        </button>
+          {/if}
+        {/if}
       </div>
     </div>
   </div>
@@ -184,118 +146,76 @@
   .modal-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.6);
+    background: rgba(0, 0, 0, 0.5);
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 1000;
+    z-index: 2000;
   }
-
   .modal-content {
-    width: 90%;
-    max-width: 720px;
     background: var(--bg-primary);
     border-radius: 12px;
-    border: 1px solid var(--border-color);
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.35);
-    overflow: hidden;
+    max-width: 520px;
+    width: 90%;
+    max-height: 80vh;
+    overflow: auto;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
   }
-
   .modal-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 1rem 1.5rem;
+    padding: 1rem 1.25rem;
     border-bottom: 1px solid var(--border-color);
   }
-
+  .modal-header h2 {
+    margin: 0;
+    font-size: 1.1rem;
+  }
+  .close-btn {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: var(--text-secondary);
+  }
   .modal-body {
-    padding: 1.5rem;
-    display: grid;
-    gap: 1rem;
+    padding: 1.25rem;
   }
-
-  .modal-footer {
-    padding: 1rem 1.5rem;
-    border-top: 1px solid var(--border-color);
-    display: flex;
-    justify-content: flex-end;
-    gap: 0.75rem;
-  }
-
-  .device-summary {
-    display: flex;
-    gap: 0.75rem;
-    align-items: baseline;
+  .hint {
     color: var(--text-secondary);
+    font-size: 0.9rem;
+    margin-bottom: 1rem;
   }
-
-  .parameters-table {
-    display: grid;
-    gap: 0.5rem;
+  .params-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
   }
-
-  .parameters-header {
+  .param-row {
     display: grid;
-    grid-template-columns: 1fr 1fr auto;
-    gap: 0.5rem;
-    font-weight: 600;
-    color: var(--text-secondary);
-  }
-
-  .parameter-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr auto;
+    grid-template-columns: 180px 1fr;
     gap: 0.5rem;
     align-items: center;
   }
-
-  .parameter-row input {
-    padding: 0.5rem 0.75rem;
-    border-radius: 6px;
-    border: 1px solid var(--border-color);
-    background: var(--bg-secondary);
-    color: var(--text-primary);
-  }
-
-  .remove-btn {
-    background: transparent;
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
-    padding: 0.4rem 0.6rem;
-    cursor: pointer;
+  .param-row label {
+    font-size: 0.85rem;
     color: var(--text-secondary);
+    word-break: break-all;
   }
-
-  .alert {
-    padding: 0.75rem 1rem;
-    border-radius: 6px;
-  }
-
-  .alert-error {
-    background: rgba(239, 68, 68, 0.15);
-    color: #f87171;
-  }
-
-  .alert-success {
-    background: rgba(16, 185, 129, 0.15);
-    color: #34d399;
-  }
-
-  .btn {
-    padding: 0.6rem 1rem;
-    border-radius: 6px;
+  .param-row input {
+    padding: 0.5rem;
     border: 1px solid var(--border-color);
-    cursor: pointer;
+    border-radius: 6px;
+    font-family: monospace;
+    font-size: 0.9rem;
   }
-
-  .btn-primary {
-    background: var(--accent-color);
-    color: white;
+  .actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 1rem;
   }
-
-  .btn-secondary {
-    background: var(--bg-tertiary);
-    color: var(--text-primary);
-  }
+  .error { color: var(--error-color, #ef4444); }
+  .success { color: var(--success-color, #10b981); }
 </style>

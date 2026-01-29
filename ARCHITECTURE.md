@@ -27,6 +27,8 @@ Used for ALL application data:
 - ✅ Service history, complaints, billing
 - ✅ ALL queryable, reportable business data
 
+**File storage (e.g. deployment photos):** Prefer **MongoDB Atlas (GridFS)** when possible. Use **Firebase Storage** only when GridFS is unavailable or fails. Backend `planDeploymentPhotoStorage` implements this; APIs return `storage: 'mongodb'` or `'firebase'`.
+
 ---
 
 ## 🔐 **Authentication Flow**

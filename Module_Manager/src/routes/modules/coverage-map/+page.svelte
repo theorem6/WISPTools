@@ -237,6 +237,7 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
   let planDraftSitesForActions: TowerSite[] = [];
   let combinedSites: TowerSite[] = [];
   let visiblePlanIds: string[] = [];
+  let currentVisiblePlanIds: Set<string> = new Set();
   let marketingLeads: PlanMarketingAddress[] = [];
   
   // Map mode derived from query parameters (default to coverage view)
@@ -1069,7 +1070,8 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
       const inboundMarketing = state.activePlanMarketing?.addresses ?? [];
       // Only use marketing addresses if the plan is visible
       // SharedMap already filters by visibility, but double-check here for safety
-      const isPlanVisible = !activePlanIdFromState || currentVisiblePlanIds.has(String(activePlanIdFromState));
+      // Ensure currentVisiblePlanIds is initialized before using it
+      const isPlanVisible = !activePlanIdFromState || (currentVisiblePlanIds && currentVisiblePlanIds.has(String(activePlanIdFromState)));
       marketingLeads = (isPlanVisible && Array.isArray(inboundMarketing)) ? [...inboundMarketing] : [];
       // Marketing leads logging removed - was too verbose in console
     } else if (source === 'shared-map' && type === 'center-map') {
@@ -1078,11 +1080,11 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
       
       if (mapComponent) {
         if (features && Array.isArray(features) && features.length > 0) {
-          mapComponent.centerMapOnFeatures(features).catch(err => {
+          mapComponent.centerMapOnFeatures(features).catch((err: any) => {
             console.warn('[CoverageMap] Failed to center on features:', err);
           });
         } else if (typeof lat === 'number' && typeof lon === 'number' && Number.isFinite(lat) && Number.isFinite(lon)) {
-          mapComponent.centerMapOnLocation(lat, lon, zoom).catch(err => {
+          mapComponent.centerMapOnLocation(lat, lon, zoom).catch((err: any) => {
             console.warn('[CoverageMap] Failed to center on location:', err);
           });
         }
@@ -1409,7 +1411,7 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
               _id: (s as any)._id, 
               name: s.name,
               idString: String(s.id),
-              _idString: String(s._id)
+              _idString: String((s as any)._id)
             }))
           });
         }

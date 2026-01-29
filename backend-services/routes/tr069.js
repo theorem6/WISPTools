@@ -1,8 +1,35 @@
 const express = require('express');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 const appConfig = require('../config/app');
 const { Tenant } = require('../models/tenant');
 
 const router = express.Router();
+
+// Multer for firmware upload - store in uploads/firmware
+const firmwareUploadDir = path.join(process.cwd(), 'uploads', 'firmware');
+if (!fs.existsSync(firmwareUploadDir)) {
+  fs.mkdirSync(firmwareUploadDir, { recursive: true });
+}
+const firmwareUpload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => cb(null, firmwareUploadDir),
+    filename: (req, file, cb) => {
+      const safe = (file.originalname || 'firmware').replace(/[^a-zA-Z0-9._-]/g, '_');
+      cb(null, `${Date.now()}-${safe}`);
+    }
+  }),
+  limits: { fileSize: 100 * 1024 * 1024 }, // 100MB
+  fileFilter: (req, file, cb) => {
+    const allowed = /\.(bin|img|fw|upg|tar\.gz|zip)$/i;
+    if (allowed.test(file.originalname || '')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only firmware files (.bin, .img, .fw, .upg, .tar.gz, .zip) allowed'), false);
+    }
+  }
+});
 
 // Helper function to get GenieACS MongoDB connection
 async function getGenieACSMongoDB() {
@@ -501,6 +528,175 @@ router.get('/device-metrics', async (req, res) => {
   }
 });
 
+// POST /api/tr069/devices/:deviceId/diagnostics - Run diagnostics for troubleshooting wizard
+router.post('/devices/:deviceId/diagnostics', async (req, res) => {
+  try {
+    const { deviceId } = req.params;
+    const { problemType } = req.body || {};
+
+    const config = await resolveGenieacsConfig(req.tenantId);
+    const nbiUrl = (config.genieacsApiUrl || getNbiUrl()).replace(/\/$/, '');
+
+    const results = [];
+
+    // 1. Device connectivity
+    const deviceRes = await fetch(`${nbiUrl}/devices/${deviceId}`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    const deviceReachable = deviceRes.ok;
+    results.push({
+      test: 'Device Connectivity',
+      status: deviceReachable ? 'pass' : 'fail',
+      message: deviceReachable ? 'Device is reachable' : 'Device is not responding'
+    });
+
+    if (deviceReachable) {
+      const device = await deviceRes.json();
+      const params = device.parameters || {};
+
+      // 2. Signal strength (common TR-069 paths)
+      const rssiPath = 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.X_RSIP';
+      const rssi = params[rssiPath] || params['InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.X_RSRP'] || params['Device.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.X_RSRP'];
+      const rssiNum = rssi != null ? parseFloat(rssi) : null;
+      let signalStatus = 'warning';
+      let signalMsg = 'Signal strength unknown';
+      if (rssiNum != null) {
+        if (rssiNum >= -80) { signalStatus = 'pass'; signalMsg = `Signal good (${rssiNum} dBm)`; }
+        else if (rssiNum >= -95) { signalStatus = 'warning'; signalMsg = `Signal weak (${rssiNum} dBm)`; }
+        else { signalStatus = 'fail'; signalMsg = `Signal very weak (${rssiNum} dBm)`; }
+      }
+      results.push({ test: 'Signal Strength', status: signalStatus, message: signalMsg });
+
+      // 3. Configuration / last contact
+      const lastInform = device._lastInform ? new Date(device._lastInform) : null;
+      const configStatus = lastInform && (Date.now() - lastInform.getTime() < 24 * 60 * 60 * 1000) ? 'pass' : 'warning';
+      const configMsg = lastInform ? `Last contact: ${lastInform.toLocaleString()}` : 'Last contact unknown';
+      results.push({ test: 'Configuration', status: configStatus, message: configMsg });
+    } else {
+      results.push({ test: 'Signal Strength', status: 'warning', message: 'Signal strength unknown' });
+      results.push({ test: 'Configuration', status: 'warning', message: 'Configuration status unknown' });
+    }
+
+    res.json({ success: true, results });
+  } catch (error) {
+    console.error('[TR069 API] Diagnostics failed:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Diagnostics failed',
+      details: error.message,
+      results: [
+        { test: 'Device Connectivity', status: 'fail', message: 'Unable to connect to device' },
+        { test: 'Signal Strength', status: 'warning', message: 'Signal strength unknown' },
+        { test: 'Configuration', status: 'warning', message: 'Configuration status unknown' }
+      ]
+    });
+  }
+});
+
+// GET /api/tr069/devices/:deviceId - Get single device (for verify step in troubleshooting)
+router.get('/devices/:deviceId', async (req, res) => {
+  try {
+    const { deviceId } = req.params;
+    const config = await resolveGenieacsConfig(req.tenantId);
+    const nbiUrl = (config.genieacsApiUrl || getNbiUrl()).replace(/\/$/, '');
+    const response = await fetch(`${nbiUrl}/devices/${deviceId}`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    if (!response.ok) {
+      return res.status(response.status).json({ success: false, error: 'Device not found' });
+    }
+    const device = await response.json();
+    res.json({ success: true, device });
+  } catch (error) {
+    console.error('[TR069 API] Get device failed:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// POST /api/tr069/devices/:deviceId/reboot - Reboot device via GenieACS
+router.post('/devices/:deviceId/reboot', async (req, res) => {
+  try {
+    const { deviceId } = req.params;
+
+    const config = await resolveGenieacsConfig(req.tenantId);
+    const nbiUrl = (config.genieacsApiUrl || getNbiUrl()).replace(/\/$/, '');
+    const tasksEndpoint = `${nbiUrl}/tasks`;
+
+    const response = await fetch(tasksEndpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ device: deviceId, name: 'reboot' })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      return res.status(response.status).json({
+        success: false,
+        error: 'Failed to reboot device',
+        details: errorText
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Reboot task created; device will reboot when it next contacts the ACS.'
+    });
+  } catch (error) {
+    console.error('[TR069 API] Reboot failed:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to reboot device',
+      details: error.message
+    });
+  }
+});
+
+// POST /api/tr069/devices/:deviceId/refresh - Refresh device parameters via GenieACS
+router.post('/devices/:deviceId/refresh', async (req, res) => {
+  try {
+    const { deviceId } = req.params;
+    const config = await resolveGenieacsConfig(req.tenantId);
+    const nbiUrl = (config.genieacsApiUrl || getNbiUrl()).replace(/\/$/, '');
+    const response = await fetch(`${nbiUrl}/tasks`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ device: deviceId, name: 'refreshObject' })
+    });
+    if (!response.ok) {
+      const errorText = await response.text();
+      return res.status(response.status).json({ success: false, error: 'Failed to refresh', details: errorText });
+    }
+    res.json({ success: true, message: 'Refresh task created.' });
+  } catch (error) {
+    console.error('[TR069 API] Refresh failed:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// POST /api/tr069/devices/:deviceId/factory-reset - Factory reset device via GenieACS
+router.post('/devices/:deviceId/factory-reset', async (req, res) => {
+  try {
+    const { deviceId } = req.params;
+    const config = await resolveGenieacsConfig(req.tenantId);
+    const nbiUrl = (config.genieacsApiUrl || getNbiUrl()).replace(/\/$/, '');
+    const response = await fetch(`${nbiUrl}/tasks`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ device: deviceId, name: 'factoryReset' })
+    });
+    if (!response.ok) {
+      const errorText = await response.text();
+      return res.status(response.status).json({ success: false, error: 'Failed to factory reset', details: errorText });
+    }
+    res.json({ success: true, message: 'Factory reset task created.' });
+  } catch (error) {
+    console.error('[TR069 API] Factory reset failed:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // POST /api/tr069/tasks - Execute TR-069 actions via GenieACS
 router.post('/tasks', async (req, res) => {
   try {
@@ -693,6 +889,62 @@ router.put('/devices/:deviceId/customer', async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Failed to link device to customer',
+      details: error.message
+    });
+  }
+});
+
+// DELETE /api/tr069/devices/:deviceId/customer - Unlink customer from device
+router.delete('/devices/:deviceId/customer', async (req, res) => {
+  try {
+    const { deviceId } = req.params;
+
+    const config = await resolveGenieacsConfig(req.tenantId);
+    const nbiUrl = (config.genieacsApiUrl || getNbiUrl()).replace(/\/$/, '');
+
+    const deviceResponse = await fetch(`${nbiUrl}/devices/${deviceId}`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' }
+    });
+
+    if (!deviceResponse.ok) {
+      return res.status(deviceResponse.status).json({
+        success: false,
+        error: 'Device not found in GenieACS'
+      });
+    }
+
+    // Clear customer link in device metadata (GenieACS stores these on the device object)
+    const updateData = {
+      _customerId: null,
+      _customerName: null
+    };
+
+    const updateResponse = await fetch(`${nbiUrl}/devices/${deviceId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updateData)
+    });
+
+    if (!updateResponse.ok) {
+      const errorText = await updateResponse.text();
+      return res.status(updateResponse.status).json({
+        success: false,
+        error: 'Failed to unlink customer from device',
+        details: errorText
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Customer unlinked from device successfully',
+      device: { id: deviceId }
+    });
+  } catch (error) {
+    console.error('[TR069 API] Failed to unlink device from customer:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to unlink customer from device',
       details: error.message
     });
   }
@@ -1345,19 +1597,23 @@ router.get('/firmware', async (req, res) => {
   }
 });
 
-// POST /api/tr069/firmware/upload - Upload firmware file (placeholder)
-router.post('/firmware/upload', async (req, res) => {
+// POST /api/tr069/firmware/upload - Upload firmware file
+router.post('/firmware/upload', firmwareUpload.single('firmware'), async (req, res) => {
   try {
-    // TODO: Implement firmware file upload
-    // This would typically involve:
-    // 1. File upload handling (multer)
-    // 2. Storage (S3, GCS, or local)
-    // 3. Metadata storage in database
-    
-    res.json({
-      success: false,
-      error: 'Firmware upload not yet implemented',
-      message: 'This feature is coming soon'
+    if (!req.file || !req.file.path) {
+      return res.status(400).json({
+        success: false,
+        error: 'Firmware file required (multipart field: firmware)'
+      });
+    }
+    const baseUrl = process.env.API_BASE_URL || (req.protocol + '://' + req.get('host'));
+    const firmwareUrl = `${baseUrl}/api/tr069/firmware/download/${path.basename(req.file.filename)}`;
+    res.status(201).json({
+      success: true,
+      firmwareUrl,
+      filename: req.file.originalname,
+      size: req.file.size,
+      message: 'Firmware uploaded. Use firmwareUrl with POST /api/tr069/firmware/upgrade to schedule upgrades.'
     });
   } catch (error) {
     console.error('[TR069 API] Failed to upload firmware:', error);
@@ -1367,6 +1623,16 @@ router.post('/firmware/upload', async (req, res) => {
       details: error.message
     });
   }
+});
+
+// GET /api/tr069/firmware/download/:filename - Serve uploaded firmware (for GenieACS download task)
+router.get('/firmware/download/:filename', (req, res) => {
+  const filename = path.basename(req.params.filename).replace(/\.\./g, '');
+  const filepath = path.join(firmwareUploadDir, filename);
+  if (!fs.existsSync(filepath)) {
+    return res.status(404).json({ error: 'Firmware file not found' });
+  }
+  res.sendFile(filepath);
 });
 
 // POST /api/tr069/firmware/upgrade - Schedule firmware upgrade

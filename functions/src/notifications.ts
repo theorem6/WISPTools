@@ -5,9 +5,11 @@
  * - Work order is assigned to them
  * - Work order status changes
  * - Work order is escalated
+ *
+ * Sends email when project-approved notifications are created (type === 'project_approved').
  */
 
-import { onDocumentUpdated } from 'firebase-functions/v2/firestore';
+import { onDocumentUpdated, onDocumentCreated } from 'firebase-functions/v2/firestore';
 import * as admin from 'firebase-admin';
 
 /**
@@ -189,6 +191,110 @@ async function sendWorkOrderNotification(
     console.error('Error sending notification:', error);
   }
 }
+
+/**
+ * Firestore trigger: when a notification is created with type project_approved,
+ * send email (SendGrid) and optional push (FCM) to the user.
+ * Email requires SENDGRID_API_KEY. Push uses user FCM tokens if present.
+ */
+export const onNotificationCreated = onDocumentCreated('notifications/{notificationId}', async (event) => {
+  const snapshot = event.data;
+  if (!snapshot) return;
+
+  const data = snapshot.data();
+  if (data?.type !== 'project_approved') return;
+
+  const userId = data.userId;
+  const title = data.title || 'Project approved';
+  const message = data.message || '';
+  const projectName = (data.data as { projectName?: string })?.projectName || '';
+  const projectId = (data.data as { projectId?: string })?.projectId || '';
+
+  if (!userId) {
+    console.warn('[onNotificationCreated] No userId in project_approved notification');
+    return;
+  }
+
+  let email: string | undefined;
+  let fcmTokens: string[] = [];
+  try {
+    const userRecord = await admin.auth().getUser(userId);
+    email = userRecord.email || undefined;
+    const userDoc = await admin.firestore().collection('users').doc(userId).get();
+    const userData = userDoc.data();
+    const tokens = (userData?.fcmTokens || {}) as Record<string, { token?: string }>;
+    fcmTokens = Object.values(tokens)
+      .map((device) => device?.token)
+      .filter((t): t is string => Boolean(t));
+  } catch {
+    console.warn(`[onNotificationCreated] Could not get user ${userId}`);
+    return;
+  }
+
+  const textBody = message || `Project "${projectName}" has been approved for deployment and is ready for field work.`;
+
+  // Optional: send push notification to mobile app
+  if (fcmTokens.length > 0) {
+    try {
+      await admin.messaging().sendEachForMulticast({
+        notification: {
+          title,
+          body: textBody
+        },
+        data: {
+          type: 'project_approved',
+          projectId,
+          projectName,
+          tenantId: String(data.tenantId || '')
+        },
+        android: {
+          priority: 'high' as const,
+          notification: { channelId: 'project_approvals', priority: 'high' as const }
+        },
+        tokens: fcmTokens
+      });
+      console.log(`[onNotificationCreated] Push sent to ${fcmTokens.length} device(s) for project approval: ${projectName}`);
+    } catch (pushErr) {
+      console.warn('[onNotificationCreated] Push failed (non-blocking):', pushErr);
+    }
+  }
+
+  // Optional: send email via SendGrid
+  const apiKey = process.env.SENDGRID_API_KEY;
+  if (!apiKey) {
+    console.log('[onNotificationCreated] SENDGRID_API_KEY not set – skipping email (in-app + push still sent if tokens present)');
+    return;
+  }
+  if (!email) {
+    console.warn(`[onNotificationCreated] User ${userId} has no email – skipping email`);
+    return;
+  }
+
+  try {
+    const body = {
+      personalizations: [{ to: [{ email }] }],
+      from: { email: process.env.SENDGRID_FROM_EMAIL || 'noreply@wisptools.io', name: 'WISPTools' },
+      subject: title,
+      content: [{ type: 'text/plain', value: textBody }]
+    };
+    const res = await fetch('https://api.sendgrid.com/v3/mail/send', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`
+      },
+      body: JSON.stringify(body)
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      console.error('[onNotificationCreated] SendGrid error:', res.status, text);
+      return;
+    }
+    console.log(`[onNotificationCreated] Email sent to ${email} for project approval: ${projectName}`);
+  } catch (err) {
+    console.error('[onNotificationCreated] Failed to send email:', err);
+  }
+});
 
 /**
  * Cleanup invalid FCM tokens

@@ -251,7 +251,13 @@ function createTenantStore() {
           return [];
         }
         
-        // For other errors, still return empty array but log the error
+        // Rethrow 5xx / service misconfiguration so TenantGuard can show a clear error instead of redirecting to tenant-setup
+        if (error?.status >= 500 || error?.message?.includes('INTERNAL_API_KEY') || error?.message?.includes('Service Unavailable')) {
+          update(state => ({ ...state, isLoading: false }));
+          throw error;
+        }
+        
+        // For other errors, return empty array but log the error
         update(state => ({
           ...state,
           isLoading: false,

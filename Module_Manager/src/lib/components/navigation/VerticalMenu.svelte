@@ -107,6 +107,14 @@
       <span class="menu-label">Optimize</span>
     </button>
     
+    <button class="menu-item" on:click={() => dispatch('wizard')} disabled={!hasData} title="Conflict Resolution Wizard">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+        <polyline points="2 17 12 22 22 17"></polyline>
+      </svg>
+      <span class="menu-label">Conflict Wizard</span>
+    </button>
+    
     <div class="menu-divider"></div>
     
     <button class="menu-item" on:click={() => dispatch('analysis')} title="View detailed analysis">

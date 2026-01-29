@@ -13,8 +13,12 @@ import { loadCBRSConfig, saveCBRSConfig, getConfigStatus, loadPlatformCBRSConfig
   import SettingsModal from './components/SettingsModal.svelte';
   import UserIDSelector from './components/UserIDSelector.svelte';
   import HelpModal from '$lib/components/modals/HelpModal.svelte';
+  import TipsModal from '$lib/components/modals/TipsModal.svelte';
+  import { getModuleTips } from '$lib/config/moduleTips';
+  import { tipsService } from '$lib/services/tipsService';
   import { cbrsManagementDocs } from '$lib/docs/cbrs-management-docs';
   import CBRSSetupWizard from '$lib/components/wizards/CBRSSetupWizard.svelte';
+  import CBRSDeviceRegistrationWizard from '$lib/components/wizards/cbrs/DeviceRegistrationWizard.svelte';
   
   // State
   let devices: CBSDDevice[] = [];
@@ -30,7 +34,11 @@ import { loadCBRSConfig, saveCBRSConfig, getConfigStatus, loadPlatformCBRSConfig
   let showUserIDSelector = false;
   let showHelpModal = false;
   let showSetupWizard = false;
+  let showDeviceRegistrationWizard = false;
   const helpContent = cbrsManagementDocs;
+  let showTipsModal = false;
+  let tipsShown = false;
+  const tips = getModuleTips('cbrs-management');
   let currentUserID: string | null = null;
   let currentUserIDDisplay: string | null = null;
   
@@ -113,6 +121,14 @@ let configStatus: ConfigStatus = getConfigStatus(null);
           cbrsService = createCBRSService(config);
         }
         
+        // Show Quick Tips on first visit if enabled
+        if (tenantId && tips.length > 0 && tipsService.shouldShowTips('cbrs-management') && !tipsShown) {
+          setTimeout(() => {
+            showTipsModal = true;
+            tipsShown = true;
+          }, 800);
+        }
+
         // Load devices (only if we have a tenant)
         if (tenantId) {
           await loadDevices();
@@ -354,7 +370,24 @@ let configStatus: ConfigStatus = getConfigStatus(null);
     }
   }
   
-  async function handleAddDevice() {
+  async function handleWizardComplete() {
+    showSetupWizard = false;
+    if (!tenantId) return;
+    try {
+      const config = await loadCBRSConfig(tenantId);
+      cbrsConfig = config;
+      configStatus = getConfigStatus(config);
+      if (config && configStatus.status === 'complete') {
+        const cfg = await buildServiceConfig(config, platformConfig, tenantId);
+        cbrsService = createCBRSService(cfg);
+        await loadDevices();
+      }
+    } catch (err: any) {
+      console.error('[CBRS] Wizard complete reload failed:', err);
+    }
+  }
+
+  async function handleAddDevice(_e?: Event) {
     try {
       if (!tenantId) {
         error = 'Please select a tenant before adding devices.';
@@ -400,13 +433,39 @@ let configStatus: ConfigStatus = getConfigStatus(null);
       error = err?.message || 'Failed to add device';
     }
   }
+
+  function handleDeviceRegistrationWizardSaved(event: CustomEvent<{ cbsdSerialNumber: string; fccId: string; cbsdCategory: string; sasProviderId: 'google'; latitude: number; longitude: number; height: number; antennaGain: number }>) {
+    const p = event.detail;
+    if (!tenantId) return;
+    const device: CBSDDevice = {
+      id: `cbsd-${Date.now()}`,
+      cbsdSerialNumber: p.cbsdSerialNumber,
+      fccId: p.fccId,
+      cbsdCategory: p.cbsdCategory as CBSDCategory,
+      sasProviderId: p.sasProviderId,
+      installationParam: {
+        latitude: p.latitude,
+        longitude: p.longitude,
+        height: p.height,
+        heightType: 'AGL',
+        antennaGain: p.antennaGain
+      },
+      state: 'UNREGISTERED' as CBSDState,
+      tenantId,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    devices = [...devices, device];
+    addDeviceMarkers();
+    showDeviceRegistrationWizard = false;
+  }
   
   function handleRequestGrant(device: CBSDDevice) {
     selectedDevice = device;
     showGrantRequestModal = true;
   }
   
-  async function handleSubmitGrantRequest() {
+  async function handleSubmitGrantRequest(_e?: Event) {
     try {
       if (!cbrsService || !selectedDevice) return;
       
@@ -953,6 +1012,11 @@ let configStatus: ConfigStatus = getConfigStatus(null);
     on:close={() => showSetupWizard = false}
     on:complete={handleWizardComplete}
   />
+  <CBRSDeviceRegistrationWizard
+    show={showDeviceRegistrationWizard}
+    on:close={() => showDeviceRegistrationWizard = false}
+    on:saved={handleDeviceRegistrationWizardSaved}
+  />
 {/if}
 
 <div class="cbrs-module">
@@ -1016,6 +1080,9 @@ let configStatus: ConfigStatus = getConfigStatus(null);
         </button>
         <button class="btn btn-primary" onclick={() => showAddDeviceModal = true}>
           + Add CBSD Device
+        </button>
+        <button class="btn btn-secondary" onclick={() => showDeviceRegistrationWizard = true} title="Guided wizard to add a CBSD device">
+          📡 Register Device Wizard
         </button>
       </div>
     </div>
@@ -1131,6 +1198,7 @@ let configStatus: ConfigStatus = getConfigStatus(null);
           onDeviceSelect={handleDeviceSelect}
           onRegister={handleRegisterDevice}
           onDeregister={handleDeregisterDevice}
+          on:getstarted={() => showSetupWizard = true}
         />
       </div>
       
@@ -1302,6 +1370,14 @@ let configStatus: ConfigStatus = getConfigStatus(null);
   title="CBRS Management Help"
   content={helpContent}
   on:close={() => showHelpModal = false}
+/>
+
+<!-- Quick Tips Modal -->
+<TipsModal 
+  bind:show={showTipsModal}
+  moduleId="cbrs-management"
+  {tips}
+  on:close={() => showTipsModal = false}
 />
 </TenantGuard>
 

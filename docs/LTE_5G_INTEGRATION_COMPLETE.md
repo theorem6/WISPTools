@@ -287,12 +287,12 @@ Customer online/offline status is automatically tracked via MME status reports. 
 ### Scripts
 - `backend-services/scripts/configure-local-hss-failover.sh` - HSS configuration script
 
-### Frontend (TODO)
-- Update `AddEditCustomerModal.svelte` to include:
-  - Service type selector
-  - LTE authentication fields
-  - MAC address field
-  - Enhanced speed package fields
+### Frontend ✅
+- `AddEditCustomerModal.svelte` includes:
+  - Service type selector (4G/5G, FWA, WiFi, Fiber)
+  - LTE authentication section when 4G/5G: IMSI, MSISDN, Ki, OPc, OP, SQN
+  - MAC address field (optional)
+  - QoS when 4G/5G: QCI, Data Quota, Priority Level; plan download/upload from group
 
 ## Next Steps
 

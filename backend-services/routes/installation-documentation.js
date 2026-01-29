@@ -218,7 +218,8 @@ router.post('/:id/photos', requireAuth, upload.array('photos', 20), async (req, 
       const publicUrl = `https://storage.googleapis.com/${bucket.name}/${filename}`;
       
       // Create thumbnail (simplified - in production, use image processing library)
-      const thumbnailUrl = publicUrl; // TODO: Generate actual thumbnail
+      // Thumbnail: use same URL for now (storage resize URLs could be added later)
+      const thumbnailUrl = publicUrl;
       
       const photo = {
         url: publicUrl,
@@ -332,9 +333,29 @@ router.post('/:id/submit', requireAuth, async (req, res) => {
     }
     
     await doc.save();
-    
-    // TODO: Send notification to management for approval
-    
+
+    try {
+      const { firestore, admin } = require('../config/firebase');
+      if (firestore && admin) {
+        const { UserTenant } = require('../models/user');
+        const admins = await UserTenant.find({ tenantId: req.tenantId, role: { $in: ['owner', 'admin'] } }).lean();
+        for (const u of admins) {
+          await firestore.collection('notifications').add({
+            userId: u.userId,
+            tenantId: req.tenantId,
+            type: 'installation_doc_submitted',
+            title: 'Installation documentation submitted',
+            message: `Documentation for ${doc.customerName || doc.siteName || 'site'} is ready for review.`,
+            read: false,
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            data: { docId: doc._id.toString(), tenantId: req.tenantId }
+          });
+        }
+      }
+    } catch (notifErr) {
+      console.warn('[InstallationDoc] Notification failed:', notifErr.message);
+    }
+
     res.json({
       success: true,
       message: 'Documentation submitted for approval',
@@ -397,9 +418,25 @@ router.post('/:id/approve', requireAuth, requireAdmin, async (req, res) => {
     }
     
     await doc.save();
-    
-    // TODO: Send notification to installer/subcontractor
-    
+
+    try {
+      const { firestore, admin } = require('../config/firebase');
+      if (firestore && admin && !rejected && doc.uploadedBy) {
+        await firestore.collection('notifications').add({
+          userId: doc.uploadedBy,
+          tenantId: req.tenantId,
+          type: 'installation_doc_approved',
+          title: 'Installation documentation approved',
+          message: `Your documentation for ${doc.customerName || doc.siteName || 'site'} has been approved.`,
+          read: false,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          data: { docId: doc._id.toString(), tenantId: req.tenantId }
+        });
+      }
+    } catch (notifErr) {
+      console.warn('[InstallationDoc] Notification failed:', notifErr.message);
+    }
+
     res.json({
       success: true,
       message: rejected ? 'Documentation rejected' : 'Documentation approved',

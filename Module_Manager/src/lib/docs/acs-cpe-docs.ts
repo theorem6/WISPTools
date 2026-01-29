@@ -13,6 +13,7 @@ export const acsCpeDocs = `
     <li><a href="#map-view">🗺️ Map View</a></li>
     <li><a href="#device-management">📊 Device Management</a></li>
     <li><a href="#preset-management">⚙️ Preset Management</a></li>
+    <li><a href="#device-wizards">🧙 Device Wizards</a></li>
     <li><a href="#fault-management">🚨 Fault Management</a></li>
     <li><a href="#administration">🔧 Administration</a></li>
     <li><a href="#api-endpoints">📡 API Endpoints</a></li>
@@ -135,6 +136,83 @@ ACS Password: (optional)</code></pre>
   <li>Click "Apply"</li>
   <li>Monitor application progress</li>
 </ul>
+
+<h4 id="device-wizards">🧙 Device Wizards</h4>
+
+<div class="info">
+  <strong>Purpose:</strong> Guided workflows for device onboarding and troubleshooting to simplify complex operations.
+</div>
+
+<h4>Device Onboarding Wizard</h4>
+
+<h4>Accessing the Wizard</h4>
+<ol>
+  <li>Navigate to <strong>ACS CPE Management</strong> module</li>
+  <li>Click <strong>"👋 Onboard Device"</strong> button in module actions</li>
+  <li>Wizard opens with welcome screen</li>
+</ol>
+
+<h4>Wizard Steps</h4>
+<ol>
+  <li><strong>Welcome:</strong> Overview of onboarding process</li>
+  <li><strong>Discover Device:</strong> Scan, manual entry, or auto-discover</li>
+  <li><strong>Link Customer:</strong> Select customer for device</li>
+  <li><strong>Service Plan:</strong> Assign service plan</li>
+  <li><strong>Configure:</strong> Review device information</li>
+  <li><strong>Apply Preset:</strong> Apply configuration preset</li>
+  <li><strong>Test:</strong> Run connectivity and configuration tests</li>
+  <li><strong>Complete:</strong> Review summary and finish</li>
+</ol>
+
+<h4>Tips</h4>
+<ul>
+  <li>Have device serial number ready</li>
+  <li>Ensure customer exists before onboarding</li>
+  <li>Select appropriate service plan</li>
+  <li>Run all tests before completing</li>
+</ul>
+
+<h4>Troubleshooting Wizard</h4>
+
+<h4>Accessing the Wizard</h4>
+<ol>
+  <li>Navigate to <strong>ACS CPE Management</strong> module</li>
+  <li>Select a device from device list or map</li>
+  <li>Click <strong>"🔍 Troubleshoot"</strong> button</li>
+  <li>Wizard opens with device pre-selected</li>
+</ol>
+
+<h4>Wizard Steps</h4>
+<ol>
+  <li><strong>Welcome:</strong> Overview of troubleshooting process</li>
+  <li><strong>Select Device:</strong> Choose device (if not pre-selected)</li>
+  <li><strong>Problem Type:</strong> Identify issue (Offline, Slow, Configuration, Signal, Other)</li>
+  <li><strong>Diagnostics:</strong> Run automated diagnostic tests</li>
+  <li><strong>Solutions:</strong> Review suggested fixes</li>
+  <li><strong>Apply Fix:</strong> Apply selected solution</li>
+  <li><strong>Verify:</strong> Confirm issue is resolved</li>
+  <li><strong>Complete:</strong> Review troubleshooting summary</li>
+</ol>
+
+<h4>Problem Types</h4>
+<ul>
+  <li><strong>Device Offline:</strong> Device not responding - solutions include reboot, check power, factory reset</li>
+  <li><strong>Slow Performance:</strong> Device responding slowly - solutions include refresh parameters, check signal, update firmware</li>
+  <li><strong>Configuration Issue:</strong> Device misconfigured - solutions include apply preset, reset configuration</li>
+  <li><strong>Signal Problem:</strong> Poor signal strength - solutions include reposition antenna, check obstructions</li>
+</ul>
+
+<h4>Tips</h4>
+<ul>
+  <li>Select correct problem type for better diagnostics</li>
+  <li>Review all diagnostic results before selecting solution</li>
+  <li>For manual fixes, follow instructions carefully</li>
+  <li>Verify fix before closing wizard</li>
+</ul>
+
+<div class="success">
+  <strong>✅ Quick Access:</strong> Both wizards can be accessed from the ACS CPE Management module. The Troubleshooting Wizard requires a device to be selected first.
+</div>
 
 <h4 id="fault-management">🚨 Fault Management</h4>
 

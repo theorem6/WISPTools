@@ -22,12 +22,10 @@
         return;
       }
       
-      await customerPortalService.createCustomerTicket({
-        title,
-        description,
-        category,
-        priority
-      });
+      await customerPortalService.createCustomerTicket(
+        { title, description, category, priority },
+        customer.tenantId
+      );
       
       goto('/modules/customers/portal/tickets');
     } catch (err: any) {
