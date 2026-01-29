@@ -156,27 +156,18 @@
           <button class="back-button" onclick={() => window.location.href = '/dashboard'}>
             ← Back to Dashboard
           </button>
-          <button
-            class="wizard-header-btn"
-            onclick={() => showSubscriberWizard = true}
-            title="Subscriber Creation Wizard"
-          >
-            🧙 Add Subscriber Wizard
-          </button>
-          <button
-            class="wizard-header-btn"
-            onclick={() => showBandwidthPlanWizard = true}
-            title="Bandwidth Plan Wizard"
-          >
-            📶 Add Plan Wizard
-          </button>
-          <button
-            class="wizard-header-btn"
-            onclick={() => showGroupWizard = true}
-            title="Subscriber Group Wizard"
-          >
-            📦 Add Group Wizard
-          </button>
+          <ModuleWizardMenu
+            wizards={[
+              { id: 'subscriber', label: 'Add Subscriber Wizard', icon: '🧙' },
+              { id: 'plan', label: 'Add Plan Wizard', icon: '📶' },
+              { id: 'group', label: 'Add Group Wizard', icon: '📦' }
+            ]}
+            on:select={(e) => {
+              if (e.detail.id === 'subscriber') showSubscriberWizard = true;
+              else if (e.detail.id === 'plan') showBandwidthPlanWizard = true;
+              else if (e.detail.id === 'group') showGroupWizard = true;
+            }}
+          />
         </div>
         <div>
           <h1>🔐 HSS & Subscriber Management</h1>

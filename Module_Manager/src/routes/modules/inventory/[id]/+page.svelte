@@ -171,15 +171,19 @@
         <div class="info-grid">
           <div class="info-item">
             <label>Location Type</label>
-            <span class="value">{item.currentLocation.type}</span>
+            <span class="value">{item.currentLocation?.type === 'unassigned' ? 'Unassigned' : (item.currentLocation?.type ?? '—')}</span>
           </div>
-          {#if item.currentLocation.siteName}
+          {#if item.currentLocation?.type === 'unassigned'}
+            <div class="info-item">
+              <span class="value">Assign during deploy</span>
+            </div>
+          {:else if item.currentLocation?.siteName}
             <div class="info-item">
               <label>Site Name</label>
               <span class="value">{item.currentLocation.siteName}</span>
             </div>
           {/if}
-          {#if item.currentLocation.warehouse}
+          {#if item.currentLocation?.type !== 'unassigned' && item.currentLocation?.warehouse}
             <div class="info-item">
               <label>Warehouse</label>
               <span class="value">{item.currentLocation.warehouse.name || 'N/A'}</span>
@@ -197,7 +201,7 @@
               <span class="value">{item.currentLocation.warehouse.shelf || 'N/A'}</span>
             </div>
           {/if}
-          {#if item.currentLocation.tower}
+          {#if item.currentLocation?.type !== 'unassigned' && item.currentLocation?.tower}
             <div class="info-item">
               <label>Rack</label>
               <span class="value">{item.currentLocation.tower.rack || 'N/A'}</span>

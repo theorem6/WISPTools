@@ -37,7 +37,7 @@ export interface InventoryItem {
   
   // Current Location
   currentLocation: {
-    type: 'warehouse' | 'tower' | 'noc' | 'vehicle' | 'customer' | 'rma' | 'vendor' | 'other';
+    type: 'unassigned' | 'warehouse' | 'tower' | 'noc' | 'vehicle' | 'customer' | 'rma' | 'vendor' | 'other';
     siteId?: string;
     siteName?: string;
     warehouse?: {

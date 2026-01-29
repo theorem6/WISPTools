@@ -49,9 +49,9 @@
     partNumber: '',
     serialNumber: '',
     
-    // Location
+    // Location (optional; deploy step can assign later)
     locationSiteId: '',
-    locationType: 'warehouse' as 'warehouse' | 'tower' | 'noc' | 'vehicle' | 'customer' | 'rma' | 'other',
+    locationType: 'unassigned' as 'unassigned' | 'warehouse' | 'tower' | 'noc' | 'vehicle' | 'customer' | 'rma' | 'other',
     warehouseSection: '',
     rackLocation: '',
     rackUnit: '',
@@ -86,8 +86,9 @@
   $: useCustomType = formData.equipmentType === 'Other/Custom';
   
   $: selectedLocation = availableLocations.find(loc => loc.id === formData.locationSiteId);
+  $: locationUnassigned = formData.locationType === 'unassigned';
   $: filteredLocations = availableLocations.filter(loc => 
-    formData.locationType === 'customer' || formData.locationType === 'other' 
+    formData.locationType === 'unassigned' || formData.locationType === 'customer' || formData.locationType === 'other' 
       ? true 
       : loc.type === formData.locationType
   );
@@ -105,11 +106,6 @@
       return;
     }
     
-    if (!formData.locationSiteId && formData.locationType !== 'customer' && formData.locationType !== 'other') {
-      error = 'Please select a location from the map, or add the location in Coverage Map first';
-      return;
-    }
-    
     isSaving = true;
     error = '';
     
@@ -122,19 +118,21 @@
         partNumber: formData.partNumber || undefined,
         serialNumber: formData.serialNumber,
         
-        currentLocation: {
-          type: formData.locationType,
-          siteId: formData.locationSiteId || undefined,
-          siteName: selectedLocation?.name || undefined,
-          warehouse: formData.locationType === 'warehouse' ? {
-            name: selectedLocation?.name,
-            section: formData.warehouseSection
-          } : undefined,
-          tower: (formData.locationType === 'tower' || formData.locationType === 'noc') ? {
-            rack: formData.rackLocation,
-            rackUnit: formData.rackUnit
-          } : undefined
-        },
+        currentLocation: formData.locationType === 'unassigned'
+          ? { type: 'unassigned' as const }
+          : {
+              type: formData.locationType,
+              siteId: formData.locationSiteId || undefined,
+              siteName: selectedLocation?.name || undefined,
+              warehouse: formData.locationType === 'warehouse' ? {
+                name: selectedLocation?.name,
+                section: formData.warehouseSection
+              } : undefined,
+              tower: (formData.locationType === 'tower' || formData.locationType === 'noc') ? {
+                rack: formData.rackLocation,
+                rackUnit: formData.rackUnit
+              } : undefined
+            },
         
         status: formData.status,
         condition: formData.condition,
@@ -175,6 +173,7 @@
   
   function getLocationIcon(type: string): string {
     const icons: Record<string, string> = {
+      unassigned: '📋',
       tower: '📡',
       rooftop: '🏢',
       monopole: '📍',
@@ -274,13 +273,15 @@
         </div>
       </div>
       
-      <!-- Location -->
+      <!-- Location (optional; assign during deploy if left unassigned) -->
       <div class="section">
-        <h3>📍 Location (from Coverage Map)</h3>
+        <h3>📍 Location</h3>
+        <p class="help-text" style="margin-bottom: 1rem;">Optional. Leave unassigned to assign a location during the deploy step.</p>
         <div class="form-grid">
           <div class="form-group">
-            <label>Location Type *</label>
-            <select bind:value={formData.locationType} required>
+            <label>Location Type</label>
+            <select bind:value={formData.locationType}>
+              <option value="unassigned">Unassigned (assign during deploy)</option>
               <option value="warehouse">Warehouse</option>
               <option value="tower">Tower Site</option>
               <option value="noc">NOC</option>
@@ -291,33 +292,35 @@
             </select>
           </div>
           
-          <div class="form-group">
-            <label>Select Location *</label>
-            <select bind:value={formData.locationSiteId} required>
-              <option value="">-- Select from map --</option>
-              {#each filteredLocations as location}
-                <option value={location.id}>
-                  {getLocationIcon(location.type)} {location.name} ({location.type})
-                </option>
-              {/each}
-            </select>
-            {#if filteredLocations.length === 0}
-              <p class="help-text warning">
-                ⚠️ No {formData.locationType} locations found. 
-                <button type="button" class="link-button" on:click={() => goto('/modules/coverage-map')}>
-                  Add in Coverage Map →
-                </button>
-              </p>
-            {:else}
-              <p class="help-text">
-                Selected location must exist on Coverage Map
-              </p>
-            {/if}
-          </div>
+          {#if !locationUnassigned}
+            <div class="form-group">
+              <label>Select Location</label>
+              <select bind:value={formData.locationSiteId}>
+                <option value="">-- Select from map --</option>
+                {#each filteredLocations as location}
+                  <option value={location.id}>
+                    {getLocationIcon(location.type)} {location.name} ({location.type})
+                  </option>
+                {/each}
+              </select>
+              {#if filteredLocations.length === 0 && formData.locationType !== 'customer' && formData.locationType !== 'other'}
+                <p class="help-text warning">
+                  ⚠️ No {formData.locationType} locations found. 
+                  <button type="button" class="link-button" on:click={() => goto('/modules/coverage-map')}>
+                    Add in Coverage Map →
+                  </button>
+                </p>
+              {:else if formData.locationType !== 'customer' && formData.locationType !== 'other'}
+                <p class="help-text">
+                  Selected location must exist on Coverage Map
+                </p>
+              {/if}
+            </div>
+          {/if}
         </div>
         
         <!-- Specific location details based on type -->
-        {#if formData.locationSiteId}
+        {#if !locationUnassigned && formData.locationSiteId}
           {#if formData.locationType === 'warehouse'}
             <div class="form-group">
               <label>Warehouse Section/Aisle</label>

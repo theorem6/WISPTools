@@ -26,6 +26,7 @@
   import { getModuleTips } from '$lib/config/moduleTips';
   import { tipsService } from '$lib/services/tipsService';
   import MonitoringSetupWizard from '$lib/components/wizards/MonitoringSetupWizard.svelte';
+  import ModuleWizardMenu from '$lib/components/wizards/ModuleWizardMenu.svelte';
   import { debug } from '$lib/utils/debug';
   
   // Use real backend data now that devices are created
@@ -1076,10 +1077,10 @@
             <line x1="12" y1="17" x2="12.01" y2="17"></line>
           </svg>
         </button>
-        <button class="module-control-btn" onclick={() => showSetupWizard = true} title="Monitoring Setup Wizard">
-          <span class="control-icon">🚀</span>
-          <span class="control-label">Setup</span>
-        </button>
+        <ModuleWizardMenu
+          wizards={[{ id: 'setup', label: 'Setup Wizard', icon: '🚀' }]}
+          on:select={() => showSetupWizard = true}
+        />
         <button class="module-control-btn" onclick={() => showSNMPConfig = true} title="Configuration">
           <span class="control-icon">🔧</span>
           <span class="control-label">Config</span>

@@ -32,6 +32,7 @@ import { iframeCommunicationService } from '$lib/services/iframeCommunicationSer
   import { tipsService } from '$lib/services/tipsService';
   import DeploymentWizard from '$lib/components/wizards/deployment/DeploymentWizard.svelte';
   import SiteDeploymentWizard from '$lib/components/wizards/deployment/SiteDeploymentWizard.svelte';
+  import ModuleWizardMenu from '$lib/components/wizards/ModuleWizardMenu.svelte';
 
   let currentUser: any = null;
   let showEPCDeploymentModal = false;
@@ -1300,28 +1301,24 @@ import { iframeCommunicationService } from '$lib/services/iframeCommunicationSer
           <span class="control-label">Deploy Plan</span>
         </button>
         
-        <button 
-          class="module-control-btn" 
-          onclick={() => {
-            showSiteDeploymentWizard = true;
+        <ModuleWizardMenu
+          wizards={[
+            { id: 'add-site', label: 'Add Site', icon: '📍' },
+            { id: 'deploy-equipment', label: 'Deploy Equipment', icon: '📦' },
+            { id: 'pci-planner', label: 'PCI Planner', icon: '📊' },
+            { id: 'frequency-planner', label: 'Frequency Planner', icon: '📡' }
+          ]}
+          on:select={(e) => {
+            if (e.detail.id === 'add-site') showSiteDeploymentWizard = true;
+            else if (e.detail.id === 'deploy-equipment') {
+              showDeploymentWizard = true;
+              deploymentWizardLocation = null;
+              deploymentWizardSiteId = null;
+            }
+            else if (e.detail.id === 'pci-planner') showPCIPlannerModal = true;
+            else if (e.detail.id === 'frequency-planner') showFrequencyPlannerModal = true;
           }}
-          title="Add Site Wizard - Create a new tower/NOC/warehouse site"
-        >
-          <span class="control-icon">📍</span>
-          <span class="control-label">Add Site</span>
-        </button>
-        <button 
-          class="module-control-btn" 
-          onclick={() => {
-            showDeploymentWizard = true;
-            deploymentWizardLocation = null;
-            deploymentWizardSiteId = null;
-          }}
-          title="Deploy Equipment Wizard - Step-by-step equipment deployment"
-        >
-          <span class="control-icon">📦</span>
-          <span class="control-label">Deploy Equipment</span>
-        </button>
+        />
       </div>
     </div>
 

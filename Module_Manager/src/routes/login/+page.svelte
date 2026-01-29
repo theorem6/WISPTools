@@ -447,7 +447,7 @@
         console.log('[Login Page] Tenant created:', result.tenantId);
         
         // Load the newly created tenant and set it as current
-        const tenant = await tenantService.getTenant(result.tenantId);
+        const { tenant } = await tenantService.getTenant(result.tenantId);
         if (tenant) {
           tenantStore.setCurrentTenant(tenant);
           console.log('[Login Page] Tenant set as current:', tenant.displayName);

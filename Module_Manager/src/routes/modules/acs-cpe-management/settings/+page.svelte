@@ -46,7 +46,8 @@
     // Load tenant data (if tenant is selected)
     if (tenantId) {
       try {
-        tenant = await tenantService.getTenant(tenantId);
+        const result = await tenantService.getTenant(tenantId);
+        tenant = result.tenant;
         if (!tenant) {
           error = 'Tenant not found';
           return;
@@ -88,7 +89,8 @@
       const result = await tenantService.updateTenantSettings(tenantId, settings);
       if (result.success) {
         success = 'ACS settings saved successfully!';
-        tenant = await tenantService.getTenant(tenantId);
+        const r = await tenantService.getTenant(tenantId);
+        tenant = r.tenant;
       } else {
         error = result.error || 'Failed to save settings';
       }

@@ -59,7 +59,7 @@
     return {
       ...base,
       currentLocation: {
-        type: currentLocation?.type ?? 'warehouse',
+        type: currentLocation?.type ?? 'unassigned',
         siteId: currentLocation?.siteId ?? '',
         siteName: currentLocation?.siteName ?? '',
         warehouse: {
@@ -92,26 +92,29 @@
   }
 
   function toUpdatePayload(form: InventoryFormData): Partial<InventoryItem> {
+    const loc = form.currentLocation;
     return {
       ...form,
-      currentLocation: {
-        type: form.currentLocation.type,
-        siteId: form.currentLocation.siteId || undefined,
-        siteName: form.currentLocation.siteName || undefined,
-        warehouse: {
-          name: form.currentLocation.warehouse.name || undefined,
-          section: form.currentLocation.warehouse.section || undefined,
-          aisle: form.currentLocation.warehouse.aisle || undefined,
-          shelf: form.currentLocation.warehouse.shelf || undefined,
-          bin: form.currentLocation.warehouse.bin || undefined
-        },
-        tower: {
-          rack: form.currentLocation.tower.rack || undefined,
-          rackUnit: form.currentLocation.tower.rackUnit || undefined,
-          cabinet: form.currentLocation.tower.cabinet || undefined,
-          position: form.currentLocation.tower.position || undefined
-        }
-      },
+      currentLocation: loc.type === 'unassigned'
+        ? { type: 'unassigned' as const }
+        : {
+            type: loc.type,
+            siteId: loc.siteId || undefined,
+            siteName: loc.siteName || undefined,
+            warehouse: {
+              name: loc.warehouse?.name || undefined,
+              section: loc.warehouse?.section || undefined,
+              aisle: loc.warehouse?.aisle || undefined,
+              shelf: loc.warehouse?.shelf || undefined,
+              bin: loc.warehouse?.bin || undefined
+            },
+            tower: {
+              rack: loc.tower?.rack || undefined,
+              rackUnit: loc.tower?.rackUnit || undefined,
+              cabinet: loc.tower?.cabinet || undefined,
+              position: loc.tower?.position || undefined
+            }
+          },
       purchaseInfo: {
         vendor: form.purchaseInfo.vendor || undefined,
         purchaseDate: form.purchaseInfo.purchaseDate || undefined,
@@ -348,13 +351,14 @@
           </div>
         </div>
 
-        <!-- Current Location -->
+        <!-- Current Location (optional; assign during deploy if unassigned) -->
         <div class="form-section">
           <h3>📍 Current Location</h3>
           <div class="form-grid">
             <div class="form-group">
-              <label for="locationType">Location Type *</label>
-              <select id="locationType" bind:value={formData.currentLocation.type} required>
+              <label for="locationType">Location Type</label>
+              <select id="locationType" bind:value={formData.currentLocation.type}>
+                <option value="unassigned">Unassigned (assign during deploy)</option>
                 <option value="warehouse">Warehouse</option>
                 <option value="tower">Tower Site</option>
                 <option value="noc">NOC</option>
@@ -366,15 +370,17 @@
               </select>
             </div>
             
-            <div class="form-group">
-              <label for="siteName">Site Name</label>
-              <input 
-                id="siteName"
-                type="text" 
-                bind:value={formData.currentLocation.siteName} 
-                placeholder="Enter site name"
-              />
-            </div>
+            {#if formData.currentLocation.type !== 'unassigned'}
+              <div class="form-group">
+                <label for="siteName">Site Name</label>
+                <input 
+                  id="siteName"
+                  type="text" 
+                  bind:value={formData.currentLocation.siteName} 
+                  placeholder="Enter site name"
+                />
+              </div>
+            {/if}
           </div>
         </div>
 

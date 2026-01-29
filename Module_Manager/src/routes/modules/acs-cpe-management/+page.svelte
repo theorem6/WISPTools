@@ -17,6 +17,7 @@
   import BulkOperationsWizard from '$lib/components/wizards/acs/BulkOperationsWizard.svelte';
   import FirmwareUpdateWizard from '$lib/components/wizards/acs/FirmwareUpdateWizard.svelte';
   import DeviceRegistrationWizard from '$lib/components/wizards/acs/DeviceRegistrationWizard.svelte';
+  import ModuleWizardMenu from '$lib/components/wizards/ModuleWizardMenu.svelte';
   import CPEPerformanceModal from './components/CPEPerformanceModal.svelte';
   import { formatUptime } from './lib/tr069MetricsService';
 
@@ -47,7 +48,6 @@
   let showBulkWizard = false;
   let showFirmwareWizard = false;
   let showDeviceRegistrationWizard = false;
-  let showWizardsDropdown = false;
   let selectedDeviceForTroubleshooting: { id: string; serial: string } | null = null;
   $: bulkSelectedDeviceIds = selectedCPE ? [(selectedCPE.id || selectedCPE._id)].filter(Boolean) : [];
   $: firmwareDeviceIds = selectedCPE ? [(selectedCPE.id || selectedCPE._id)].filter(Boolean) : [];
@@ -478,7 +478,6 @@
   <meta name="description" content="TR-069 device management and CPE monitoring with GPS mapping" />
 </svelte:head>
 
-<svelte:window on:click={(e) => { if (showWizardsDropdown && e.target instanceof Element && !(e.target as Element).closest('.wizards-dropdown')) showWizardsDropdown = false; }} />
 <TenantGuard>
 <div class="acs-module">
   <!-- Main Navigation -->
@@ -547,62 +546,32 @@
           {/if}
         </button>
 
-        <button
-          class="btn btn-secondary"
-          onclick={() => showSetupWizard = true}
+        <ModuleWizardMenu
+          wizards={[
+            { id: 'setup', label: 'Setup ACS', icon: '⚙️' },
+            { id: 'device-onboarding', label: 'Onboard Device', icon: '👋' },
+            { id: 'troubleshooting', label: 'Troubleshoot', icon: '🔍' },
+            { id: 'preset-creation', label: 'Preset Creation', icon: '⚙️' },
+            { id: 'bulk-operations', label: 'Bulk Operations', icon: '📦' },
+            { id: 'firmware-update', label: 'Firmware Update', icon: '💾' },
+            { id: 'device-registration', label: 'Device Registration', icon: '📱' }
+          ]}
           disabled={isLoading}
-          title="Configure GenieACS connection and settings"
-        >
-          ⚙️ Setup ACS
-        </button>
-        
-        <button
-          class="btn btn-primary"
-          onclick={() => {
-            showDeviceOnboardingWizard = true;
-          }}
-          disabled={isLoading}
-          title="Onboard a new CPE device"
-        >
-          👋 Onboard Device
-        </button>
-        
-        <button
-          class="btn btn-secondary"
-          onclick={() => {
-            if (selectedCPE) {
-              selectedDeviceForTroubleshooting = {
-                id: selectedCPE.id || selectedCPE._id,
-                serial: selectedCPE.serialNumber || selectedCPE._deviceId?.SerialNumber || ''
-              };
+          on:select={(e) => {
+            const id = e.detail.id;
+            if (id === 'setup') showSetupWizard = true;
+            else if (id === 'device-onboarding') showDeviceOnboardingWizard = true;
+            else if (id === 'troubleshooting') {
+              if (selectedCPE) selectedDeviceForTroubleshooting = { id: selectedCPE.id || selectedCPE._id, serial: selectedCPE.serialNumber || selectedCPE._deviceId?.SerialNumber || '' };
+              showTroubleshootingWizard = true;
             }
-            showTroubleshootingWizard = true;
+            else if (id === 'preset-creation') showPresetWizard = true;
+            else if (id === 'bulk-operations') showBulkWizard = true;
+            else if (id === 'firmware-update') showFirmwareWizard = true;
+            else if (id === 'device-registration') showDeviceRegistrationWizard = true;
           }}
-          disabled={isLoading || !selectedCPE}
-          title={selectedCPE ? `Troubleshoot ${selectedCPE.serialNumber || 'device'}` : 'Select a device to troubleshoot'}
-        >
-          🔍 Troubleshoot
-        </button>
+        />
 
-        <div class="wizards-dropdown">
-          <button
-            class="btn btn-secondary"
-            onclick={() => showWizardsDropdown = !showWizardsDropdown}
-            disabled={isLoading}
-            title="Open preset, bulk, firmware, or registration wizards"
-          >
-            🧙 More wizards ▼
-          </button>
-          {#if showWizardsDropdown}
-            <div class="wizards-dropdown-menu" role="menu">
-              <button type="button" role="menuitem" onclick={() => { showPresetWizard = true; showWizardsDropdown = false; }}>⚙️ Preset Creation</button>
-              <button type="button" role="menuitem" onclick={() => { showBulkWizard = true; showWizardsDropdown = false; }}>📦 Bulk Operations</button>
-              <button type="button" role="menuitem" onclick={() => { showFirmwareWizard = true; showWizardsDropdown = false; }}>💾 Firmware Update</button>
-              <button type="button" role="menuitem" onclick={() => { showDeviceRegistrationWizard = true; showWizardsDropdown = false; }}>📱 Device Registration</button>
-            </div>
-          {/if}
-        </div>
-        
         <button 
           class="btn btn-primary" 
             onclick={handleSyncToInventory}
@@ -1009,41 +978,6 @@
     transform: translateY(0);
   }
 
-  .wizards-dropdown {
-    position: relative;
-    display: inline-block;
-  }
-
-  .wizards-dropdown-menu {
-    position: absolute;
-    top: 100%;
-    left: 0;
-    margin-top: 0.25rem;
-    min-width: 12rem;
-    padding: 0.25rem 0;
-    background: var(--bg-primary);
-    border: 1px solid var(--border-color);
-    border-radius: 0.375rem;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    z-index: 100;
-  }
-
-  .wizards-dropdown-menu button {
-    display: block;
-    width: 100%;
-    text-align: left;
-    padding: 0.5rem 1rem;
-    border: none;
-    background: transparent;
-    color: var(--text-primary);
-    cursor: pointer;
-    font-size: 0.875rem;
-  }
-
-  .wizards-dropdown-menu button:hover {
-    background: var(--bg-secondary);
-  }
-  
   .help-button svg {
     width: 24px;
     height: 24px;

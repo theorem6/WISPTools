@@ -14,6 +14,7 @@
   import ScanModal from './components/ScanModal.svelte';
   import InventoryCheckInWizard from '$lib/components/wizards/inventory/InventoryCheckInWizard.svelte';
   import RMATrackingWizard from '$lib/components/wizards/inventory/RMATrackingWizard.svelte';
+  import ModuleWizardMenu from '$lib/components/wizards/ModuleWizardMenu.svelte';
   import { goto } from '$app/navigation';
   import { page } from '$app/stores';
   import HelpModal from '$lib/components/modals/HelpModal.svelte';
@@ -327,12 +328,16 @@
       <button class="btn-secondary" onclick={() => { scanMode = 'check-in'; showScanModal = true; }}>
         📥 Scan Check In
       </button>
-      <button class="btn-primary" onclick={() => showCheckInWizard = true}>
-        📦 Check-in Wizard
-      </button>
-      <button class="btn-secondary" onclick={() => showRMAWizard = true}>
-        📋 Track RMA
-      </button>
+      <ModuleWizardMenu
+        wizards={[
+          { id: 'check-in', label: 'Check-in Wizard', icon: '📦' },
+          { id: 'rma', label: 'Track RMA', icon: '📋' }
+        ]}
+        on:select={(e) => {
+          if (e.detail.id === 'check-in') showCheckInWizard = true;
+          else if (e.detail.id === 'rma') showRMAWizard = true;
+        }}
+      />
       <button class="btn-secondary" onclick={() => { scanMode = 'check-out'; showScanModal = true; }}>
         📤 Scan Check Out
       </button>
@@ -507,9 +512,11 @@
                 </td>
                 <td>
                   <div class="location-cell">
-                    <div class="location-type">{item.currentLocation.type}</div>
-                    {#if item.currentLocation.siteName}
+                    <div class="location-type">{item.currentLocation?.type === 'unassigned' ? 'Unassigned' : (item.currentLocation?.type ?? '—')}</div>
+                    {#if item.currentLocation?.siteName}
                       <div class="location-name">{item.currentLocation.siteName}</div>
+                    {:else if item.currentLocation?.type === 'unassigned'}
+                      <div class="location-name">Assign during deploy</div>
                     {/if}
                   </div>
                 </td>

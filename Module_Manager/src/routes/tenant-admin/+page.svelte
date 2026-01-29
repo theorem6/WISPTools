@@ -54,7 +54,8 @@ const dataRetentionFieldId = 'tenant-data-retention';
 
     // Load tenant data
     try {
-      tenant = await tenantService.getTenant(tenantId);
+      const result = await tenantService.getTenant(tenantId);
+      tenant = result.tenant;
       if (!tenant) {
         error = 'Tenant not found';
         return;
@@ -108,7 +109,8 @@ const dataRetentionFieldId = 'tenant-data-retention';
       success = 'General settings saved successfully!';
       
       // Reload tenant data
-      tenant = await tenantService.getTenant(tenantId);
+      const r1 = await tenantService.getTenant(tenantId);
+      tenant = r1.tenant;
     } catch (err: any) {
       error = err.message || 'Failed to save settings';
     } finally {
@@ -126,7 +128,8 @@ const dataRetentionFieldId = 'tenant-data-retention';
       if (result.success) {
         success = 'Device settings saved successfully!';
         // Reload tenant data
-        tenant = await tenantService.getTenant(tenantId);
+        const r2 = await tenantService.getTenant(tenantId);
+        tenant = r2.tenant;
       } else {
         error = result.error || 'Failed to save settings';
       }
@@ -147,7 +150,8 @@ const dataRetentionFieldId = 'tenant-data-retention';
       if (result.success) {
         success = 'Limits updated successfully!';
         // Reload tenant data
-        tenant = await tenantService.getTenant(tenantId);
+        const r3 = await tenantService.getTenant(tenantId);
+        tenant = r3.tenant;
       } else {
         error = result.error || 'Failed to update limits';
       }

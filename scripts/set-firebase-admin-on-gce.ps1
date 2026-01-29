@@ -11,7 +11,8 @@
 # After running, main-api is restarted. /api/tenant-settings and /api/notifications should return 200 instead of 401.
 
 param(
-    [string]$KeyPath
+    [string]$KeyPath,
+    [string]$GceProject = "lte-pci-mapper-65450042-bbf71"
 )
 
 $ErrorActionPreference = "Stop"
@@ -39,7 +40,7 @@ $tempFile = [System.IO.Path]::GetTempFileName()
 try {
     [System.IO.File]::WriteAllText($tempFile, $base64)
     Write-Host "Copying to GCE instance..." -ForegroundColor Cyan
-    gcloud compute scp $tempFile "${InstanceName}:/tmp/firebase_sa_b64.txt" --zone=$Zone --tunnel-through-iap
+    gcloud compute scp $tempFile "${InstanceName}:/tmp/firebase_sa_b64.txt" --zone=$Zone --project=$GceProject --tunnel-through-iap
     if ($LASTEXITCODE -ne 0) {
         Write-Host "SCP failed. Run: gcloud auth login" -ForegroundColor Red
         exit 1
@@ -47,7 +48,7 @@ try {
 
     $remoteCmd = "set -e; cd $BackendDir; if [ -f .env ]; then grep -v '^FIREBASE_SERVICE_ACCOUNT_BASE64=' .env > .env.tmp || true; else touch .env.tmp; fi; echo -n 'FIREBASE_SERVICE_ACCOUNT_BASE64=' >> .env.tmp; cat /tmp/firebase_sa_b64.txt >> .env.tmp; echo '' >> .env.tmp; mv .env.tmp .env; rm -f /tmp/firebase_sa_b64.txt; sudo PM2_HOME=/root/.pm2 /usr/lib/node_modules/pm2/bin/pm2 restart main-api --update-env 2>/dev/null || true; echo Done."
     Write-Host "Setting FIREBASE_SERVICE_ACCOUNT_BASE64 on backend and restarting main-api..." -ForegroundColor Cyan
-    gcloud compute ssh $InstanceName --zone=$Zone --tunnel-through-iap --command="$remoteCmd"
+    gcloud compute ssh $InstanceName --zone=$Zone --project=$GceProject --tunnel-through-iap --command="$remoteCmd"
     if ($LASTEXITCODE -eq 0) {
         Write-Host "Done. Backend can now verify Firebase tokens; /api/tenant-settings and /api/notifications should return 200." -ForegroundColor Green
     } else {

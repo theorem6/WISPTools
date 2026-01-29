@@ -311,8 +311,7 @@
         console.log('[Tenant Setup] Tenant created successfully:', result.tenantId);
         
         // Load the newly created tenant
-        const newTenant = await tenantService.getTenant(result.tenantId);
-        
+        const { tenant: newTenant } = await tenantService.getTenant(result.tenantId);
         if (newTenant) {
           // IMPORTANT: Set tenant in store - this handles all localStorage updates
           tenantStore.setCurrentTenant(newTenant);

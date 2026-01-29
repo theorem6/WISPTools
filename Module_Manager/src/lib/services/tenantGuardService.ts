@@ -226,7 +226,7 @@ class TenantGuardService {
           );
 
           if (result.success && result.tenantId) {
-            const tenant = await tenantService.getTenant(result.tenantId);
+            const { tenant } = await tenantService.getTenant(result.tenantId);
             if (tenant) {
               tenantStore.setCurrentTenant(tenant);
               return {

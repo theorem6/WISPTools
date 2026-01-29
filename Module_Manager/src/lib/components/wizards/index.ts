@@ -33,6 +33,7 @@ export { default as CustomerOnboardingWizard } from './customers/CustomerOnboard
 
 // Module wizard manager
 export { default as ModuleWizardManager } from './ModuleWizardManager.svelte';
+export { default as ModuleWizardMenu } from './ModuleWizardMenu.svelte';
 
 // CBRS wizards
 export { default as CBRSDeviceRegistrationWizard } from './cbrs/DeviceRegistrationWizard.svelte';

@@ -127,9 +127,10 @@
       <button class="btn-secondary" on:click={() => showCreateModal = true}>
         ➕ Quick Create
       </button>
-      <button class="btn-primary" on:click={() => showWorkOrderWizard = true}>
-        📋 Create Work Order Wizard
-      </button>
+      <ModuleWizardMenu
+        wizards={[{ id: 'create-work-order', label: 'Create Work Order Wizard', icon: '📋' }]}
+        on:select={() => showWorkOrderWizard = true}
+      />
     </div>
   </div>
   

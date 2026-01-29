@@ -264,8 +264,8 @@
       <button class="back-btn" onclick={() => goto('/dashboard')} type="button">
         ← Dashboard
       </button>
-      <h1>🧙 Wizards</h1>
-      <p class="subtitle">Guided flows for setup, deployment, and operations. Open a module to run a wizard.</p>
+      <h1>🧙 List of wizards</h1>
+      <p class="subtitle">Guided flows for setup, deployment, and operations. Each wizard runs inside its module. <strong>How to start one:</strong> click "Open in [Module]" below to go to that module, then click the wizard button in that module's header (e.g. "Setup Wizard", "Conflict Wizard").</p>
     </header>
 
     <div class="wizards-grid">

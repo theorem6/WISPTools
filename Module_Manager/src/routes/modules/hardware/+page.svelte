@@ -534,7 +534,10 @@
       <button class="btn-secondary" on:click={() => goto('/modules/inventory/reports')}>
         📊 Reports
       </button>
-      
+      <ModuleWizardMenu
+        wizards={[{ id: 'epc-deployment', label: 'EPC Deployment', icon: '🔧' }]}
+        on:select={() => showEPCWizard = true}
+      />
       <!-- Add Hardware Dropdown -->
       <div class="dropdown-container">
         <button class="btn-primary dropdown-toggle" on:click={() => showAddMenu = !showAddMenu}>

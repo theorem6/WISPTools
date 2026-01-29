@@ -9,7 +9,7 @@ const mongoose = require('mongoose');
 const LocationSchema = new mongoose.Schema({
   type: {
     type: String,
-    enum: ['warehouse', 'tower', 'noc', 'vehicle', 'customer', 'rma', 'vendor', 'other'],
+    enum: ['unassigned', 'warehouse', 'tower', 'noc', 'vehicle', 'customer', 'rma', 'vendor', 'other'],
     required: true
   },
   // Link to tower site (if type is 'tower' or 'noc')

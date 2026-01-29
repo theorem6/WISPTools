@@ -1866,6 +1866,10 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
           <span class="control-icon">📁</span>
           <span class="control-label">Projects</span>
         </button>
+        <ModuleWizardMenu
+          wizards={[{ id: 'marketing-discovery', label: 'Marketing Discovery', icon: '📍' }]}
+          on:select={() => openMarketingTools()}
+        />
         <button
           class="module-control-btn marketing-btn"
           class:drawing={isDrawingRectangle}

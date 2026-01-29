@@ -134,28 +134,33 @@ export class TenantService {
   }
 
   /**
-   * Get tenant by ID (for regular users)
+   * Get tenant by ID (for regular users).
+   * Uses apiProxy URL so the request hits the backend (not userTenants), avoiding 403 when Hosting rewrites /api/user-tenants/** to userTenants.
+   * Returns { tenant, error } so callers can avoid clearing tenant on 401 (auth/config issue) and only clear on 404 (not found).
    */
-  async getTenant(tenantId: string): Promise<Tenant | null> {
+  async getTenant(tenantId: string): Promise<{ tenant: Tenant | null; error?: 'not_found' | 'unauthorized' }> {
     try {
       const headers = await this.getAuthHeaders();
-      
-      // Use the correct endpoint: /api/user-tenants/tenant/:tenantId
-      const response = await fetch(`${this.apiBaseUrl}/user-tenants/tenant/${tenantId}`, {
+      const path = `/api/user-tenants/tenant/${tenantId}`;
+      const url = `${API_CONFIG.CLOUD_FUNCTIONS.API_PROXY}?path=${encodeURIComponent(path)}`;
+
+      const response = await fetch(url, {
         method: 'GET',
         headers
       });
 
       if (!response.ok) {
-        if (response.status === 404) return null;
+        if (response.status === 404) return { tenant: null, error: 'not_found' };
+        if (response.status === 401) return { tenant: null, error: 'unauthorized' };
         throw new Error(`Failed to get tenant: ${response.statusText}`);
       }
 
-      const tenant = await response.json();
-      return this.mapApiTenantToTenant(tenant);
+      const data = await response.json();
+      const tenant = this.mapApiTenantToTenant(data);
+      return { tenant };
     } catch (error) {
       console.error('Error getting tenant:', error);
-      return null;
+      return { tenant: null };
     }
   }
 

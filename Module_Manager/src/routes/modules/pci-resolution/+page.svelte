@@ -557,11 +557,18 @@
   <VerticalMenu 
     hasData={$hasData}
     hasConflicts={$hasConflicts}
+    wizardItems={[
+      { id: 'conflict-resolution', label: 'Conflict Resolution Wizard', icon: '📊' },
+      { id: 'import', label: 'Import Wizard', icon: '📥' }
+    ]}
     on:import={() => showImportWizard = true}
     on:towers={() => showTowerManager = true}
     on:analyze={() => performAnalysis(true)}
     on:optimize={optimizePCIAssignments}
-    on:wizard={() => showConflictResolutionWizard = true}
+    on:wizard={(e) => {
+      if (e.detail?.id === 'import') showImportWizard = true;
+      else showConflictResolutionWizard = true;
+    }}
     on:analysis={() => uiActions.openModal('showAnalysisModal')}
     on:conflicts={() => uiActions.openModal('showConflictsModal')}
     on:recommendations={() => uiActions.openModal('showRecommendationsModal')}

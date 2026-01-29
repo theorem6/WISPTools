@@ -49,9 +49,9 @@ After the fix, `GET https://hss.wisptools.io/api/internal/user-tenants/:userId` 
 
 ---
 
-## 401 on /api/tenant-settings and /api/notifications (backend token verification)
+## 401 on /api/tenant-settings, /api/plans, /api/notifications (backend token verification)
 
-**Symptom:** User tenants list works (200), but **GET /api/tenant-settings** and **GET /api/notifications** (and other routes that use `verifyAuth`) return **401 Unauthorized**. The backend uses Firebase Admin to verify the Bearer token; without a service account it falls back to ADC and verification fails.
+**Symptom:** User tenants list works (200), but **GET /api/tenant-settings**, **GET /api/plans**, **GET /api/notifications** (and other routes that use `verifyAuth`) return **401 Unauthorized** with "Invalid token". The backend uses Firebase Admin to verify the Bearer token; without a service account it falls back to ADC and verification fails.
 
 **Fix:** Set **Firebase Admin credentials** on the GCE backend so `auth().verifyIdToken()` succeeds.
 
@@ -59,6 +59,7 @@ After the fix, `GET https://hss.wisptools.io/api/internal/user-tenants/:userId` 
 2. **Run the script (from repo root):**
    ```powershell
    .\scripts\set-firebase-admin-on-gce.ps1 -KeyPath "C:\path\to\wisptools-production-xxxxx.json"
+   .\scripts\set-firebase-admin-on-gce.ps1 -KeyPath "C:\path\to\key.json" -GceProject "lte-pci-mapper-65450042-bbf71"
    ```
    The script writes `FIREBASE_SERVICE_ACCOUNT_BASE64` to the backend `.env`, restarts main-api, and removes the temp file from the server.
 3. After that, `/api/tenant-settings` and `/api/notifications` (and any other `verifyAuth` route) should return 200 when called with a valid Bearer token.

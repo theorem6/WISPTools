@@ -25,10 +25,6 @@
     showSettings = false;
   }
   
-  function openWizards() {
-    goto('/wizards');
-  }
-  
   function openDocs() {
     goto('/docs');
   }
@@ -36,16 +32,6 @@
 
 {#if shouldShow}
   <div class="header-buttons">
-    <button 
-      class="wizards-button" 
-      class:dashboard-mode={isDashboard}
-      on:click={openWizards} 
-      title="Wizards"
-      aria-label="Open wizards"
-      type="button"
-    >
-      🧙
-    </button>
     <button 
       class="docs-button"
       class:dashboard-mode={isDashboard}
@@ -86,7 +72,6 @@
     z-index: 10002;
   }
   
-  .wizards-button,
   .docs-button,
   .settings-button {
     width: 48px;
@@ -99,20 +84,6 @@
     display: flex;
     align-items: center;
     justify-content: center;
-  }
-  
-  .wizards-button {
-    background: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%);
-    border: 2px solid rgba(0, 217, 255, 0.3);
-    box-shadow: 0 4px 20px rgba(0, 217, 255, 0.4),
-                0 0 20px rgba(0, 242, 254, 0.2);
-  }
-  
-  .wizards-button:hover {
-    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-    transform: translateY(-2px);
-    box-shadow: 0 6px 25px rgba(0, 217, 255, 0.5),
-                0 0 30px rgba(0, 242, 254, 0.3);
   }
   
   .docs-button {
@@ -141,15 +112,6 @@
     box-shadow: 0 6px 25px rgba(0, 217, 255, 0.5),
                 0 0 30px rgba(0, 242, 254, 0.3);
     border-color: #00d9ff;
-  }
-  
-  .wizards-button.dashboard-mode:hover {
-    transform: translateY(-2px);
-  }
-  
-  .settings-button:active,
-  .wizards-button:active {
-    transform: translateY(0);
   }
   
   .settings-button:active {

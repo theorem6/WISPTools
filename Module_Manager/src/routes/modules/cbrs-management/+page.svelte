@@ -19,6 +19,7 @@ import { loadCBRSConfig, saveCBRSConfig, getConfigStatus, loadPlatformCBRSConfig
   import { cbrsManagementDocs } from '$lib/docs/cbrs-management-docs';
   import CBRSSetupWizard from '$lib/components/wizards/CBRSSetupWizard.svelte';
   import CBRSDeviceRegistrationWizard from '$lib/components/wizards/cbrs/DeviceRegistrationWizard.svelte';
+  import ModuleWizardMenu from '$lib/components/wizards/ModuleWizardMenu.svelte';
   
   // State
   let devices: CBSDDevice[] = [];
@@ -1012,12 +1013,13 @@ let configStatus: ConfigStatus = getConfigStatus(null);
     on:close={() => showSetupWizard = false}
     on:complete={handleWizardComplete}
   />
-  <CBRSDeviceRegistrationWizard
-    show={showDeviceRegistrationWizard}
-    on:close={() => showDeviceRegistrationWizard = false}
-    on:saved={handleDeviceRegistrationWizardSaved}
-  />
 {/if}
+<!-- CBRS Device Registration Wizard -->
+<CBRSDeviceRegistrationWizard
+  show={showDeviceRegistrationWizard}
+  on:close={() => showDeviceRegistrationWizard = false}
+  on:saved={handleDeviceRegistrationWizardSaved}
+/>
 
 <div class="cbrs-module">
   <!-- Header -->
@@ -1081,9 +1083,16 @@ let configStatus: ConfigStatus = getConfigStatus(null);
         <button class="btn btn-primary" onclick={() => showAddDeviceModal = true}>
           + Add CBSD Device
         </button>
-        <button class="btn btn-secondary" onclick={() => showDeviceRegistrationWizard = true} title="Guided wizard to add a CBSD device">
-          📡 Register Device Wizard
-        </button>
+        <ModuleWizardMenu
+          wizards={[
+            { id: 'setup', label: 'Setup Wizard', icon: '⚙️' },
+            { id: 'register-device', label: 'Register Device Wizard', icon: '📡' }
+          ]}
+          on:select={(e) => {
+            if (e.detail.id === 'setup') showSetupWizard = true;
+            else if (e.detail.id === 'register-device') showDeviceRegistrationWizard = true;
+          }}
+        />
       </div>
     </div>
   </div>

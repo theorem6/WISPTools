@@ -6,9 +6,11 @@
   import { resetAllStores } from '../../stores/appState';
   import { goto } from '$app/navigation';
   import { browser } from '$app/environment';
+  import ModuleWizardMenu from '../wizards/ModuleWizardMenu.svelte';
   
   export let hasData = false;
   export let hasConflicts = false;
+  export let wizardItems: Array<{ id: string; label: string; icon?: string }> = [];
   
   const dispatch = createEventDispatcher();
   
@@ -107,13 +109,23 @@
       <span class="menu-label">Optimize</span>
     </button>
     
-    <button class="menu-item" on:click={() => dispatch('wizard')} disabled={!hasData} title="Conflict Resolution Wizard">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
-        <polyline points="2 17 12 22 22 17"></polyline>
-      </svg>
-      <span class="menu-label">Conflict Wizard</span>
-    </button>
+    {#if wizardItems.length > 0}
+      <div class="menu-wizards">
+        <ModuleWizardMenu
+          wizards={wizardItems}
+          disabled={!hasData}
+          on:select={(e) => dispatch('wizard', e.detail)}
+        />
+      </div>
+    {:else}
+      <button class="menu-item" on:click={() => dispatch('wizard')} disabled={!hasData} title="Conflict Resolution Wizard">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+          <polyline points="2 17 12 22 22 17"></polyline>
+        </svg>
+        <span class="menu-label">Conflict Wizard</span>
+      </button>
+    {/if}
     
     <div class="menu-divider"></div>
     
@@ -281,6 +293,20 @@
     height: 1px;
     background: var(--border-color);
     margin: 0.35rem 0;
+  }
+
+  .menu-wizards {
+    width: 100%;
+    margin-bottom: 0.25rem;
+  }
+
+  .menu-wizards :global(.module-wizard-menu) {
+    width: 100%;
+  }
+
+  .menu-wizards :global(.wizard-trigger) {
+    width: 100%;
+    justify-content: flex-start;
   }
 
   .network-selector {

@@ -8,6 +8,7 @@
   import AddEditCustomerModal from './components/AddEditCustomerModal.svelte';
   import CustomerBillingModal from './components/CustomerBillingModal.svelte';
   import CustomerOnboardingWizard from '$lib/components/wizards/customers/CustomerOnboardingWizard.svelte';
+  import ModuleWizardMenu from '$lib/components/wizards/ModuleWizardMenu.svelte';
   import { goto } from '$app/navigation';
   import GroupManagement from '../hss-management/components/GroupManagement.svelte';
   import BandwidthPlans from '../hss-management/components/BandwidthPlans.svelte';
@@ -233,9 +234,10 @@
       </div>
       <div class="header-actions">
         {#if activeTab === 'customers'}
-          <button class="btn-secondary" on:click={() => showOnboardingWizard = true} title="Guided customer onboarding">
-            🧙 Onboarding Wizard
-          </button>
+          <ModuleWizardMenu
+            wizards={[{ id: 'onboarding', label: 'Onboarding Wizard', icon: '🧙' }]}
+            on:select={() => showOnboardingWizard = true}
+          />
           <button class="btn-primary" on:click={handleAdd}>
             ➕ Add Customer
           </button>

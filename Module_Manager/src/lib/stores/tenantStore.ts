@@ -59,8 +59,9 @@ function createTenantStore() {
         if (selectedTenantId) {
           // Lazy load tenantService to avoid circular dependencies
           const { tenantService } = await import('../services/tenantService');
-          const tenant = await tenantService.getTenant(selectedTenantId);
-          
+          const result = await tenantService.getTenant(selectedTenantId);
+          const tenant = result.tenant;
+
           if (tenant) {
             // Tenant found - set as current
             update(state => ({
@@ -71,20 +72,20 @@ function createTenantStore() {
               isInitialized: true,
               error: null
             }));
-            
+
             // Update localStorage
             localStorage.setItem('selectedTenantId', tenant.id);
             localStorage.setItem('selectedTenantName', tenant.displayName);
             localStorage.setItem('tenantSetupCompleted', 'true');
-            
+
             debug.log('[TenantStore] Initialized with tenant:', tenant.displayName);
-          } else {
-            // Tenant not found - clear localStorage
+          } else if (result.error === 'not_found') {
+            // Tenant not found (404) - clear localStorage
             console.warn('[TenantStore] Tenant not found, clearing localStorage');
             localStorage.removeItem('selectedTenantId');
             localStorage.removeItem('selectedTenantName');
             localStorage.removeItem('tenantSetupCompleted');
-            
+
             update(state => ({
               ...state,
               currentTenant: null,
@@ -92,6 +93,14 @@ function createTenantStore() {
               isLoading: false,
               isInitialized: true,
               error: null
+            }));
+          } else {
+            // 401 or other error - keep current tenant in localStorage, just mark initialized
+            update(state => ({
+              ...state,
+              isLoading: false,
+              isInitialized: true,
+              error: result.error === 'unauthorized' ? 'Auth or server config issue' : null
             }));
           }
         } else {
