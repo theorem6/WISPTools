@@ -1,3 +1,8 @@
+---
+title: ACS Implementation - Complete
+description: ACS/TR-069 implementation status; GenieACS, device management, alerts, firmware.
+---
+
 # ACS Implementation - COMPLETE ✅
 
 ## 🎉 Final Status: 100% Complete

@@ -5,13 +5,15 @@
   import { customerAuthService } from '$lib/services/customerAuthService';
   import { portalBranding } from '$lib/stores/portalBranding';
 
-  let billing: {
+  type BillingPortal = {
     servicePlan?: { planName?: string; monthlyFee?: number; setupFee?: number };
     billingCycle?: { type?: string; dayOfMonth?: number; nextBillingDate?: string };
     balance?: { current?: number; overdue?: number };
     autoPay?: { enabled?: boolean };
-    invoices?: unknown[];
-  } | null = null;
+    invoices?: { invoiceId: string; invoiceNumber: string; amount: number; status: string; dueDate: string }[];
+    paymentHistory?: { amount: number; method?: string; paidAt?: string }[];
+  };
+  let billing: BillingPortal | null = null;
   let loading = true;
   let error = '';
   let featureEnabled = true;
@@ -40,10 +42,10 @@
         return;
       }
       if (!featureEnabled) {
-        loading = false;
+        goto('/modules/customers/portal/dashboard');
         return;
       }
-      billing = await customerPortalService.getCustomerBilling(customer.tenantId);
+      billing = (await customerPortalService.getCustomerBilling(customer.tenantId)) as BillingPortal | null;
     } catch (err: any) {
       error = err.message || 'Failed to load billing information';
     } finally {
@@ -141,6 +143,41 @@
             </div>
           </section>
         {/if}
+
+        {#if billing.invoices && billing.invoices.length > 0}
+          <section class="info-section">
+            <h2>Invoices</h2>
+            <div class="info-card">
+              <ul class="invoice-list">
+                {#each billing.invoices as inv}
+                  <li class="invoice-row">
+                    <span class="inv-num">{inv.invoiceNumber}</span>
+                    <span class="inv-amount">{formatCurrency(inv.amount)}</span>
+                    <span class="inv-status">{inv.status}</span>
+                    <span class="inv-due">Due {formatDate(inv.dueDate)}</span>
+                  </li>
+                {/each}
+              </ul>
+            </div>
+          </section>
+        {/if}
+
+        {#if billing.paymentHistory && billing.paymentHistory.length > 0}
+          <section class="info-section">
+            <h2>Payment history</h2>
+            <div class="info-card">
+              <ul class="payment-list">
+                {#each billing.paymentHistory.slice().reverse() as pay}
+                  <li class="payment-row">
+                    <span class="pay-amount">{formatCurrency(pay.amount)}</span>
+                    <span class="pay-method">{pay.method || '—'}</span>
+                    <span class="pay-date">{formatDate(pay.paidAt)}</span>
+                  </li>
+                {/each}
+              </ul>
+            </div>
+          </section>
+        {/if}
       </div>
     {:else}
       <div class="empty-state">
@@ -215,6 +252,24 @@
     font-size: 0.875rem;
     font-weight: 500;
   }
+  .invoice-list, .payment-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .invoice-row, .payment-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1rem;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #f3f4f6;
+    font-size: 0.9rem;
+  }
+  .invoice-row:last-child, .payment-row:last-child {
+    border-bottom: none;
+  }
+  .inv-num, .pay-amount { font-weight: 600; }
+  .inv-status { text-transform: capitalize; }
   .empty-state {
     padding: 2rem;
     text-align: center;

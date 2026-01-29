@@ -21,6 +21,7 @@ export { default as SiteDeploymentWizard } from './deployment/SiteDeploymentWiza
 
 // Inventory wizards
 export { default as InventoryCheckInWizard } from './inventory/InventoryCheckInWizard.svelte';
+export { default as RMATrackingWizard } from './inventory/RMATrackingWizard.svelte';
 
 // Work order wizards
 export { default as WorkOrderCreationWizard } from './workorders/WorkOrderCreationWizard.svelte';
@@ -42,4 +43,6 @@ export { default as CBRSDeviceRegistrationWizard } from './cbrs/DeviceRegistrati
 export { default as ACSSetupWizard } from './ACSSetupWizard.svelte';
 export { default as CBRSSetupWizard } from './CBRSSetupWizard.svelte';
 export { default as FirstTimeSetupWizard } from './FirstTimeSetupWizard.svelte';
+export { default as OrganizationSetupWizard } from './OrganizationSetupWizard.svelte';
+export { default as InitialConfigurationWizard } from './InitialConfigurationWizard.svelte';
 export { default as MonitoringSetupWizard } from './MonitoringSetupWizard.svelte';

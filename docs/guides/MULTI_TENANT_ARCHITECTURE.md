@@ -1,3 +1,8 @@
+---
+title: Multi-Tenant GenieACS Architecture
+description: GenieACS multi-tenant system architecture and frontend/backend layers.
+---
+
 # Multi-Tenant GenieACS Architecture
 
 ## 🎨 System Architecture

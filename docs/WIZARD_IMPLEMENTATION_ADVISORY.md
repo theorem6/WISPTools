@@ -1,7 +1,12 @@
+---
+title: Wizard Implementation Advisory
+description: Analysis and priority list for wizards across modules; all planned wizards now implemented.
+---
+
 # Wizard Implementation Advisory
 
 **Date:** January 2025  
-**Status:** Analysis Complete - Ready for Implementation
+**Status:** Analysis Complete - All wizards implemented
 
 ---
 

@@ -1,3 +1,8 @@
+---
+title: Documentation System Implementation Status
+description: Phase status for WISPTools documentation cleanup and doc site setup.
+---
+
 # Documentation System Implementation Status
 
 **Last Updated:** 2025-12-19  

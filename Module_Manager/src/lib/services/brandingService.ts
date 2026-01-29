@@ -42,6 +42,8 @@ export interface TenantBranding {
   features: {
     enableFAQ?: boolean;
     enableServiceStatus?: boolean;
+    enableBilling?: boolean;
+    enableTickets?: boolean;
     enableLiveChat?: boolean;
     enableKnowledgeBase?: boolean;
   };

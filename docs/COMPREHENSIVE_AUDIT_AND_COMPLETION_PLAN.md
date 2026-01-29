@@ -1,3 +1,8 @@
+---
+title: Comprehensive WISP Tools Audit & Completion Plan
+description: Complete audit of missing features, incomplete implementations, and user experience improvements.
+---
+
 # Comprehensive WISP Tools Audit & Completion Plan
 
 **Date:** January 2025  

@@ -10,12 +10,16 @@
   import { goto } from '$app/navigation';
   import { currentTenant } from '$lib/stores/tenantStore';
   import { authService } from '$lib/services/authService';
-  
+  import OrganizationSetupWizard from './OrganizationSetupWizard.svelte';
+  import InitialConfigurationWizard from './InitialConfigurationWizard.svelte';
+
   export let show = false;
   export let autoStart = false; // If true, starts wizard automatically on mount
-  
+
   const dispatch = createEventDispatcher();
-  
+
+  let showOrgWizard = false;
+  let showConfigWizard = false;
   let currentStep = 0;
   let completedSteps: Set<number> = new Set();
   let isLoading = false;
@@ -227,6 +231,7 @@
             {/if}
             
             <p class="hint">✅ Organization setup complete! You can edit these details later in Settings.</p>
+            <button type="button" class="btn-link" on:click={() => (showOrgWizard = true)}>Open full Organization Setup wizard</button>
           </div>
           
         {:else if currentStep === 2}
@@ -285,6 +290,7 @@
             </div>
             
             <p class="hint">💡 You can configure these modules later from the Dashboard.</p>
+            <button type="button" class="btn-link" on:click={() => (showConfigWizard = true)}>Open full Initial Configuration wizard</button>
           </div>
           
         {:else if currentStep === 4}
@@ -346,9 +352,25 @@
       </div>
     </div>
   </div>
+  <OrganizationSetupWizard show={showOrgWizard} on:close={() => (showOrgWizard = false)} />
+  <InitialConfigurationWizard show={showConfigWizard} on:close={() => (showConfigWizard = false)} />
 {/if}
 
 <style>
+  .btn-link {
+    background: none;
+    border: none;
+    color: var(--primary-color, #007bff);
+    text-decoration: underline;
+    cursor: pointer;
+    font-size: 0.9rem;
+    padding: 0.25rem 0;
+    margin-top: 0.5rem;
+    display: inline-block;
+  }
+  .btn-link:hover {
+    color: var(--primary-hover, #0056b3);
+  }
   .wizard-overlay {
     position: fixed;
     inset: 0;

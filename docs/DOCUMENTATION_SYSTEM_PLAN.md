@@ -1,3 +1,8 @@
+---
+title: Documentation System Plan
+description: Comprehensive, interactive documentation system for WISPTools (planning and structure).
+---
+
 # Documentation System Plan
 
 **Date:** 2025-12-19  

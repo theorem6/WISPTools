@@ -1,3 +1,8 @@
+---
+title: Monitoring and Alerting System
+description: Tenant-based monitoring, alerts, and network topology.
+---
+
 # Monitoring and Alerting System
 
 Complete guide to the tenant-based monitoring and alerting system.

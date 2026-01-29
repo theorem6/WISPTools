@@ -1,3 +1,8 @@
+---
+title: Project Workflow Implementation Status
+description: Plan mode, deploy workflow, notifications, and deployment photos status.
+---
+
 # Project Workflow Implementation Status
 
 ## ✅ Already Implemented

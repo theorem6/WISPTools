@@ -1,3 +1,8 @@
+---
+title: WISP Operations Deep Dive Analysis
+description: Comprehensive analysis of WISP operational activities and feature gaps.
+---
+
 # WISP Operations Deep Dive Analysis
 
 **Date:** January 2025  

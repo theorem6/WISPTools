@@ -1,3 +1,8 @@
+---
+title: CBRS Management Module - Complete
+description: CBRS module with Google SAS and Federated Wireless APIs.
+---
+
 # CBRS Management Module - Implementation Complete
 
 ## Summary

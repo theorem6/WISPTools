@@ -1,3 +1,8 @@
+---
+title: EPC Monitoring Status
+description: EPC monitoring graphs and real device data status.
+---
+
 # EPC Monitoring Status Summary
 
 ## ✅ **Graphs ARE Real - Using Actual Device Data**

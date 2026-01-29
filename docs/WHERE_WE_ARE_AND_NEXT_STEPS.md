@@ -1,3 +1,8 @@
+---
+title: Where We Are & Next Steps (Priority)
+description: Current state and prioritized next steps for WISPTools.
+---
+
 # Where We Are & Next Steps (Priority)
 
 **Snapshot:** Current state and prioritized next steps for WISPTools.
@@ -8,7 +13,7 @@
 
 ### Deploy & infra
 - **Frontend:** Firebase Hosting (wisptools-production.web.app). Deploy: `firebase deploy --only hosting:app` (after `npm run build` in Module_Manager).
-- **Backend:** GCE VM `acs-hss-server` (us-central1-a). Deploy: `.\deploy-backend-to-gce.ps1 -DeployMethod Upload` (then run remote install+pm2 if script fails), or **Git:** `-DeployMethod Git` (script reads GitHub token from `scripts/deployment/update-backend-from-git.sh` and uses HTTPS).
+- **Backend:** GCE VM `acs-hss-server` (us-central1-a). Deploy: `.\deploy-backend-to-gce.ps1 -DeployMethod Upload` (then run remote install+pm2 if script fails), or **Git:** `-DeployMethod Git` (script reads GitHub token from `scripts/deployment/update-backend-from-git.sh` and uses HTTPS). Set **API_BASE_URL** in backend env (see `backend-services/.env.example`) so deployment/TR-069 photo and firmware URLs use the correct public base URL when behind a load balancer or Cloud Run; see `DEPLOY_BACKEND_FALLBACK.md`.
 - **Functions:** apiProxy, notifications, etc. Deploy: `firebase deploy --only functions`.
 - **GitHub token:** Default token lives in `scripts/deployment/update-backend-from-git.sh`; deploy script uses it for Git deploy. **Security:** Token is in repo; prefer env `GITHUB_TOKEN` or a secret and remove default from file.
 

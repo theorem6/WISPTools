@@ -1,3 +1,8 @@
+---
+title: WISPTools – Further Enhancements
+description: Prioritized list of improvements; items marked Done are already implemented.
+---
+
 # WISPTools – Further Enhancements
 
 Prioritized list of improvements you can tackle next. Items marked **Done** are already implemented.
@@ -15,36 +20,31 @@ Prioritized list of improvements you can tackle next. Items marked **Done** are 
 - **NotificationCenter: retry when empty** – Subtle “Retry” button when list is empty (no error) so users can re-fetch.
 - **Dashboard / module cards a11y** – Module and admin cards have `aria-label="Open {name}. {description}"`.
 - **Keyboard: Escape** – NotificationCenter panel closes on Escape.
+- **CBRS config encryption** – Firebase callables saveCbrsConfigSecure / loadCbrsConfigSecure (AES-256-GCM); set CBRS_CONFIG_ENCRYPTION_KEY in Functions config.
+- **CPE performance data** – CPEPerformanceModal calls getDeviceParameters and maps TR-069 params to performance data; fallback to device metrics on error.
+- **Keyboard navigation** – Focus trap and Tab cycle in GlobalSettings and NotificationCenter; Escape closes; panel gets role="dialog" and focus on open.
+- **Push or email on project approval** – onNotificationCreated sends SendGrid email and FCM push when a project_approved notification is created.
+- **ACS parameter editor** – ParameterEditorModal in TR069Actions; Edit Parameters button; POST setParameterValues via /api/tr069/tasks.
+- **Hardware module EPC** – EPC ID kept readonly/auto-generated per product decision; no further change unless requirements change.
 
 ---
 
-## High value
+## High value (future)
 
-1. **CBRS config encryption**  
-   `configService.ts` has a TODO for proper encryption of CBRS config (e.g. via Firebase Functions or KMS).
-
-2. **CPE performance data**  
-   `CPEPerformanceModal.svelte` uses placeholder data; replace with real API for device performance.
+1. **Customer Portal MVP** – Branding schema + UI, ticket wiring, portal route polish (see CUSTOMER_PORTAL_IMPLEMENTATION_PLAN.md).
 
 ---
 
-## UX / polish
+## UX / polish (future)
 
-3. **Keyboard navigation**  
-   Ensure Wizards and Settings are focusable in a logical order (already tabindex/role; optional: focus trap in modals).
+2. **Optional focus trap** – Additional modals could use focus trap if needed.
 
 ---
 
 ## Optional / later
 
-6. **Push or email on project approval**  
-   Cloud Function (e.g. SendGrid) to notify assignee when a plan is approved (see PROJECT_WORKFLOW_STATUS §4).
-
-7. **ACS parameter editor**  
-   REFACTOR_SUMMARY mentions a TODO for a parameter editor in ACS/CPE management.
-
-8. **Hardware module**  
-    EPC edit field is readonly/disabled; consider allowing edit when appropriate or clarifying why it’s fixed.
+3. **Monitoring/Map** – Connection topology drawing, advanced alerting rules, predictive analytics.
+4. **Field app** – Branded app icon (see ICON_BRANDING.md).
 
 ---
 

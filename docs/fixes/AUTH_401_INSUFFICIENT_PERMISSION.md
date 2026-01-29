@@ -1,3 +1,8 @@
+---
+title: Fix 401 Unauthorized on user-tenants
+description: Cloud Function + INTERNAL_API_KEY for /api/user-tenants.
+---
+
 # Fix: 401 Unauthorized / auth/insufficient-permission on /api/user-tenants
 
 ## Fix in use: Cloud Function + INTERNAL_API_KEY (no backend Firebase needed)

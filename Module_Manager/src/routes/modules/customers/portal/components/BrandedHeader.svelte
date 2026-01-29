@@ -32,6 +32,7 @@
     faq: $portalBranding?.features?.enableFAQ !== false,
     serviceStatus: $portalBranding?.features?.enableServiceStatus !== false,
     billing: $portalBranding?.features?.enableBilling !== false,
+    tickets: $portalBranding?.features?.enableTickets !== false,
     knowledgeBase: !!$portalBranding?.features?.enableKnowledgeBase,
     liveChat: !!$portalBranding?.features?.enableLiveChat
   };
@@ -52,7 +53,9 @@
     {#if currentCustomer}
       <nav class="header-nav">
         <a href="/modules/customers/portal/dashboard" class="nav-link">Dashboard</a>
-        <a href="/modules/customers/portal/tickets" class="nav-link">Tickets</a>
+        {#if featureFlags.tickets}
+          <a href="/modules/customers/portal/tickets" class="nav-link">Tickets</a>
+        {/if}
         {#if featureFlags.billing}
           <a href="/modules/customers/portal/billing" class="nav-link">Billing</a>
         {/if}

@@ -1,3 +1,8 @@
+---
+title: Customer Portal Implementation Plan
+description: Brandable customer-facing portal for complaints, reporting, and customer service.
+---
+
 # Customer Portal Implementation Plan
 
 **Date:** December 2024  
@@ -9,7 +14,7 @@
 
 - **Routes:** `/modules/customers/portal`, `/portal/login`, `/portal/signup`, `/portal/dashboard`, `/portal/tickets`, `/portal/tickets/new`, `/portal/tickets/[id]`, `/portal/service`, `/portal/faq`, `/portal/knowledge`, `/portal/live-chat` exist with placeholder or partial content.
 - **Dashboard:** A **Customer Portal** card (active) links to `/modules/customers/portal` so staff can open the portal entry; landing redirects to login or dashboard based on customer auth.
-- **Remaining:** Tenant branding (logo/colors) refinements; auth/tickets are wired. **Password reset:** Done – portal login "Forgot password?" opens inline form, calls `customerAuthService.requestPasswordReset(email)` → Firebase reset link to `/reset-password`.
+- **Remaining:** Tenant branding (logo/colors) refinements; auth/tickets are wired. **Password reset:** Done – portal login "Forgot password?" opens inline form, calls `customerAuthService.requestPasswordReset(email)` → Firebase reset link to `/reset-password`. **Feature toggles:** `enableBilling` and `enableTickets` in Customize Portal → Features; when disabled, portal hides/redirects billing or tickets.
 
 ---
 

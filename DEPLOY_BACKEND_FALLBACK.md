@@ -60,7 +60,7 @@ Replace the project ID with yours if different. After this, backend (including d
 1. Open [Cloud Shell](https://console.cloud.google.com).
 2. Ensure project/zone and run the same `gcloud compute ssh ... --command "..."` as in Option A or B.
 
-Cloud Shell usually has working IAP/SSH, so this avoids plink/Windows issues.
+Cloud Shell usually has working IAP/SSH, so this avoids plink/Windows issues. **If SSH fails on Windows** (e.g. `plink.exe exited with return code 1`), run Option A or B from **Cloud Shell** in the browser; the upload from the script already put files in `/tmp/backend-services-deploy`.
 
 ## Git deploy / update-backend-from-git.sh
 

@@ -1,3 +1,8 @@
+---
+title: Critical Fix Summary - EPC Command Loop
+description: EPC agent script update and result reporting fix.
+---
+
 # Critical Fix Summary - EPC Command Infinite Loop
 
 ## The Real Problem

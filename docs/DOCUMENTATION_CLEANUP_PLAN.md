@@ -1,3 +1,8 @@
+---
+title: Documentation Cleanup Plan
+description: Plan for cleaning up temporary scripts and organizing documentation files.
+---
+
 # Documentation Cleanup Plan
 
 **Date:** 2025-12-19  

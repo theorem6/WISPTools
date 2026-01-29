@@ -35,6 +35,8 @@
   // Features
   let enableFAQ = true;
   let enableServiceStatus = true;
+  let enableBilling = true;
+  let enableTickets = true;
   let enableLiveChat = false;
   let enableKnowledgeBase = false;
 
@@ -180,6 +182,8 @@
 
       enableFAQ = branding.features?.enableFAQ !== false;
       enableServiceStatus = branding.features?.enableServiceStatus !== false;
+      enableBilling = branding.features?.enableBilling !== false;
+      enableTickets = branding.features?.enableTickets !== false;
       enableLiveChat = branding.features?.enableLiveChat || false;
       enableKnowledgeBase = branding.features?.enableKnowledgeBase || false;
     } catch (err: any) {
@@ -274,7 +278,7 @@
           portalSubdomain: enableCustomDomain ? undefined : portalSubdomain,
           welcomeMessage: `Welcome to ${companyName}'s Customer Portal`
         },
-        features: { enableFAQ, enableServiceStatus, enableLiveChat, enableKnowledgeBase }
+        features: { enableFAQ, enableServiceStatus, enableBilling, enableTickets, enableLiveChat, enableKnowledgeBase }
       });
       
       portalUrl = getPortalUrl();
@@ -299,7 +303,7 @@
     
     try {
       await brandingService.updateTenantBranding(tenantId, {
-        features: { enableFAQ, enableServiceStatus, enableLiveChat, enableKnowledgeBase }
+        features: { enableFAQ, enableServiceStatus, enableBilling, enableTickets, enableLiveChat, enableKnowledgeBase }
       });
       
       success = 'Features saved successfully!';
@@ -721,6 +725,28 @@
                 <div class="toggle-content">
                   <span class="toggle-title">🚨 Service Status & Outages</span>
                   <span class="toggle-description">Display service alerts and outage notifications</span>
+                </div>
+              </label>
+            </div>
+            
+            <div class="feature-toggle">
+              <label class="toggle-label">
+                <input type="checkbox" bind:checked={enableBilling} />
+                <span class="toggle-switch"></span>
+                <div class="toggle-content">
+                  <span class="toggle-title">💳 Billing & Invoices</span>
+                  <span class="toggle-description">Let customers view billing and invoice history</span>
+                </div>
+              </label>
+            </div>
+            
+            <div class="feature-toggle">
+              <label class="toggle-label">
+                <input type="checkbox" bind:checked={enableTickets} />
+                <span class="toggle-switch"></span>
+                <div class="toggle-content">
+                  <span class="toggle-title">🎫 Support Tickets</span>
+                  <span class="toggle-description">Let customers open and track support tickets</span>
                 </div>
               </label>
             </div>

@@ -1,3 +1,8 @@
+---
+title: Backend Services Architecture
+description: Node.js services on GCE, port allocation, and Firebase proxy.
+---
+
 # Backend Services Architecture
 
 **Date:** December 2024  

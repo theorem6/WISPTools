@@ -138,6 +138,7 @@ const tenantSchema = new mongoose.Schema({
     features: {
       enableFAQ: { type: Boolean, default: true },
       enableServiceStatus: { type: Boolean, default: true },
+      enableBilling: { type: Boolean, default: true },
       enableLiveChat: { type: Boolean, default: false },
       enableKnowledgeBase: { type: Boolean, default: false }
     }

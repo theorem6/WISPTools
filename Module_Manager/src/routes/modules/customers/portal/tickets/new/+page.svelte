@@ -1,7 +1,9 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { customerPortalService } from '$lib/services/customerPortalService';
   import { customerAuthService } from '$lib/services/customerAuthService';
+  import { portalBranding } from '$lib/stores/portalBranding';
   
   let title = '';
   let description = '';
@@ -9,6 +11,11 @@
   let priority: 'low' | 'medium' | 'high' | 'critical' = 'medium';
   let loading = false;
   let error = '';
+  $: ticketsEnabled = $portalBranding?.features?.enableTickets !== false;
+  
+  onMount(() => {
+    if (!ticketsEnabled) goto('/modules/customers/portal/dashboard');
+  });
   
   async function handleSubmit(e: Event) {
     e.preventDefault();

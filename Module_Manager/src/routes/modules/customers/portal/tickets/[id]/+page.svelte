@@ -4,6 +4,7 @@
   import { goto } from '$app/navigation';
   import { customerPortalService } from '$lib/services/customerPortalService';
   import { customerAuthService } from '$lib/services/customerAuthService';
+  import { portalBranding } from '$lib/stores/portalBranding';
   import type { WorkOrder } from '$lib/services/workOrderService';
   
   let ticket: WorkOrder | null = null;
@@ -12,6 +13,7 @@
   let error = '';
   let comment = '';
   let submittingComment = false;
+  $: ticketsEnabled = $portalBranding?.features?.enableTickets !== false;
   
   $: ticketId = $page.params.id;
   
@@ -26,6 +28,10 @@
       const customer = await customerAuthService.getCurrentCustomer();
       if (!customer) {
         goto('/modules/customers/portal/login');
+        return;
+      }
+      if (!ticketsEnabled) {
+        goto('/modules/customers/portal/dashboard');
         return;
       }
       currentCustomer = customer;

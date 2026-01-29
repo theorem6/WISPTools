@@ -5,6 +5,8 @@
    */
   import { goto } from '$app/navigation';
   import TenantGuard from '$lib/components/admin/TenantGuard.svelte';
+  import OrganizationSetupWizard from '$lib/components/wizards/OrganizationSetupWizard.svelte';
+  import InitialConfigurationWizard from '$lib/components/wizards/InitialConfigurationWizard.svelte';
 
   interface WizardEntry {
     id: string;
@@ -14,7 +16,11 @@
     moduleName: string;
     modulePath: string;
     whereInModule: string;
+    openHere?: boolean; // if true, open wizard on this page instead of navigating
   }
+
+  let showOrgWizard = false;
+  let showConfigWizard = false;
 
   const wizards: WizardEntry[] = [
     {
@@ -25,6 +31,26 @@
       moduleName: 'Dashboard / Onboarding',
       modulePath: '/onboarding',
       whereInModule: 'Shown automatically on first visit, or open from /onboarding.',
+    },
+    {
+      id: 'organization-setup',
+      name: 'Organization Setup',
+      description: 'Verify or edit organization (tenant) name and contact details.',
+      icon: '🏢',
+      moduleName: 'Onboarding',
+      modulePath: '/onboarding',
+      whereInModule: 'Onboarding flow step 1, or open here.',
+      openHere: true,
+    },
+    {
+      id: 'initial-configuration',
+      name: 'Initial Configuration',
+      description: 'Add first tower and configure CBRS, ACS, and Monitoring modules.',
+      icon: '⚙️',
+      moduleName: 'Onboarding',
+      modulePath: '/onboarding',
+      whereInModule: 'Onboarding flow step 3, or open here.',
+      openHere: true,
     },
     {
       id: 'site-deployment',
@@ -279,15 +305,21 @@
           </p>
           <button
             class="open-in-module"
-            onclick={() => goto(w.modulePath)}
+            onclick={() => w.openHere && w.id === 'organization-setup' ? (showOrgWizard = true) : w.openHere && w.id === 'initial-configuration' ? (showConfigWizard = true) : goto(w.modulePath)}
             type="button"
           >
-            Open in {w.moduleName}
+            {#if w.openHere}
+              Open {w.name}
+            {:else}
+              Open in {w.moduleName}
+            {/if}
           </button>
         </article>
       {/each}
     </div>
   </div>
+  <OrganizationSetupWizard show={showOrgWizard} on:close={() => (showOrgWizard = false)} />
+  <InitialConfigurationWizard show={showConfigWizard} on:close={() => (showConfigWizard = false)} />
 </TenantGuard>
 
 <style>

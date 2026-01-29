@@ -242,7 +242,7 @@
             ➕ Add Customer
           </button>
         {:else if activeTab === 'portal'}
-          <a href="/modules/customers/portal-setup" class="btn-secondary" title="Setup Customer Portal">🌐 Setup Portal</a>
+          <a href="/modules/customers/portal-setup" class="btn-secondary" title="Customize portal branding, FAQ, alerts, and ticket options">🌐 Customize Portal</a>
           <a href="/modules/customers/portal/login" target="_blank" class="btn-secondary" title="Open Customer Portal">👁️ View Portal</a>
         {/if}
       </div>
@@ -493,11 +493,11 @@
         <div class="portal-tab">
           <div class="portal-tab-header">
             <h2>Customer Portal</h2>
-            <p class="portal-tab-desc">The customer portal lets your subscribers log in to view tickets, service status, billing, and support. Use <strong>Setup Portal</strong> to configure branding and options; use <strong>View Portal</strong> to open the portal in a new tab.</p>
+            <p class="portal-tab-desc">The customer portal lets your subscribers log in to view tickets, service status, billing, and support. Use <strong>Customize Portal</strong> to configure branding and options; use <strong>View Portal</strong> to open the portal in a new tab.</p>
           </div>
           <div class="portal-actions">
-            <a href="/modules/customers/portal-setup" class="btn-primary" title="Configure portal branding and options">
-              🌐 Setup Portal
+            <a href="/modules/customers/portal-setup" class="btn-primary" title="Customize portal branding, FAQ, alerts, and ticket options">
+              🌐 Customize Portal
             </a>
             <a href="/modules/customers/portal/login" target="_blank" rel="noopener noreferrer" class="btn-secondary" title="Open portal login in new tab">
               👁️ View Portal

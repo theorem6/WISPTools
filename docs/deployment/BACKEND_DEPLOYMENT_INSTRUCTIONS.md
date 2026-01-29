@@ -1,3 +1,8 @@
+---
+title: Backend Deployment Instructions
+description: Deploy backend to GCE (SSH, gcloud, PM2).
+---
+
 # Backend Deployment Instructions
 
 ## Status: gcloud Authenticated ✅

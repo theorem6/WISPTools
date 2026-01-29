@@ -1,3 +1,8 @@
+---
+title: Documentation Plan Summary
+description: Documentation system plan for WISPTools (cleanup, organization, interactive docs).
+---
+
 # Documentation Plan Summary
 
 **Date:** 2025-12-19  

@@ -60,6 +60,7 @@
     faq: $portalBranding?.features?.enableFAQ !== false,
     serviceStatus: $portalBranding?.features?.enableServiceStatus !== false,
     billing: $portalBranding?.features?.enableBilling !== false,
+    tickets: $portalBranding?.features?.enableTickets !== false,
     knowledgeBase: !!$portalBranding?.features?.enableKnowledgeBase,
     liveChat: !!$portalBranding?.features?.enableLiveChat
   };
@@ -89,34 +90,38 @@
     </div>
     
     <div class="dashboard-stats">
-      <div class="stat-card">
-        <div class="stat-value">{stats.totalTickets}</div>
-        <div class="stat-label">Total Tickets</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-value">{stats.openTickets}</div>
-        <div class="stat-label">Open Tickets</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-value">{stats.resolvedTickets}</div>
-        <div class="stat-label">Resolved</div>
-      </div>
+      {#if featureFlags.tickets}
+        <div class="stat-card">
+          <div class="stat-value">{stats.totalTickets}</div>
+          <div class="stat-label">Total Tickets</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">{stats.openTickets}</div>
+          <div class="stat-label">Open Tickets</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">{stats.resolvedTickets}</div>
+          <div class="stat-label">Resolved</div>
+        </div>
+      {/if}
       <div class="stat-card">
         <div class="stat-value">{serviceInfo?.serviceStatus || 'N/A'}</div>
         <div class="stat-label">Service Status</div>
       </div>
     </div>
     
-    <div class="dashboard-actions">
-      <a href="/modules/customers/portal/tickets/new" class="btn-primary">
-        Create New Ticket
-      </a>
-      <a href="/modules/customers/portal/tickets" class="btn-secondary">
-        View All Tickets
-      </a>
-    </div>
+    {#if featureFlags.tickets}
+      <div class="dashboard-actions">
+        <a href="/modules/customers/portal/tickets/new" class="btn-primary">
+          Create New Ticket
+        </a>
+        <a href="/modules/customers/portal/tickets" class="btn-secondary">
+          View All Tickets
+        </a>
+      </div>
+    {/if}
     
-    {#if featureFlags.faq || featureFlags.serviceStatus || featureFlags.billing || featureFlags.knowledgeBase || featureFlags.liveChat}
+    {#if featureFlags.faq || featureFlags.serviceStatus || featureFlags.billing || featureFlags.tickets || featureFlags.knowledgeBase || featureFlags.liveChat}
       <div class="support-tools">
         {#if featureFlags.billing}
           <div class="support-card">
@@ -156,7 +161,7 @@
       </div>
     {/if}
     
-    {#if tickets.length > 0}
+    {#if featureFlags.tickets && tickets.length > 0}
       <div class="recent-tickets">
         <h2>Recent Tickets</h2>
         <div class="tickets-list">

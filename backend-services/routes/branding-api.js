@@ -208,6 +208,8 @@ function registerBrandingRoutes(app) {
       features: {
         enableFAQ: true,
         enableServiceStatus: true,
+        enableBilling: true,
+        enableTickets: true,
         enableLiveChat: false,
         enableKnowledgeBase: false
       }

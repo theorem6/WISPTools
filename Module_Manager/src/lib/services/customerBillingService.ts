@@ -23,6 +23,39 @@ export interface CustomerBillingCycle {
   nextBillingDate?: string | Date | null;
 }
 
+export interface CustomerBillingSLA {
+  responseTimeHours?: number;
+  uptimePercent?: number;
+  notes?: string;
+}
+
+export interface InvoiceLineItem {
+  description: string;
+  quantity?: number;
+  unitPrice: number;
+  total: number;
+}
+
+export interface CustomerBillingInvoice {
+  invoiceId: string;
+  invoiceNumber: string;
+  amount: number;
+  status: 'pending' | 'paid' | 'overdue' | 'cancelled';
+  dueDate: string | Date;
+  paidDate?: string | Date;
+  lineItems?: InvoiceLineItem[];
+  payments?: { amount: number; method?: string; paidAt?: string | Date }[];
+}
+
+export interface CustomerBillingPayment {
+  paymentId?: string;
+  amount: number;
+  method?: string;
+  transactionId?: string;
+  paidAt?: string | Date;
+  invoiceId?: string;
+}
+
 export interface CustomerBilling {
   _id?: string;
   customerId: string;
@@ -32,8 +65,9 @@ export interface CustomerBilling {
   paymentMethod?: string;
   balance?: { current?: number; overdue?: number; lastPaymentDate?: string | Date | null };
   autoPay?: { enabled?: boolean; paymentMethodId?: string };
-  invoices?: unknown[];
-  paymentHistory?: unknown[];
+  sla?: CustomerBillingSLA;
+  invoices?: CustomerBillingInvoice[];
+  paymentHistory?: { paymentId?: string; amount: number; method?: string; invoiceId?: string; paidAt?: string | Date }[];
   createdAt?: string;
   updatedAt?: string;
 }
@@ -78,7 +112,7 @@ export const customerBillingService = {
     return apiCall(q);
   },
 
-  async createOrUpdate(customerId: string, data: { servicePlan?: CustomerBillingServicePlan; billingCycle?: CustomerBillingCycle }): Promise<CustomerBilling> {
+  async createOrUpdate(customerId: string, data: { servicePlan?: CustomerBillingServicePlan; billingCycle?: CustomerBillingCycle; sla?: CustomerBillingSLA }): Promise<CustomerBilling> {
     return apiCall('', {
       method: 'POST',
       body: JSON.stringify({ customerId, ...data })
@@ -88,6 +122,29 @@ export const customerBillingService = {
   async update(customerId: string, data: Partial<CustomerBilling>): Promise<CustomerBilling> {
     return apiCall(`/${encodeURIComponent(customerId)}`, {
       method: 'PUT',
+      body: JSON.stringify(data)
+    });
+  },
+
+  async addInvoice(
+    customerId: string,
+    data: { invoiceNumber: string; amount: number; dueDate: string | Date; lineItems?: InvoiceLineItem[]; status?: string }
+  ): Promise<CustomerBilling> {
+    return apiCall(`/${encodeURIComponent(customerId)}/invoices`, {
+      method: 'POST',
+      body: JSON.stringify({
+        ...data,
+        dueDate: typeof data.dueDate === 'string' ? data.dueDate : (data.dueDate as Date).toISOString().slice(0, 10)
+      })
+    });
+  },
+
+  async recordPayment(
+    customerId: string,
+    data: { amount: number; method?: string; invoiceId?: string; transactionId?: string }
+  ): Promise<CustomerBilling> {
+    return apiCall(`/${encodeURIComponent(customerId)}/payments`, {
+      method: 'POST',
       body: JSON.stringify(data)
     });
   }

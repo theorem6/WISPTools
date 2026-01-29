@@ -539,6 +539,21 @@ router.get('/billing', requireCustomerAuth, async (req, res) => {
     if (!doc) {
       return res.status(200).json(null);
     }
+    if (doc.invoices?.length) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      let changed = false;
+      for (const inv of doc.invoices) {
+        if (inv.status === 'pending' && inv.dueDate && new Date(inv.dueDate) < today) {
+          inv.status = 'overdue';
+          changed = true;
+        }
+      }
+      if (changed) {
+        doc.updatedAt = new Date();
+        await doc.save();
+      }
+    }
     res.json(doc);
   } catch (error) {
     console.error('Error fetching portal billing:', error);

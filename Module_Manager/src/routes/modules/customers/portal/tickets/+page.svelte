@@ -3,18 +3,24 @@
   import { goto } from '$app/navigation';
   import { customerPortalService } from '$lib/services/customerPortalService';
   import { customerAuthService } from '$lib/services/customerAuthService';
+  import { portalBranding } from '$lib/stores/portalBranding';
   import type { WorkOrder } from '$lib/services/workOrderService';
   
   let tickets: WorkOrder[] = [];
   let loading = true;
   let error = '';
   let statusFilter: string = 'all';
+  $: ticketsEnabled = $portalBranding?.features?.enableTickets !== false;
   
   onMount(async () => {
     try {
       const customer = await customerAuthService.getCurrentCustomer();
       if (!customer) {
         goto('/modules/customers/portal/login');
+        return;
+      }
+      if (!ticketsEnabled) {
+        goto('/modules/customers/portal/dashboard');
         return;
       }
       

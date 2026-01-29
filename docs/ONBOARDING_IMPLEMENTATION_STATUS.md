@@ -1,3 +1,8 @@
+---
+title: Onboarding & Wizard Implementation Status
+description: First-time setup wizard, module wizards, and onboarding flow status.
+---
+
 # Onboarding & Wizard Implementation Status
 
 **Date:** January 2025  

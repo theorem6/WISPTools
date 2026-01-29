@@ -85,6 +85,12 @@ const customerBillingSchema = new mongoose.Schema({
     enabled: { type: Boolean, default: false },
     paymentMethodId: String
   },
+  // SLA tracking (response time, uptime guarantee)
+  sla: {
+    responseTimeHours: { type: Number, default: 24 }, // e.g. 24 = respond within 24h
+    uptimePercent: { type: Number, default: 99.9, min: 0, max: 100 },
+    notes: String
+  },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
 });

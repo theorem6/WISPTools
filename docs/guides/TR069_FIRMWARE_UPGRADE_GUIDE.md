@@ -1,3 +1,8 @@
+---
+title: TR-069 Firmware Upgrade Guide
+description: URL-based download and firmware upgrade methods for TR-069/GenieACS.
+---
+
 # TR-069 Firmware Upgrade Implementation Guide
 
 ## 📚 TR-069 Firmware Upgrade Methods
