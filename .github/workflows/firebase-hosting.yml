@@ -42,12 +42,7 @@ jobs:
         with:
           filters:
             frontend:
-              - 'Module_Manager/src/**'
-              - 'Module_Manager/package.json'
-              - 'Module_Manager/package-lock.json'
-              - 'Module_Manager/vite.config.ts'
-              - 'Module_Manager/svelte.config.js'
-              - 'Module_Manager/tsconfig.json'
+              - 'Module_Manager/**'
               - 'firebase.json'
             backend:
               - 'backend-services/**'
@@ -72,12 +67,12 @@ jobs:
           cache-dependency-path: Module_Manager/package-lock.json
 
       - name: Install dependencies
-        if: steps.changes.outputs.frontend == 'true'
+        if: steps.changes.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch'
         working-directory: ./Module_Manager
         run: npm ci
 
       - name: Build application
-        if: steps.changes.outputs.frontend == 'true'
+        if: steps.changes.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch'
         working-directory: ./Module_Manager
         run: npm run build
         env:
@@ -106,7 +101,7 @@ jobs:
         env:
           FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
         run: |
-          firebase deploy --only hosting --project ${{ env.FIREBASE_PROJECT_ID }} --token "$FIREBASE_TOKEN"
+          firebase deploy --only hosting --project ${{ env.FIREBASE_PROJECT_ID }} --token "$FIREBASE_TOKEN" --non-interactive
 
       - name: Deployment summary
         if: steps.changes.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch'

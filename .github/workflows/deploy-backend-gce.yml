@@ -1,5 +1,5 @@
 # Deploy backend-services to GCE VM (acs-hss-server)
-# Run manually from Actions tab, or on push to backend-services/
+# Runs on every push to main/master (fully automated). Also run manually from Actions tab.
 # Requires GitHub secret: GCP_SA_KEY (JSON key for a service account with Compute Engine and IAP tunnel access)
 
 name: Deploy Backend to GCE
@@ -7,8 +7,6 @@ name: Deploy Backend to GCE
 on:
   push:
     branches: [ main, master ]
-    paths:
-      - 'backend-services/**'
   workflow_dispatch:
 
 env:
