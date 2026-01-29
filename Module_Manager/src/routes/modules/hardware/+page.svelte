@@ -18,7 +18,8 @@
   import { formatInTenantTimezone } from '$lib/utils/timezone';
   import { coverageMapService } from '../coverage-map/lib/coverageMapService.mongodb';
   import SNMPDevicesPanel from '../monitoring/components/SNMPDevicesPanel.svelte';
-  
+  import ModuleWizardMenu from '$lib/components/wizards/ModuleWizardMenu.svelte';
+
   const HSS_API = API_CONFIG.PATHS.HSS;
   
   // Data

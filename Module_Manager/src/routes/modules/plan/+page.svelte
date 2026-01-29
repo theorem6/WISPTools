@@ -23,6 +23,7 @@ import { getCapabilitiesForMode, type MapCapabilities, type MapModuleMode } from
   import TipsModal from '$lib/components/modals/TipsModal.svelte';
   import { getModuleTips } from '$lib/config/moduleTips';
   import { tipsService } from '$lib/services/tipsService';
+  import ModuleWizardMenu from '$lib/components/wizards/ModuleWizardMenu.svelte';
 
 interface MapViewExtentPayload {
   center?: { lat: number; lon: number };

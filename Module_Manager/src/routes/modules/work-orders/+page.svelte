@@ -9,7 +9,8 @@
   import WorkOrderCreationWizard from '$lib/components/wizards/workorders/WorkOrderCreationWizard.svelte';
   import WorkOrderCard from './components/WorkOrderCard.svelte';
   import APKDownload from '$lib/components/common/APKDownload.svelte';
-  
+  import ModuleWizardMenu from '$lib/components/wizards/ModuleWizardMenu.svelte';
+
   let workOrders: WorkOrder[] = [];
   let isLoading = true;
   let error = '';

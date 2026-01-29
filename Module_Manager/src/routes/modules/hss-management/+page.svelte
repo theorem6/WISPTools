@@ -18,7 +18,8 @@
   import SubscriberCreationWizard from '$lib/components/wizards/hss/SubscriberCreationWizard.svelte';
   import BandwidthPlanWizard from '$lib/components/wizards/hss/BandwidthPlanWizard.svelte';
   import SubscriberGroupWizard from '$lib/components/wizards/hss/SubscriberGroupWizard.svelte';
-  
+  import ModuleWizardMenu from '$lib/components/wizards/ModuleWizardMenu.svelte';
+
   type HSSManagementTab = 'dashboard' | 'groups' | 'plans' | 'mme' | 'import' | 'remote-epcs';
   
   // Use centralized API configuration
