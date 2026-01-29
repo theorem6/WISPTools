@@ -4,14 +4,13 @@ on:
   push:
     branches:
       - main
-    # Always run on push to main - let job decide what to deploy based on changed files
   pull_request:
     branches:
       - main
     paths:
       - 'Module_Manager/**'
       - 'firebase.json'
-  workflow_dispatch: # Allow manual trigger from GitHub Actions UI
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -25,7 +24,6 @@ jobs:
   deploy:
     name: Deploy to Firebase Hosting
     runs-on: ubuntu-latest
-    
     permissions:
       contents: read
       pull-requests: read
@@ -33,33 +31,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0  # Fetch all history for diff comparison
-      
-      - name: Check changed files
-        uses: dorny/paths-filter@v2
-        id: changes
-        with:
-          filters:
-            frontend:
-              - 'Module_Manager/**'
-              - 'firebase.json'
-            backend:
-              - 'backend-services/**'
-              - 'gce-backend/**'
-              - 'distributed-epc/**'
-              - 'hss-module/**'
-              - 'scripts/**'
-      
-      - name: Skip if no frontend changes (unless manual trigger)
-        if: steps.changes.outputs.frontend == 'false' && github.event_name != 'workflow_dispatch'
-        run: |
-          echo "⏭️ No frontend changes detected - skipping deployment"
-          echo "Backend-only changes will not trigger frontend deployment"
-          exit 0
 
       - name: Setup Node.js
-        if: steps.changes.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch'
         uses: actions/setup-node@v4
         with:
           node-version: '20'
@@ -67,51 +40,42 @@ jobs:
           cache-dependency-path: Module_Manager/package-lock.json
 
       - name: Install dependencies
-        if: steps.changes.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch'
         working-directory: ./Module_Manager
         run: npm ci
 
       - name: Build application
-        if: steps.changes.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch'
         working-directory: ./Module_Manager
         run: npm run build
         env:
-          NODE_OPTIONS: --max-old-space-size=4096
+          NODE_OPTIONS: --max-old-space-size=6144
 
-      - name: Install Firebase CLI
-        if: steps.changes.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch'
-        run: npm install -g firebase-tools@latest
-        
       - name: Verify build output
-        if: steps.changes.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch'
         working-directory: ./Module_Manager
         run: |
           if [ ! -f "build/client/index.html" ]; then
             echo "❌ Error: build/client/index.html not found!"
-            echo "Build may have failed. Checking build directory..."
-            ls -la build/ || echo "Build directory does not exist"
+            ls -la build/ 2>/dev/null || echo "Build directory does not exist"
             exit 1
           fi
-          echo "✅ Build output verified: build/client/index.html exists"
-          echo "📦 Build size:"
+          echo "✅ Build output verified"
           du -sh build/client || true
 
+      - name: Install Firebase CLI
+        run: npm install -g firebase-tools@latest
+
       - name: Deploy to Firebase Hosting
-        if: steps.changes.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch'
         env:
           FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
         run: |
+          if [ -z "$FIREBASE_TOKEN" ]; then
+            echo "❌ FIREBASE_TOKEN secret is not set. Add it in repo Settings → Secrets and variables → Actions."
+            exit 1
+          fi
           firebase deploy --only hosting --project ${{ env.FIREBASE_PROJECT_ID }} --token "$FIREBASE_TOKEN" --non-interactive
 
       - name: Deployment summary
-        if: steps.changes.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch'
         run: |
           echo "✅ Deployment successful!" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Service**: Firebase Hosting" >> $GITHUB_STEP_SUMMARY
-          echo "**Project**: ${{ env.FIREBASE_PROJECT_ID }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Deployment Type**: Git-based automated deployment" >> $GITHUB_STEP_SUMMARY
-          echo "**Status**: Frontend deployed successfully from Git commit" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**View deployment**: https://console.firebase.google.com/project/${{ env.FIREBASE_PROJECT_ID }}/hosting" >> $GITHUB_STEP_SUMMARY
+          echo "**Service**: Firebase Hosting | **Project**: ${{ env.FIREBASE_PROJECT_ID }}" >> $GITHUB_STEP_SUMMARY
+          echo "[View hosting](https://console.firebase.google.com/project/${{ env.FIREBASE_PROJECT_ID }}/hosting)" >> $GITHUB_STEP_SUMMARY
 
