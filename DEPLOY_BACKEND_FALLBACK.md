@@ -1,5 +1,7 @@
 # Backend Deploy Fallback (Manual)
 
+**Automated deploy:** Backend is deployed on **every push to `main`** via GitHub Actions (`.github/workflows/deploy-backend-gce.yml`). No manual step is needed for normal pushes. Use the options below only when doing a one-off manual deploy or when the CI SSH step failed and you need to finish on the VM.
+
 When `deploy-backend-to-gce.ps1` uploads files but the **SSH step fails** (e.g. plink/IAP on Windows), finish the deploy manually.
 
 ## Prerequisites
