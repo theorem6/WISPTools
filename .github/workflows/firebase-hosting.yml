@@ -31,11 +31,11 @@ jobs:
     steps:
       - name: Check required secret
         run: |
-          if [ -z "${{ secrets.FIREBASE_TOKEN }}" ]; then
-            echo "::error::FIREBASE_TOKEN is not set. Add it at: repo Settings → Secrets and variables → Actions → New repository secret. Get a token with: firebase login:ci"
+          if [ -z "${{ secrets.FIREBASE_SERVICE_ACCOUNT }}" ]; then
+            echo "::error::FIREBASE_SERVICE_ACCOUNT is not set. Add a Firebase/GCP service account JSON key at: Settings → Secrets and variables → Actions. See .github/AUTOMATIC_DEPLOYMENT.md"
             exit 1
           fi
-          echo "FIREBASE_TOKEN is set"
+          echo "FIREBASE_SERVICE_ACCOUNT is set"
 
       - name: Checkout code
         uses: actions/checkout@v4
@@ -73,13 +73,15 @@ jobs:
 
       - name: Deploy to Firebase Hosting
         env:
-          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
         run: |
-          if [ -z "$FIREBASE_TOKEN" ]; then
-            echo "❌ FIREBASE_TOKEN secret is not set. Add it in repo Settings → Secrets and variables → Actions."
+          if [ -z "$FIREBASE_SERVICE_ACCOUNT" ]; then
+            echo "::error::FIREBASE_SERVICE_ACCOUNT secret is not set."
             exit 1
           fi
-          firebase deploy --only hosting --project ${{ env.FIREBASE_PROJECT_ID }} --token "$FIREBASE_TOKEN" --non-interactive
+          echo "$FIREBASE_SERVICE_ACCOUNT" > "$RUNNER_TEMP/firebase-sa.json"
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/firebase-sa.json" >> "$GITHUB_ENV"
+          firebase deploy --only hosting --project ${{ env.FIREBASE_PROJECT_ID }} --non-interactive
 
       - name: Deployment summary
         run: |

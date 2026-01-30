@@ -46,33 +46,40 @@ This project is configured for **automatic deployment** to Firebase when you pus
 
 | Secret | Used by | How to get |
 |--------|---------|------------|
-| **FIREBASE_TOKEN** | Deploy to Firebase Hosting | Run `firebase login:ci` (see Step 1 below) |
+| **FIREBASE_SERVICE_ACCOUNT** | Deploy to Firebase Hosting | Service account JSON key with Firebase Hosting Admin (see Step 1 below) |
 | **GCP_SA_KEY** | Deploy Backend to GCE | JSON key for a GCP service account with Compute Engine + IAP access |
 
 If a workflow run fails immediately with "X is not set", add the missing secret above.
 
-### Step 1: Generate Firebase CI Token
+### Step 1: Firebase Hosting – Service account (replaces deprecated `firebase login:ci` token)
 
-Run this command locally:
-```bash
-firebase login:ci
-```
+The `--token` from `firebase login:ci` is deprecated and can cause 401 errors. Use a **service account JSON key** instead.
 
-This will:
-1. Open your browser
-2. Ask you to login to Firebase
-3. Generate a token like: `1//0xxxxx-xxxxxxxxx`
-4. Copy this token
+1. **Create a service account** (Firebase project **wisptools-production**):
+   - [Google Cloud Console](https://console.cloud.google.com/) → select project **wisptools-production**
+   - IAM & Admin → Service Accounts → Create Service Account
+   - Name it e.g. `firebase-hosting-deploy`
+   - Create and Continue
 
-### Step 2: Add Token to GitHub Secrets
+2. **Grant Firebase Hosting Admin**:
+   - Add role: **Firebase Hosting Admin** (or **Firebase Admin** if you prefer)
+   - Done
 
-1. Go to your GitHub repository: https://github.com/theorem6/lte-pci-mapper
-2. Click **Settings** tab
-3. Click **Secrets and variables** → **Actions**
-4. Click **New repository secret**
-5. Name: `FIREBASE_TOKEN`
-6. Value: Paste the token from Step 1
-7. Click **Add secret**
+3. **Create a JSON key**:
+   - Open the new service account → Keys → Add Key → Create new key → JSON → Create
+   - Save the downloaded `.json` file
+
+4. **Add to GitHub**:
+   - Repo → **Settings** → **Secrets and variables** → **Actions**
+   - **New repository secret**
+   - Name: `FIREBASE_SERVICE_ACCOUNT`
+   - Value: paste the **entire contents** of the JSON file (including `{` and `}`)
+   - Add secret
+
+### Step 2: Add other secrets (GCP_SA_KEY, etc.)
+
+1. Go to your GitHub repository → **Settings** → **Secrets and variables** → **Actions**
+2. Add **GCP_SA_KEY** for backend GCE deploy (JSON key for the GCE service account)
 
 ### Step 3: Test the Setup
 
