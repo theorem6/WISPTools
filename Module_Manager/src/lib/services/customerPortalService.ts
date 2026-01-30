@@ -207,6 +207,39 @@ class CustomerPortalService {
   }
 
   /**
+   * Create Stripe payment intent for portal pay-now. Returns { configured, clientSecret?, message? }.
+   */
+  async createPaymentIntent(
+    amount: number,
+    invoiceId?: string,
+    tenantId?: string
+  ): Promise<{ configured: boolean; clientSecret?: string; message?: string }> {
+    try {
+      const token = await this.getIdToken();
+      if (!token) throw new Error('Not authenticated');
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`
+      };
+      if (tenantId) headers['X-Tenant-ID'] = tenantId;
+      const response = await fetch(`${API_URL}/customer-portal/billing/create-payment-intent`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ amount, invoiceId })
+      });
+      const data = await response.json();
+      return {
+        configured: !!data.configured,
+        clientSecret: data.clientSecret,
+        message: data.message
+      };
+    } catch (error: any) {
+      console.error('Error creating payment intent:', error);
+      return { configured: false, message: error.message || 'Failed to create payment' };
+    }
+  }
+
+  /**
    * Get ID token for API calls
    */
   private async getIdToken(): Promise<string | null> {

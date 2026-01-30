@@ -1,6 +1,6 @@
 {
   "name": "wisp-multitool-mobile",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "WISP Multitool - Complete Field Operations Platform",
   "main": "index.js",
   "scripts": {

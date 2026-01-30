@@ -14,8 +14,7 @@
     <p class="message">{message}</p>
     <div class="actions">
       <a href="/dashboard" class="btn-primary">← Back to App</a>
-      <a href="/docs" class="btn-secondary">Documentation</a>
-      <a href="/help" class="btn-secondary">Help</a>
+      <a href="/help" class="btn-secondary">Help & Documentation</a>
     </div>
   </div>
 </div>

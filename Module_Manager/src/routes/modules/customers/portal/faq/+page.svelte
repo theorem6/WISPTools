@@ -3,7 +3,10 @@
   import { goto } from '$app/navigation';
   import { customerAuthService } from '$lib/services/customerAuthService';
   import { portalBranding } from '$lib/stores/portalBranding';
+  import { getApiUrl } from '$lib/config/api';
 
+  type FAQItem = { _id?: string; question: string; answer: string; category?: string };
+  let faqItems: FAQItem[] = [];
   let loading = true;
   let featureEnabled = true;
   let brandName = 'Our team';
@@ -33,12 +36,23 @@
   $: brandName = $portalBranding?.company?.displayName || $portalBranding?.company?.name || brandName;
   $: supportEmail = $portalBranding?.company?.supportEmail || 'support@example.com';
   $: supportPhone = $portalBranding?.company?.supportPhone || '';
+  $: displayFaqs = faqItems.length > 0 ? faqItems : defaultFaqs;
 
   onMount(async () => {
     const customer = await customerAuthService.getCurrentCustomer();
     if (!customer) {
       goto('/modules/customers/portal/login');
       return;
+    }
+    try {
+      const apiUrl = getApiUrl();
+      const res = await fetch(`${apiUrl}/portal-content/${customer.tenantId}/faq/published`);
+      if (res.ok) {
+        const data = await res.json();
+        faqItems = Array.isArray(data) ? data : [];
+      }
+    } catch (_) {
+      // keep defaultFaqs
     }
     loading = false;
   });
@@ -65,7 +79,7 @@
     <p class="subtitle">Quick answers to the most common questions from subscribers.</p>
     
     <div class="faq-list">
-      {#each defaultFaqs as faq}
+      {#each displayFaqs as faq}
         <details class="faq-item">
           <summary>{faq.question}</summary>
           <p>{faq.answer}</p>

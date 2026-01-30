@@ -212,6 +212,21 @@ function registerBrandingRoutes(app) {
         enableTickets: true,
         enableLiveChat: false,
         enableKnowledgeBase: false
+      },
+      billingPortal: {
+        paymentGateways: {
+          stripe: { enabled: false, publicKey: '', note: '' },
+          paypal: { enabled: false, clientId: '', sandbox: true, note: '' }
+        },
+        invoice: {
+          companyName: tenant.displayName || '',
+          logoUrl: '',
+          address: '',
+          footerText: '',
+          termsAndConditions: '',
+          dueDays: 14,
+          currency: 'USD'
+        }
       }
     };
     
@@ -221,7 +236,14 @@ function registerBrandingRoutes(app) {
       colors: { ...defaultBranding.colors, ...(branding.colors || {}) },
       company: { ...defaultBranding.company, ...(branding.company || {}) },
       portal: { ...defaultBranding.portal, ...(branding.portal || {}) },
-      features: { ...defaultBranding.features, ...(branding.features || {}) }
+      features: { ...defaultBranding.features, ...(branding.features || {}) },
+      billingPortal: {
+        paymentGateways: {
+          stripe: { ...defaultBranding.billingPortal.paymentGateways.stripe, ...(branding.billingPortal?.paymentGateways?.stripe || {}) },
+          paypal: { ...defaultBranding.billingPortal.paymentGateways.paypal, ...(branding.billingPortal?.paymentGateways?.paypal || {}) }
+        },
+        invoice: { ...defaultBranding.billingPortal.invoice, ...(branding.billingPortal?.invoice || {}) }
+      }
     };
     
     res.json(mergedBranding);
@@ -301,6 +323,22 @@ function registerBrandingRoutes(app) {
     
     if (brandingData.features) {
       tenant.branding.features = { ...tenant.branding.features, ...brandingData.features };
+    }
+    
+    if (brandingData.billingPortal) {
+      if (!tenant.branding.billingPortal) tenant.branding.billingPortal = {};
+      if (brandingData.billingPortal.paymentGateways) {
+        tenant.branding.billingPortal.paymentGateways = tenant.branding.billingPortal.paymentGateways || {};
+        if (brandingData.billingPortal.paymentGateways.stripe) {
+          tenant.branding.billingPortal.paymentGateways.stripe = { ...tenant.branding.billingPortal.paymentGateways.stripe, ...brandingData.billingPortal.paymentGateways.stripe };
+        }
+        if (brandingData.billingPortal.paymentGateways.paypal) {
+          tenant.branding.billingPortal.paymentGateways.paypal = { ...tenant.branding.billingPortal.paymentGateways.paypal, ...brandingData.billingPortal.paymentGateways.paypal };
+        }
+      }
+      if (brandingData.billingPortal.invoice) {
+        tenant.branding.billingPortal.invoice = { ...tenant.branding.billingPortal.invoice, ...brandingData.billingPortal.invoice };
+      }
     }
     
     await tenant.save();

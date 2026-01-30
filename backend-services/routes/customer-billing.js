@@ -38,6 +38,100 @@ router.get('/', async (req, res) => {
   }
 });
 
+/**
+ * POST /api/customer-billing/generate-invoices
+ * Generate next invoice for all billing records where nextBillingDate has passed.
+ * Requires X-Tenant-ID.
+ */
+router.post('/generate-invoices', async (req, res) => {
+  try {
+    const tenantId = req.tenantId;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const docs = await CustomerBilling.find({
+      tenantId,
+      'billingCycle.nextBillingDate': { $lte: today },
+      'servicePlan.monthlyFee': { $exists: true, $gt: 0 }
+    });
+    const generated = [];
+    for (const doc of docs) {
+      const fee = doc.servicePlan?.monthlyFee ?? 0;
+      if (fee <= 0) continue;
+      const nextDate = doc.billingCycle?.nextBillingDate ? new Date(doc.billingCycle.nextBillingDate) : new Date();
+      const invNum = `INV-${new Date().getFullYear()}-${String((doc.invoices?.length || 0) + 1).padStart(4, '0')}`;
+      const invoiceId = `inv_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+      const invoice = {
+        invoiceId,
+        invoiceNumber: invNum,
+        amount: fee,
+        status: 'pending',
+        dueDate: new Date(nextDate.getTime() + 14 * 24 * 60 * 60 * 1000),
+        lineItems: [{ description: doc.servicePlan?.planName || 'Monthly service', quantity: 1, unitPrice: fee, total: fee }]
+      };
+      if (!doc.invoices) doc.invoices = [];
+      doc.invoices.push(invoice);
+      doc.balance = doc.balance || { current: 0, overdue: 0 };
+      doc.balance.current = (doc.balance.current || 0) + fee;
+      const nextBilling = new Date(nextDate);
+      nextBilling.setMonth(nextBilling.getMonth() + 1);
+      doc.billingCycle = doc.billingCycle || {};
+      doc.billingCycle.nextBillingDate = nextBilling;
+      doc.updatedAt = new Date();
+      await doc.save();
+      generated.push({ customerId: doc.customerId, invoiceNumber: invNum, amount: fee });
+    }
+    res.json({ generated: generated.length, invoices: generated });
+  } catch (error) {
+    console.error('Error generating invoices:', error);
+    res.status(500).json({ error: 'Failed to generate invoices' });
+  }
+});
+
+/**
+ * POST /api/customer-billing/dunning/run
+ * Process overdue invoices: send reminder logic (log/email), increment reminderCount;
+ * after 3 reminders set suspendedAt and optionally set Customer.serviceStatus to 'suspended'.
+ * Requires X-Tenant-ID.
+ */
+router.post('/dunning/run', async (req, res) => {
+  try {
+    const tenantId = req.tenantId;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const REMINDER_THRESHOLD = 3;
+    const docs = await CustomerBilling.find({ tenantId }).lean();
+    const processed = [];
+    for (const doc of docs) {
+      const overdue = (doc.invoices || []).filter(
+        (inv) => inv.status === 'overdue' || (inv.status === 'pending' && inv.dueDate && new Date(inv.dueDate) < today)
+      );
+      if (overdue.length === 0) continue;
+      const billingDoc = await CustomerBilling.findOne({ _id: doc._id });
+      if (!billingDoc) continue;
+      if (!billingDoc.dunning) billingDoc.dunning = {};
+      billingDoc.dunning.reminderCount = (billingDoc.dunning.reminderCount || 0) + 1;
+      billingDoc.dunning.lastReminderAt = new Date();
+      if (billingDoc.dunning.reminderCount >= REMINDER_THRESHOLD && !billingDoc.dunning.suspendedAt) {
+        billingDoc.dunning.suspendedAt = new Date();
+        billingDoc.dunning.suspensionReason = 'Overdue invoices after reminder threshold';
+        await Customer.findOneAndUpdate(
+          { tenantId, customerId: billingDoc.customerId },
+          { serviceStatus: 'suspended' }
+        );
+        processed.push({ customerId: billingDoc.customerId, action: 'suspended', reminderCount: billingDoc.dunning.reminderCount });
+      } else {
+        processed.push({ customerId: billingDoc.customerId, action: 'reminder', reminderCount: billingDoc.dunning.reminderCount });
+      }
+      billingDoc.updatedAt = new Date();
+      await billingDoc.save();
+    }
+    res.json({ processed: processed.length, details: processed });
+  } catch (error) {
+    console.error('Error running dunning:', error);
+    res.status(500).json({ error: 'Failed to run dunning' });
+  }
+});
+
 function markOverdueInvoices(doc) {
   if (!doc.invoices || !doc.invoices.length) return false;
   const today = new Date();
@@ -54,7 +148,7 @@ function markOverdueInvoices(doc) {
 
 /**
  * GET /api/customer-billing/:customerId
- * Get one customer's billing record.
+ * Get one customer's billing record. Returns 200 with null when no record exists (so UI can show empty form).
  */
 router.get('/:customerId', async (req, res) => {
   try {
@@ -64,7 +158,7 @@ router.get('/:customerId', async (req, res) => {
       customerId
     });
     if (!doc) {
-      return res.status(404).json({ error: 'Customer billing not found', customerId });
+      return res.status(200).json(null);
     }
     if (markOverdueInvoices(doc)) {
       doc.updatedAt = new Date();

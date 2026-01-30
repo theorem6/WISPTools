@@ -16,6 +16,7 @@
   const dispatch = createEventDispatcher();
   
   let currentTip: ModuleTip | null = null;
+  let currentTipIndex = 0;
   let dontShowAgain = false;
   let hasSelectedTip = false;
   
@@ -23,18 +24,30 @@
   function selectRandomTip() {
     if (tips.length === 0) {
       currentTip = null;
+      currentTipIndex = 0;
       hasSelectedTip = false;
       return;
     }
     const randomIndex = Math.floor(Math.random() * tips.length);
+    currentTipIndex = randomIndex;
     currentTip = tips[randomIndex];
     hasSelectedTip = true;
-    console.log('[TipsModal] Selected random tip:', { moduleId, tipId: currentTip.id, totalTips: tips.length });
+  }
+  
+  function goNext() {
+    if (tips.length <= 1) return;
+    currentTipIndex = (currentTipIndex + 1) % tips.length;
+    currentTip = tips[currentTipIndex];
+  }
+  
+  function goPrev() {
+    if (tips.length <= 1) return;
+    currentTipIndex = currentTipIndex === 0 ? tips.length - 1 : currentTipIndex - 1;
+    currentTip = tips[currentTipIndex];
   }
   
   // Reset and select random tip when modal opens (only once per show cycle)
   $: if (show && !hasSelectedTip && tips.length > 0) {
-    console.log('[TipsModal] Modal opened, selecting tip:', { moduleId, tipsCount: tips.length });
     selectRandomTip();
     dontShowAgain = false;
   }
@@ -43,6 +56,7 @@
   $: if (!show) {
     hasSelectedTip = false;
     currentTip = null;
+    currentTipIndex = 0;
   }
   
   function handleClose() {
@@ -74,10 +88,19 @@
       </div>
       
       <div class="tips-footer">
-        <label class="dont-show-again">
-          <input type="checkbox" bind:checked={dontShowAgain} />
-          <span>Don't show these tips again</span>
-        </label>
+        <div class="tips-footer-left">
+          {#if tips.length > 1}
+            <div class="tip-nav">
+              <button type="button" class="nav-btn" onclick={goPrev} aria-label="Previous tip">←</button>
+              <span class="tip-counter">{currentTipIndex + 1} of {tips.length}</span>
+              <button type="button" class="nav-btn" onclick={goNext} aria-label="Next tip">→</button>
+            </div>
+          {/if}
+          <label class="dont-show-again">
+            <input type="checkbox" bind:checked={dontShowAgain} />
+            <span>Don't show again</span>
+          </label>
+        </div>
         <button class="close-button" onclick={handleClose} type="button">Close</button>
       </div>
     </div>
@@ -226,6 +249,38 @@
           padding: 1rem 1.5rem;
           border-top: 1px solid var(--border-color, #e0e0e0);
           background: var(--bg-secondary, #f9f9f9);
+        }
+        
+        .tips-footer-left {
+          display: flex;
+          align-items: center;
+          gap: 1rem;
+          flex-wrap: wrap;
+        }
+        
+        .tip-nav {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+        }
+        
+        .nav-btn {
+          background: var(--bg-secondary, #f0f0f0);
+          border: 1px solid var(--border-color, #e0e0e0);
+          padding: 0.35rem 0.6rem;
+          border-radius: 0.375rem;
+          cursor: pointer;
+          font-size: 1rem;
+          color: var(--text-primary, #1a1a1a);
+        }
+        
+        .nav-btn:hover {
+          background: var(--hover-bg, #e5e5e5);
+        }
+        
+        .tip-counter {
+          font-size: 0.875rem;
+          color: var(--text-secondary, #666);
         }
         
         .dont-show-again {

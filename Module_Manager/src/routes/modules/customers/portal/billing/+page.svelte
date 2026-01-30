@@ -4,6 +4,7 @@
   import { customerPortalService } from '$lib/services/customerPortalService';
   import { customerAuthService } from '$lib/services/customerAuthService';
   import { portalBranding } from '$lib/stores/portalBranding';
+  import StripeCardForm from '$lib/components/portal/StripeCardForm.svelte';
 
   type BillingPortal = {
     servicePlan?: { planName?: string; monthlyFee?: number; setupFee?: number };
@@ -17,8 +18,15 @@
   let loading = true;
   let error = '';
   let featureEnabled = true;
+  let payMessage = '';
+  let paying = false;
+  let currentTenantId = '';
+  let showCardForm = false;
+  let clientSecretForStripe = '';
+  let payAmount = 0;
 
   $: featureEnabled = ($portalBranding?.features?.enableBilling !== false);
+  $: stripePublishableKey = $portalBranding?.billingPortal?.paymentGateways?.stripe?.publicKey ?? '';
 
   function formatCurrency(n: number | undefined): string {
     if (n == null || Number.isNaN(n)) return '—';
@@ -45,6 +53,7 @@
         goto('/modules/customers/portal/dashboard');
         return;
       }
+      currentTenantId = customer.tenantId || '';
       billing = (await customerPortalService.getCustomerBilling(customer.tenantId)) as BillingPortal | null;
     } catch (err: any) {
       error = err.message || 'Failed to load billing information';
@@ -52,6 +61,53 @@
       loading = false;
     }
   });
+
+  async function handlePayNow() {
+    if (!billing || paying) return;
+    const amount = (billing.balance?.current ?? 0) || (billing.balance?.overdue ?? 0);
+    if (amount <= 0) {
+      payMessage = 'No balance due.';
+      return;
+    }
+    paying = true;
+    payMessage = '';
+    showCardForm = false;
+    clientSecretForStripe = '';
+    try {
+      const result = await customerPortalService.createPaymentIntent(amount, undefined, currentTenantId);
+      if (!result.configured) {
+        payMessage = result.message || 'Online payments are not configured. Please pay by check or contact support.';
+        return;
+      }
+      if (result.clientSecret && stripePublishableKey) {
+        clientSecretForStripe = result.clientSecret;
+        payAmount = amount;
+        showCardForm = true;
+        payMessage = '';
+      } else if (result.clientSecret) {
+        payMessage = 'Payments are configured but the payment form is not set up. Contact support.';
+      }
+    } catch (e: any) {
+      payMessage = e.message || 'Failed to start payment';
+    } finally {
+      paying = false;
+    }
+  }
+
+  function onPaymentSuccess() {
+    showCardForm = false;
+    clientSecretForStripe = '';
+    payMessage = 'Payment successful. Thank you.';
+    if (billing) {
+      customerPortalService.getCustomerBilling(currentTenantId).then((b) => {
+        if (b) billing = b as BillingPortal;
+      });
+    }
+  }
+
+  function onPaymentError(e: { detail: { message: string } }) {
+    payMessage = e.detail?.message || 'Payment failed.';
+  }
 </script>
 
 {#if loading}
@@ -140,6 +196,31 @@
           <section class="info-section">
             <div class="info-card auto-pay-badge">
               <span class="badge">Auto-pay enabled</span>
+            </div>
+          </section>
+        {/if}
+
+        {#if billing.balance && ((billing.balance.current ?? 0) + (billing.balance.overdue ?? 0)) > 0}
+          <section class="info-section">
+            <h2>Pay now</h2>
+            <div class="info-card">
+              {#if showCardForm && clientSecretForStripe && stripePublishableKey}
+                <StripeCardForm
+                  clientSecret={clientSecretForStripe}
+                  publishableKey={stripePublishableKey}
+                  amountLabel={formatCurrency(payAmount)}
+                  on:success={onPaymentSuccess}
+                  on:error={onPaymentError}
+                />
+              {:else}
+                <p class="pay-desc">Pay your current balance online (when Stripe is configured).</p>
+                <button type="button" class="btn-pay" disabled={paying} on:click={handlePayNow}>
+                  {paying ? 'Checking…' : 'Pay now'}
+                </button>
+              {/if}
+              {#if payMessage}
+                <p class="pay-message">{payMessage}</p>
+              {/if}
             </div>
           </section>
         {/if}
@@ -270,6 +351,32 @@
   }
   .inv-num, .pay-amount { font-weight: 600; }
   .inv-status { text-transform: capitalize; }
+  .pay-desc {
+    color: var(--brand-text-secondary, #6b7280);
+    margin-bottom: 1rem;
+    font-size: 0.9rem;
+  }
+  .btn-pay {
+    background: var(--brand-primary, #3b82f6);
+    color: white;
+    border: none;
+    padding: 0.6rem 1.25rem;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .btn-pay:hover:not(:disabled) {
+    background: var(--brand-accent, #10b981);
+  }
+  .btn-pay:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+  }
+  .pay-message {
+    margin-top: 1rem;
+    font-size: 0.875rem;
+    color: var(--brand-text-secondary, #6b7280);
+  }
   .empty-state {
     padding: 2rem;
     text-align: center;

@@ -68,7 +68,7 @@ Write-Host "🚀 Deploying to Firebase Hosting..." -ForegroundColor Yellow
 
 try {
     # Deploy only the main production site
-    firebase deploy --only hosting:wisptools-production --project $FIREBASE_PROJECT
+    firebase deploy --only hosting:app --project $FIREBASE_PROJECT
     
     if ($LASTEXITCODE -ne 0) {
         Write-Host "❌ Firebase Hosting deployment failed" -ForegroundColor Red
@@ -193,7 +193,7 @@ Write-Host "✅ Frontend (Firebase Hosting):" -ForegroundColor Green
 Write-Host "   - URL: https://wisptools-production.web.app" -ForegroundColor White
 Write-Host "   - Project: $FIREBASE_PROJECT" -ForegroundColor White
 Write-Host ""
-Write-Host "✅ Backend (GCE Server):" -ForegroundColor Green
+Write-Host '✅ Backend (GCE Server):' -ForegroundColor Green
 Write-Host "   - Instance: $GCE_INSTANCE" -ForegroundColor White
 Write-Host "   - Zone: $GCE_ZONE" -ForegroundColor White
 Write-Host "   - Health: https://hss.wisptools.io/api/health" -ForegroundColor White

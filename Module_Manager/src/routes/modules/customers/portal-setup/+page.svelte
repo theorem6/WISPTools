@@ -9,7 +9,7 @@
 
   const API_URL = getApiUrl();
 
-  type Tab = 'branding' | 'features' | 'alerts' | 'faq' | 'knowledge' | 'chat';
+  type Tab = 'branding' | 'features' | 'billing' | 'alerts' | 'faq' | 'knowledge' | 'chat';
 
   let currentTab: Tab = 'branding';
   let loading = false;
@@ -39,6 +39,22 @@
   let enableTickets = true;
   let enableLiveChat = false;
   let enableKnowledgeBase = false;
+
+  // Billing Portal Admin: payment gateways & invoice customization
+  let stripeEnabled = false;
+  let stripePublicKey = '';
+  let stripeNote = '';
+  let paypalEnabled = false;
+  let paypalClientId = '';
+  let paypalSandbox = true;
+  let paypalNote = '';
+  let invoiceCompanyName = '';
+  let invoiceLogoUrl = '';
+  let invoiceAddress = '';
+  let invoiceFooterText = '';
+  let invoiceTermsAndConditions = '';
+  let invoiceDueDays = 14;
+  let invoiceCurrency = 'USD';
 
   // Alerts & Outages
   interface Alert {
@@ -186,6 +202,22 @@
       enableTickets = branding.features?.enableTickets !== false;
       enableLiveChat = branding.features?.enableLiveChat || false;
       enableKnowledgeBase = branding.features?.enableKnowledgeBase || false;
+
+      const bp = branding.billingPortal;
+      stripeEnabled = bp?.paymentGateways?.stripe?.enabled || false;
+      stripePublicKey = bp?.paymentGateways?.stripe?.publicKey || '';
+      stripeNote = bp?.paymentGateways?.stripe?.note || '';
+      paypalEnabled = bp?.paymentGateways?.paypal?.enabled || false;
+      paypalClientId = bp?.paymentGateways?.paypal?.clientId || '';
+      paypalSandbox = bp?.paymentGateways?.paypal?.sandbox !== false;
+      paypalNote = bp?.paymentGateways?.paypal?.note || '';
+      invoiceCompanyName = bp?.invoice?.companyName || branding.company?.displayName || companyName || '';
+      invoiceLogoUrl = bp?.invoice?.logoUrl || '';
+      invoiceAddress = bp?.invoice?.address || '';
+      invoiceFooterText = bp?.invoice?.footerText || '';
+      invoiceTermsAndConditions = bp?.invoice?.termsAndConditions || '';
+      invoiceDueDays = bp?.invoice?.dueDays ?? 14;
+      invoiceCurrency = bp?.invoice?.currency || 'USD';
     } catch (err: any) {
       console.error('Error loading config:', err);
       error = err.message || 'Failed to load existing configuration.';
@@ -286,6 +318,41 @@
       setTimeout(() => success = '', 3000);
     } catch (err: any) {
       error = err.message || 'Failed to save branding';
+    } finally {
+      saving = false;
+    }
+  }
+
+  async function saveBillingPortal() {
+    if (!tenantId) {
+      error = 'No tenant selected.';
+      return;
+    }
+    saving = true;
+    error = '';
+    success = '';
+    try {
+      await brandingService.updateTenantBranding(tenantId, {
+        billingPortal: {
+          paymentGateways: {
+            stripe: { enabled: stripeEnabled, publicKey: stripePublicKey.trim() || undefined, note: stripeNote || undefined },
+            paypal: { enabled: paypalEnabled, clientId: paypalClientId.trim() || undefined, sandbox: paypalSandbox, note: paypalNote || undefined }
+          },
+          invoice: {
+            companyName: invoiceCompanyName || undefined,
+            logoUrl: invoiceLogoUrl || undefined,
+            address: invoiceAddress || undefined,
+            footerText: invoiceFooterText || undefined,
+            termsAndConditions: invoiceTermsAndConditions || undefined,
+            dueDays: invoiceDueDays,
+            currency: invoiceCurrency
+          }
+        }
+      });
+      success = 'Billing portal settings saved.';
+      setTimeout(() => success = '', 3000);
+    } catch (err: any) {
+      error = err.message || 'Failed to save billing portal settings';
     } finally {
       saving = false;
     }
@@ -618,6 +685,9 @@
       <button class="tab-btn" class:active={currentTab === 'features'} on:click={() => currentTab = 'features'}>
         ⚙️ Features
       </button>
+      <button class="tab-btn" class:active={currentTab === 'billing'} on:click={() => currentTab = 'billing'}>
+        💳 Billing Portal
+      </button>
       <button class="tab-btn" class:active={currentTab === 'alerts'} on:click={() => currentTab = 'alerts'}>
         🚨 Alerts & Outages
       </button>
@@ -695,6 +765,93 @@
           <div class="form-actions">
             <button class="btn-primary" on:click={saveBranding} disabled={saving}>
               {saving ? 'Saving...' : 'Save Branding'}
+            </button>
+          </div>
+        </div>
+      {/if}
+      
+      <!-- Billing Portal Tab: payment gateways & invoice customization -->
+      {#if currentTab === 'billing'}
+        <div class="content-section">
+          <h2>Billing Portal Admin</h2>
+          <p class="section-description">Configure payment gateways (Stripe, PayPal) and customize how invoices look for your customers.</p>
+          
+          <div class="billing-portal-sections">
+            <section class="billing-subsection">
+              <h3>Payment Gateways</h3>
+              <p class="help-text">Enable online payments in the customer portal. Store Stripe secret key in backend env (STRIPE_SECRET_KEY); use the publishable key here for the portal. For PayPal, use your client ID and choose sandbox for testing.</p>
+              
+              <div class="form-grid">
+                <div class="form-group full-width">
+                  <label class="toggle-label">
+                    <input type="checkbox" bind:checked={stripeEnabled} />
+                    <span class="toggle-switch"></span>
+                    <span>Enable Stripe</span>
+                  </label>
+                  <input type="text" bind:value={stripePublicKey} placeholder="pk_live_... or pk_test_... (publishable key)" class="form-input" />
+                  <input type="text" bind:value={stripeNote} placeholder="Optional note (e.g. key purpose)" class="form-input" />
+                </div>
+                <div class="form-group full-width">
+                  <label class="toggle-label">
+                    <input type="checkbox" bind:checked={paypalEnabled} />
+                    <span class="toggle-switch"></span>
+                    <span>Enable PayPal</span>
+                  </label>
+                  <input type="text" bind:value={paypalClientId} placeholder="PayPal client ID" class="form-input" />
+                  <label class="checkbox-label">
+                    <input type="checkbox" bind:checked={paypalSandbox} />
+                    Use PayPal sandbox (testing)
+                  </label>
+                  <input type="text" bind:value={paypalNote} placeholder="Optional note" class="form-input" />
+                </div>
+              </div>
+            </section>
+            
+            <section class="billing-subsection">
+              <h3>Invoice Customization</h3>
+              <p class="help-text">These appear on generated invoices and in the customer billing portal.</p>
+              
+              <div class="form-grid">
+                <div class="form-group">
+                  <label>Company name on invoices</label>
+                  <input type="text" bind:value={invoiceCompanyName} placeholder="Your WISP Name" class="form-input" />
+                </div>
+                <div class="form-group">
+                  <label>Invoice logo URL</label>
+                  <input type="url" bind:value={invoiceLogoUrl} placeholder="https://..." class="form-input" />
+                </div>
+                <div class="form-group full-width">
+                  <label>Address (on invoice)</label>
+                  <input type="text" bind:value={invoiceAddress} placeholder="Street, City, State ZIP" class="form-input" />
+                </div>
+                <div class="form-group full-width">
+                  <label>Footer text</label>
+                  <input type="text" bind:value={invoiceFooterText} placeholder="Thank you for your business" class="form-input" />
+                </div>
+                <div class="form-group full-width">
+                  <label>Terms & conditions</label>
+                  <textarea bind:value={invoiceTermsAndConditions} placeholder="Payment terms, late fees, etc." class="form-input" rows="4"></textarea>
+                </div>
+                <div class="form-group">
+                  <label>Default due days</label>
+                  <input type="number" min="1" max="90" bind:value={invoiceDueDays} class="form-input" />
+                </div>
+                <div class="form-group">
+                  <label>Currency</label>
+                  <select bind:value={invoiceCurrency} class="form-input">
+                    <option value="USD">USD</option>
+                    <option value="CAD">CAD</option>
+                    <option value="EUR">EUR</option>
+                    <option value="GBP">GBP</option>
+                  </select>
+                </div>
+              </div>
+            </section>
+          </div>
+          
+          <div class="form-actions">
+            <button class="btn-primary" on:click={saveBillingPortal} disabled={saving}>
+              {saving ? 'Saving...' : 'Save Billing Portal Settings'}
             </button>
           </div>
         </div>
@@ -1242,6 +1399,15 @@
     padding: 2rem;
   }
   
+  .billing-portal-sections { margin-top: 1.5rem; }
+  .billing-subsection {
+    margin-bottom: 2rem;
+    padding-bottom: 2rem;
+    border-bottom: 1px solid #e5e7eb;
+  }
+  .billing-subsection:last-of-type { border-bottom: none; }
+  .billing-subsection h3 { font-size: 1.125rem; margin-bottom: 0.75rem; color: #374151; }
+
   .content-section h2 {
     margin: 0 0 0.5rem 0;
     color: var(--text-primary);

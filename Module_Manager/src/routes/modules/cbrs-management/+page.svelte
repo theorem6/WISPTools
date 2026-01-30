@@ -2,6 +2,7 @@
   import { onMount, onDestroy } from 'svelte';
   import { browser } from '$app/environment';
   import { goto } from '$app/navigation';
+  import { page } from '$app/stores';
   import TenantGuard from '$lib/components/admin/TenantGuard.svelte';
   import { currentTenant } from '$lib/stores/tenantStore';
   import type { CBSDDevice, CBSDCategory, CBSDState } from './lib/models/cbsdDevice';
@@ -84,6 +85,11 @@ let configStatus: ConfigStatus = getConfigStatus(null);
   };
   
   onMount(async () => {
+    if (browser) {
+      const wizardId = $page.url.searchParams.get('wizard');
+      if (wizardId === 'cbrs-setup') { showSetupWizard = true; goto($page.url.pathname, { replaceState: true }); }
+      else if (wizardId === 'cbrs-device-registration') { showDeviceRegistrationWizard = true; goto($page.url.pathname, { replaceState: true }); }
+    }
     try {
       if (browser) {
         console.log('[CBRS Module] Initializing...');

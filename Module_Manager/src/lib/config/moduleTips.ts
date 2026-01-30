@@ -14,7 +14,134 @@ export interface ModuleTipsConfig {
   [moduleId: string]: ModuleTip[];
 }
 
+/** Placeholder replaced by dashboard when MOBILE_APP_DOWNLOAD_URL is set */
+export const FIELD_APP_DOWNLOAD_PLACEHOLDER = '{{MOBILE_APP_DOWNLOAD_LINK}}';
+
 export const moduleTips: ModuleTipsConfig = {
+  'dashboard': [
+    {
+      id: 'dashboard-field-app',
+      title: '📱 WISP Field App',
+      icon: '📱',
+      content: `
+        <h4>Mobile app for field operations</h4>
+        <p>Install the <strong>WISP Field App</strong> on your Android device for:</p>
+        <ul>
+          <li><strong>Plans & deployments</strong> – View and update plans in the field</li>
+          <li><strong>Check-in/out</strong> – Equipment and site check-ins</li>
+          <li><strong>Work orders</strong> – Create and complete work orders</li>
+          <li><strong>Notifications</strong> – Stay updated on assignments and alerts</li>
+        </ul>
+        <p>${FIELD_APP_DOWNLOAD_PLACEHOLDER}</p>
+        <p><strong>💡 Tip:</strong> Ask your administrator for the APK if the download link is not shown.</p>
+      `
+    },
+    {
+      id: 'dashboard-docs',
+      title: '📖 Documentation & Help',
+      icon: '📖',
+      content: `
+        <h4>Get help and documentation</h4>
+        <p>Use the <strong>📖 Docs</strong> icon (top right) to open:</p>
+        <ul>
+          <li><strong>Getting Started</strong> – New users and administrators</li>
+          <li><strong>Using WISPTools</strong> – Dashboard, wizards, and end-user help</li>
+          <li><strong>Project Status</strong> – Current status and next steps</li>
+        </ul>
+        <p>Each module has a <strong>Help</strong> button for module-specific docs. The <strong>⚙️ Settings</strong> gear opens theme, branding, and tenant options.</p>
+      `
+    },
+    {
+      id: 'dashboard-quick-access',
+      title: '⚡ Quick access',
+      icon: '⚡',
+      content: `
+        <h4>Wizards and shortcuts</h4>
+        <p>Use the <strong>Quick access</strong> dropdown in the header to:</p>
+        <ul>
+          <li>Open any wizard (Plan, Deploy, CBRS, Customers, HSS, Inventory, etc.)</li>
+          <li>Jump to <strong>All wizards</strong> for the full list</li>
+        </ul>
+        <p>You can also go to <strong>Dashboard → module cards</strong> to open Plan, Deploy, Monitor, Customers, Hardware, and more.</p>
+      `
+    },
+    {
+      id: 'dashboard-overview',
+      title: 'Overview',
+      icon: '📚',
+      content: `
+        <h4>What is WISP Multitool?</h4>
+        <p>All-in-one platform for WISPs: <strong>Network Planning</strong> (PCI, CBRS, coverage), <strong>Field Operations</strong> (mobile app, work orders, inventory), <strong>Customer Support</strong> (help desk, subscribers), <strong>Customers & Portal</strong> (records, billing, tickets), <strong>Device Management</strong> (ACS CPE, HSS), <strong>Team Management</strong> (roles, permissions), and <strong>Wizards & Quick Tips</strong>.</p>
+      `
+    },
+    {
+      id: 'dashboard-first-login',
+      title: 'First login',
+      icon: '🚀',
+      content: `
+        <h4>Getting started</h4>
+        <ol>
+          <li>Go to the platform URL and click <strong>Sign in with Google</strong></li>
+          <li>Authorize with your Google account</li>
+          <li>Select or create your organization (tenant)</li>
+        </ol>
+      `
+    },
+    {
+      id: 'dashboard-header',
+      title: 'Dashboard header',
+      icon: '📌',
+      content: `
+        <h4>Header tools</h4>
+        <p><strong>Docs</strong> – Opens full help. <strong>Settings</strong> – Theme, branding, module access. <strong>Notifications</strong> – In-app and browser (enable in panel). <strong>Quick access</strong> – Jump to wizards. First-time visitors see quick tips.</p>
+      `
+    },
+    {
+      id: 'dashboard-inviting',
+      title: 'Inviting team members',
+      icon: '👥',
+      content: `
+        <h4>Add users</h4>
+        <p>Go to <strong>User Management</strong> → <strong>Invite User</strong>. Enter email, select role (Admin, Engineer, Installer, Help Desk, Viewer), then <strong>Send Invitation</strong>. User appears as Pending until they accept.</p>
+      `
+    },
+    {
+      id: 'dashboard-mobile-app',
+      title: 'Mobile app setup',
+      icon: '📱',
+      content: `
+        <h4>Field technicians</h4>
+        <p>Install the WISP Field App APK, grant Camera/Location/Notifications, sign in with the same Google account, select your organization. Technicians then receive work orders and can check in equipment.</p>
+      `
+    },
+    {
+      id: 'dashboard-roles',
+      title: 'User roles (summary)',
+      icon: '🔐',
+      content: `
+        <h4>Who can do what</h4>
+        <p><strong>Owner</strong> – Full control, cannot be changed. <strong>Admin</strong> – Manage users and modules. <strong>Engineer</strong> – PCI, CBRS, HSS, ACS. <strong>Field Technician</strong> – Mobile app, assigned work orders. <strong>Help Desk</strong> – Tickets, CPE troubleshooting. <strong>Viewer</strong> – Read-only. Configure in <strong>Settings → Module Access</strong>.</p>
+      `
+    },
+    {
+      id: 'dashboard-wizards',
+      title: 'Wizards in small bites',
+      icon: '🧙',
+      content: `
+        <h4>Guided flows</h4>
+        <p><strong>Site Deployment</strong>, <strong>Subscriber Creation/Group/Bandwidth Plan</strong>, <strong>RMA Tracking</strong>, <strong>Customer Onboarding</strong>, <strong>Device Onboarding/Registration</strong> (ACS & CBRS), <strong>Conflict Resolution</strong> (PCI), <strong>Work Order Creation</strong>, <strong>Troubleshooting (ACS)</strong>, <strong>First-time/Organization/Initial Configuration</strong>. Open from Quick access or the Wizards page.</p>
+      `
+    },
+    {
+      id: 'dashboard-troubleshooting',
+      title: 'Troubleshooting',
+      icon: '🔧',
+      content: `
+        <h4>Common fixes</h4>
+        <p><strong>Can't see a module</strong> – Ask admin to enable it in Settings → Module Access. <strong>403 Forbidden</strong> – Role or permissions need updating. <strong>Mobile notifications</strong> – Check app permissions and FCM. <strong>Browser notifications</strong> – Enable in the Notifications panel. <strong>Theme</strong> – Settings (gear) → choose light/dark.</p>
+      `
+    }
+  ],
   'monitoring': [
     {
       id: 'monitoring-1',
@@ -137,7 +264,7 @@ export const moduleTips: ModuleTipsConfig = {
           <li>Right-click for site details</li>
           <li>View all equipment at a site</li>
         </ol>
-        <p><strong>💡 Tip:</strong> Use the map to quickly identify which sites need attention.</p>
+        <p><strong>💡 Tip:</strong> Use the map to quickly identify which sites need attention. Open <strong>Help</strong> in this module for more.</p>
       `
     }
   ],
@@ -539,6 +666,15 @@ export const moduleTips: ModuleTipsConfig = {
         </ul>
         <p><strong>💡 Tip:</strong> Export reports to CSV for Excel analysis or schedule automated reports.</p>
       `
+    },
+    {
+      id: 'inventory-6',
+      title: 'RMA tracking',
+      icon: '↩️',
+      content: `
+        <h4>Returns and tracking</h4>
+        <p>Use the <strong>RMA Tracking</strong> wizard (Quick access or Wizards page) to log returns, track RMA status, and link equipment to RMA records.</p>
+      `
     }
   ],
   'plan': [
@@ -672,7 +808,7 @@ export const moduleTips: ModuleTipsConfig = {
           <li>Click <strong>"Submit for Approval"</strong> or change status to <strong>"Ready"</strong></li>
           <li>Plan moves to Deploy module for approval</li>
         </ol>
-        <p><strong>💡 Tip:</strong> Plans must be approved in Deploy module before hardware can be deployed.</p>
+        <p><strong>💡 Tip:</strong> Plans must be approved in Deploy module before hardware can be deployed. Use <strong>Quick access</strong> on the dashboard to jump to wizards.</p>
       `
     },
     {
@@ -783,6 +919,15 @@ export const moduleTips: ModuleTipsConfig = {
         </ol>
         <p><strong>💡 Tip:</strong> MME connections enable subscriber authentication and session management.</p>
       `
+    },
+    {
+      id: 'hss-5',
+      title: 'Bandwidth plans',
+      icon: '📊',
+      content: `
+        <h4>Service tiers</h4>
+        <p>Create bandwidth plans for subscriber tiers. Use the <strong>Bandwidth Plan</strong> wizard from Quick access. Assign plans to groups or individual subscribers for QoS and rate limiting.</p>
+      `
     }
   ],
   'cbrs-management': [
@@ -799,7 +944,7 @@ export const moduleTips: ModuleTipsConfig = {
           <li>Complete the connection test step</li>
           <li>Add your first CBSD device using <strong>"+ Add CBSD Device"</strong></li>
         </ol>
-        <p><strong>💡 Tip:</strong> CBRS Management uses Google SAS in shared-platform mode. Ensure your Google account is registered for SAS access.</p>
+        <p><strong>💡 Tip:</strong> CBRS Management uses Google SAS in shared-platform mode. Ensure your Google account is registered for SAS access. Use the module <strong>Help</strong> button for full docs.</p>
       `
     },
     {
@@ -1020,6 +1165,98 @@ export const moduleTips: ModuleTipsConfig = {
       `
     }
   ],
+  'customers': [
+    {
+      id: 'customers-1',
+      title: '👥 Customers, Billing & Portal',
+      icon: '👥',
+      content: `
+        <h4>Customers module</h4>
+        <p>Manage customers, billing, and the <strong>Customer Portal</strong>:</p>
+        <ul>
+          <li><strong>Customers tab:</strong> Add and edit customers, view portal status</li>
+          <li><strong>Billing tab:</strong> Service plans, billing, and usage</li>
+          <li><strong>Portal tab:</strong> Enable the branded customer portal; set login, tickets, and help</li>
+        </ul>
+        <p><strong>Customer Portal</strong> – Customers can log in to view tickets, service info, and billing. Use <strong>Portal setup</strong> to configure branding and enable features.</p>
+        <p><strong>💡 Tip:</strong> Use the <strong>📖 Docs</strong> icon on the dashboard for full documentation.</p>
+      `
+    },
+    {
+      id: 'customers-2',
+      title: 'Customer records',
+      icon: '📋',
+      content: `
+        <h4>Add/Edit customers</h4>
+        <p>Customer records include <strong>service type</strong> (4G/5G, FWA, WiFi, Fiber), <strong>LTE auth</strong> (IMSI, Ki, OPc), <strong>MAC address</strong>, and <strong>QoS</strong>. Use the <strong>Customer Onboarding</strong> wizard from Quick access for guided setup.</p>
+      `
+    },
+    {
+      id: 'customers-3',
+      title: 'Portal setup',
+      icon: '🌐',
+      content: `
+        <h4>Branded customer portal</h4>
+        <p>Enable in <strong>Customers → Portal setup</strong>. Configure logo and colors. Customers get <strong>Dashboard</strong>, <strong>Billing</strong>, <strong>Tickets</strong>, <strong>Knowledge base / FAQ</strong>. Use Settings for org-wide branding.</p>
+      `
+    },
+    {
+      id: 'customers-4',
+      title: 'Billing',
+      icon: '💰',
+      content: `
+        <h4>Customer billing</h4>
+        <p>Billing modal per customer in Customers module; billing view in the customer portal. Billing cycles and invoicing can be extended when prioritized.</p>
+      `
+    }
+  ],
+  'user-management': [
+    {
+      id: 'user-mgmt-1',
+      title: 'Inviting users',
+      icon: '👥',
+      content: `
+        <h4>Add team members</h4>
+        <p>Go to <strong>User Management</strong> → <strong>Invite User</strong>. Enter email, select role (Admin, Engineer, Installer, Help Desk, Viewer), click <strong>Send Invitation</strong>. User appears as Pending until they accept and login.</p>
+      `
+    },
+    {
+      id: 'user-mgmt-2',
+      title: 'Editing user roles',
+      icon: '✏️',
+      content: `
+        <h4>Change role</h4>
+        <p>Click <strong>Edit</strong> next to the user → select new role → <strong>Update Role</strong>. Changes apply immediately. Owner role cannot be changed; only one owner per organization.</p>
+      `
+    },
+    {
+      id: 'user-mgmt-3',
+      title: 'Suspending users',
+      icon: '⏸️',
+      content: `
+        <h4>Temporarily disable access</h4>
+        <p>Edit user → <strong>Suspend User</strong>. User can still login but API calls fail. To re-enable: <strong>Activate User</strong>.</p>
+      `
+    },
+    {
+      id: 'user-mgmt-4',
+      title: 'Removing users',
+      icon: '🗑️',
+      content: `
+        <h4>Remove from organization</h4>
+        <p>Edit user → <strong>Remove from Organization</strong> → confirm. Cannot be undone. Cannot remove the owner; transfer ownership first.</p>
+      `
+    },
+    {
+      id: 'user-mgmt-5',
+      title: 'Module access',
+      icon: '🔐',
+      content: `
+        <h4>Configure per-role access</h4>
+        <p><strong>Settings → Module Access</strong>. See roles vs. modules matrix; check/uncheck to enable or disable modules per role. Save Configuration. Use reset to restore default permissions for a role.</p>
+      `
+    }
+  ],
   'maintain': [
     {
       id: 'maintain-1',
@@ -1034,7 +1271,70 @@ export const moduleTips: ModuleTipsConfig = {
           <li><strong>Update Status:</strong> Change ticket status as you work on issues</li>
           <li><strong>Customer Lookup:</strong> Quickly find customer information</li>
         </ul>
-        <p><strong>💡 Tip:</strong> Use the filters to quickly find tickets by status, priority, or search term.</p>
+        <p><strong>💡 Tip:</strong> Use the filters to quickly find tickets by status, priority, or search term. Customer Portal users can submit tickets from their portal.</p>
+      `
+    },
+    {
+      id: 'maintain-create-ticket',
+      title: 'Creating support tickets',
+      icon: '📝',
+      content: `
+        <h4>New ticket</h4>
+        <p>Click <strong>Create Ticket</strong>. Enter <strong>Title</strong>, <strong>Type</strong> (Troubleshoot, Repair, Installation, Other), <strong>Priority</strong>, <strong>Description</strong>, and optional <strong>Customer</strong>. Click Create Ticket.</p>
+      `
+    },
+    {
+      id: 'maintain-assign-ticket',
+      title: 'Assigning tickets',
+      icon: '👤',
+      content: `
+        <h4>Assign to technician</h4>
+        <p>Open ticket details → <strong>Assign</strong> → select field technician. Technician receives a push notification on the mobile app.</p>
+      `
+    },
+    {
+      id: 'maintain-filters',
+      title: 'Filtering tickets',
+      icon: '🔍',
+      content: `
+        <h4>Find tickets</h4>
+        <p>Filter by <strong>Status</strong> (Open, Assigned, In Progress, Resolved, Closed), <strong>Priority</strong> (Critical–Low), or <strong>Search</strong> by ticket number, title, or customer name.</p>
+      `
+    },
+    {
+      id: 'maintain-customer-lookup',
+      title: 'Customer lookup',
+      icon: '🔎',
+      content: `
+        <h4>Find customer</h4>
+        <p>Click <strong>Customer Lookup</strong>. Search by phone, email, or IMSI. View customer info, service status, active equipment, and recent tickets.</p>
+      `
+    },
+    {
+      id: 'maintain-work-order-create',
+      title: 'Creating work orders',
+      icon: '📋',
+      content: `
+        <h4>New work order</h4>
+        <p>From Work Orders or Help Desk → <strong>Create Work Order</strong>. Fill <strong>Title</strong>, <strong>Type</strong> (Installation, Repair, Maintenance), <strong>Priority</strong>, <strong>Site</strong>, <strong>Customer</strong>, <strong>Description</strong>. Click Create.</p>
+      `
+    },
+    {
+      id: 'maintain-work-order-assign',
+      title: 'Assigning work orders',
+      icon: '📲',
+      content: `
+        <h4>Send to field</h4>
+        <p>Open work order → <strong>Assign</strong> → select field technician. Technician gets a push notification; status becomes Assigned.</p>
+      `
+    },
+    {
+      id: 'maintain-mobile-workflow',
+      title: 'Mobile app workflow',
+      icon: '📱',
+      content: `
+        <h4>Field technician flow</h4>
+        <p>Technician gets push → opens app → views work order → navigates via GPS → completes work → sets status to Resolved → adds notes and photos.</p>
       `
     },
     {
@@ -1068,12 +1368,64 @@ export const moduleTips: ModuleTipsConfig = {
         <p><strong>💡 Tip:</strong> Regular maintenance helps prevent issues before they occur.</p>
       `
     }
+  ],
+  'acs-cpe-management': [
+    {
+      id: 'acs-1',
+      title: 'ACS CPE overview',
+      icon: '📡',
+      content: `
+        <h4>TR-069 CPE management</h4>
+        <p>Manage CPE devices via GenieACS: device discovery, GPS map, real-time status, parameter read/write, presets, and fault management. Check <strong>Administration → Service Status</strong> (CWMP 7547, NBI 7557, etc.).</p>
+      `
+    },
+    {
+      id: 'acs-2',
+      title: 'Configuring CPE for ACS',
+      icon: '⚙️',
+      content: `
+        <h4>Point CPE to ACS</h4>
+        <p>Set CPE ACS URL to <code>https://your-app.web.app/cwmp</code>. Devices appear after initial inform. <code>/cwmp</code> proxies to GenieACS CWMP (port 7547).</p>
+      `
+    },
+    {
+      id: 'acs-3',
+      title: 'Map view',
+      icon: '🗺️',
+      content: `
+        <h4>GPS devices on map</h4>
+        <p><strong>Green</strong> – online; <strong>Red</strong> – offline. Click marker for device details; performance icon opens full modal. Use zoom, pan, basemap switch, Auto-Fit.</p>
+      `
+    },
+    {
+      id: 'acs-4',
+      title: 'Preset management',
+      icon: '📋',
+      content: `
+        <h4>Configuration templates</h4>
+        <p>Go to <strong>/modules/acs-cpe-management/presets</strong>. Create presets, use parameter editor, link/unlink customers. Apply presets to devices for consistent config.</p>
+      `
+    },
+    {
+      id: 'acs-5',
+      title: 'Diagnostics & reboot',
+      icon: '🔧',
+      content: `
+        <h4>Device actions</h4>
+        <p>From device details: <strong>Diagnostics</strong>, <strong>Reboot</strong>, <strong>Refresh</strong>. Use for troubleshooting and remote management.</p>
+      `
+    },
+    {
+      id: 'acs-6',
+      title: 'Fault management',
+      icon: '🚨',
+      content: `
+        <h4>Device faults</h4>
+        <p>Track and acknowledge device faults. View fault list and clear or acknowledge as needed.</p>
+      `
+    }
   ]
 };
-
-/**
- * Get tips for a specific module
- */
 
 /**
  * Get tips for a specific module

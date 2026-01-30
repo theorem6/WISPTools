@@ -376,57 +376,8 @@ export const apiProxy = onRequest({
       ? (req.headers['x-forwarded-path'] as string) : `/${req.headers['x-forwarded-path']}`;
   }
 
-  // Handle GET /api/user-tenants/:userId in apiProxy (when Hosting sends it here instead of userTenants)
-  const userTenantsMatch = earlyPath.match(/^\/api\/user-tenants\/([^/]+)$/);
-  if (req.method === 'GET' && userTenantsMatch) {
-    const userId = userTenantsMatch[1];
-    const internalKey = process.env.INTERNAL_API_KEY;
-    const backendHost = process.env.BACKEND_HOST || 'https://hss.wisptools.io';
-    const authHeader = req.headers.authorization || req.headers.Authorization;
-    if (!internalKey) {
-      res.status(503).json({ error: 'Service misconfiguration', message: 'INTERNAL_API_KEY not set' });
-      return;
-    }
-    if (!authHeader || typeof authHeader !== 'string' || !authHeader.startsWith('Bearer ')) {
-      res.status(401).json({ error: 'Unauthorized', message: 'Missing or invalid Authorization header' });
-      return;
-    }
-    const token = authHeader.split('Bearer ')[1];
-    if (!token) {
-      res.status(401).json({ error: 'Unauthorized', message: 'No token' });
-      return;
-    }
-    try {
-      const decoded = await auth.verifyIdToken(token, true);
-      if (decoded.uid !== userId) {
-        res.status(403).json({ error: 'Forbidden', message: 'User can only request own tenants' });
-        return;
-      }
-    } catch (e: any) {
-      console.error('[apiProxy] user-tenants token verification failed:', e?.message);
-      res.status(401).json({ error: 'Invalid token', message: e?.message || 'Token verification failed' });
-      return;
-    }
-    try {
-      const path = `/api/internal/user-tenants/${userId}`;
-      const url = `${backendHost}${path}`;
-      const ax = await axios.get(url, {
-        timeout: 15000,
-        headers: {
-          'x-internal-key': internalKey,
-          'x-original-path': path
-        },
-        responseType: 'json',
-        validateStatus: () => true
-      });
-      res.status(ax.status).set('Content-Type', 'application/json').send(ax.data);
-      return;
-    } catch (e: any) {
-      console.error('[apiProxy] user-tenants backend call failed:', e?.message);
-      res.status(502).json({ error: 'Bad Gateway', message: e?.message || 'Backend request failed' });
-      return;
-    }
-  }
+  // GET /api/user-tenants/:userId is forwarded to backend /api/user-tenants/:userId with
+  // Authorization header; backend tenant-details route verifies Firebase token (no internal key).
 
   // Build the full path from originalUrl (falls back to url/path) and strip the function mount if present
   // When called via direct Cloud Function URL, path may be: /apiProxy/api/customers

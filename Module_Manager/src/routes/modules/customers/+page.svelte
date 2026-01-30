@@ -10,9 +10,11 @@
   import CustomerOnboardingWizard from '$lib/components/wizards/customers/CustomerOnboardingWizard.svelte';
   import ModuleWizardMenu from '$lib/components/wizards/ModuleWizardMenu.svelte';
   import { goto } from '$app/navigation';
+  import { page } from '$app/stores';
   import GroupManagement from '../hss-management/components/GroupManagement.svelte';
   import BandwidthPlans from '../hss-management/components/BandwidthPlans.svelte';
-  import { API_CONFIG } from '$lib/config/api';
+  import { API_CONFIG, getApiUrl } from '$lib/config/api';
+  import { authService } from '$lib/services/authService';
   
   type CustomerTab = 'customers' | 'service-plans' | 'customer-groups' | 'billing' | 'portal';
   
@@ -50,6 +52,48 @@
   $: tenantId = $currentTenant?.id || '';
   
   let loadTimeout: ReturnType<typeof setTimeout> | null = null;
+  let billingActionLoading = '';
+  let billingActionMessage = '';
+  
+  async function runGenerateInvoices() {
+    if (!tenantId) return;
+    billingActionLoading = 'invoices';
+    billingActionMessage = '';
+    try {
+      const token = await authService.getIdToken();
+      const res = await fetch(`${getApiUrl()}/customer-billing/generate-invoices`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`, 'X-Tenant-ID': tenantId }
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed');
+      billingActionMessage = `Generated ${data.generated ?? 0} invoice(s).`;
+    } catch (e: any) {
+      billingActionMessage = e.message || 'Failed to generate invoices';
+    } finally {
+      billingActionLoading = '';
+    }
+  }
+  
+  async function runDunning() {
+    if (!tenantId) return;
+    billingActionLoading = 'dunning';
+    billingActionMessage = '';
+    try {
+      const token = await authService.getIdToken();
+      const res = await fetch(`${getApiUrl()}/customer-billing/dunning/run`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`, 'X-Tenant-ID': tenantId }
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed');
+      billingActionMessage = `Processed ${data.processed ?? 0} billing record(s).`;
+    } catch (e: any) {
+      billingActionMessage = e.message || 'Failed to run dunning';
+    } finally {
+      billingActionLoading = '';
+    }
+  }
   
   afterNavigate(({ to }) => {
     const tab = to?.url.searchParams.get('tab');
@@ -57,6 +101,10 @@
     else if (tab === 'portal') activeTab = 'portal';
   });
   onMount(() => {
+    if (browser) {
+      const wizardId = $page.url.searchParams.get('wizard');
+      if (wizardId === 'customer-onboarding') { showOnboardingWizard = true; goto($page.url.pathname, { replaceState: true }); }
+    }
     if (tenantId) loadCustomers();
   });
   
@@ -235,7 +283,7 @@
       <div class="header-actions">
         {#if activeTab === 'customers'}
           <ModuleWizardMenu
-            wizards={[{ id: 'onboarding', label: 'Onboarding Wizard', icon: '🧙' }]}
+            wizards={[{ id: 'customer-onboarding', label: 'Customer Onboarding', icon: '👋' }]}
             on:select={() => showOnboardingWizard = true}
           />
           <button class="btn-primary" on:click={handleAdd}>
@@ -467,6 +515,17 @@
         <div class="billing-tab">
           <div class="billing-tab-header">
             <p class="billing-tab-desc">View or edit per-customer billing (service plan, fees, billing cycle). You can also click <strong>Billing</strong> on any customer card in the Customers tab.</p>
+            <div class="billing-admin-actions">
+              <button type="button" class="btn-secondary" disabled={billingActionLoading !== ''} on:click={runGenerateInvoices}>
+                {billingActionLoading === 'invoices' ? 'Running…' : 'Generate invoices'}
+              </button>
+              <button type="button" class="btn-secondary" disabled={billingActionLoading !== ''} on:click={runDunning}>
+                {billingActionLoading === 'dunning' ? 'Running…' : 'Run dunning'}
+              </button>
+              {#if billingActionMessage}
+                <span class="billing-action-msg">{billingActionMessage}</span>
+              {/if}
+            </div>
           </div>
           {#if customers.length === 0}
             <div class="empty-state">
@@ -733,6 +792,17 @@
     color: var(--text-secondary);
   }
   
+  .billing-admin-actions {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-top: 1rem;
+    flex-wrap: wrap;
+  }
+  .billing-action-msg {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+  }
   .billing-tab {
     padding: 1rem 0;
   }

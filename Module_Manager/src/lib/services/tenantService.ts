@@ -377,9 +377,9 @@ export class TenantService {
   async getUserTenants(userId: string): Promise<Tenant[]> {
     try {
       const headers = await this.getAuthHeaders();
-      // Use direct Cloud Function URL so path is not lost (Hosting/custom domain can strip path)
-      const userTenantsBase = API_CONFIG.CLOUD_FUNCTIONS?.USER_TENANTS || this.apiBaseUrl;
-      const url = `${userTenantsBase}/api/user-tenants/${userId}`;
+      // Use same-origin path so Firebase Hosting rewrites to userTenants Cloud Function
+      // (Function verifies Firebase token, then calls backend with internal key)
+      const url = `${this.apiBaseUrl}/user-tenants/${userId}`;
       
       console.log('[TenantService] getUserTenants request:', {
         url,

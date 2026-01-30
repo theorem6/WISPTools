@@ -91,6 +91,13 @@ const customerBillingSchema = new mongoose.Schema({
     uptimePercent: { type: Number, default: 99.9, min: 0, max: 100 },
     notes: String
   },
+  // Dunning: overdue reminders and suspension
+  dunning: {
+    reminderCount: { type: Number, default: 0 },
+    lastReminderAt: Date,
+    suspendedAt: Date,
+    suspensionReason: String
+  },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
 });

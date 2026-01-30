@@ -39,16 +39,18 @@ export const API_CONFIG = {
   CLOUD_FUNCTIONS: {
     API_PROXY: 'https://us-central1-wisptools-production.cloudfunctions.net/apiProxy',
     ISO_PROXY: 'https://us-central1-wisptools-production.cloudfunctions.net/isoProxy',
-    COVERAGE_MAP_PROXY: 'https://us-central1-wisptools-production.cloudfunctions.net/coverageMapProxy',
-    // Direct URL for user-tenants (bypasses Hosting so path is not lost)
-    USER_TENANTS: 'https://usertenants-nxulhoqnyq-uc.a.run.app'
+    COVERAGE_MAP_PROXY: 'https://us-central1-wisptools-production.cloudfunctions.net/coverageMapProxy'
+    // user-tenants: use same-origin /api/user-tenants so Hosting rewrites to userTenants Cloud Function
   },
   
   // Backend services (GCE VM)
   BACKEND_SERVICES: {
     HSS_MANAGEMENT: 'https://hss.wisptools.io:3001/api/hss',
     DEFAULT: 'https://hss.wisptools.io:3001/api'
-  }
+  },
+
+  /** Mobile Field App APK download URL. Serve APK from Firebase Hosting (static) or Firebase Storage and set here. */
+  MOBILE_APP_DOWNLOAD_URL: '/downloads/wisp-field-app.apk'
 } as const;
 
 /**

@@ -87,8 +87,13 @@
   // ========================================================================
   
   import { goto } from '$app/navigation';
+  import { page } from '$app/stores';
   
   onMount(async () => {
+    if (typeof window !== 'undefined') {
+      const wizardId = $page.url.searchParams.get('wizard');
+      if (wizardId === 'conflict-resolution') { showConflictResolutionWizard = true; goto($page.url.pathname, { replaceState: true }); }
+    }
     // Note: Auth is handled by Module_Manager dashboard
     // Users must be authenticated to reach this page
     

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { goto } from '$app/navigation';
   import { pciResolutionDocs } from '$lib/docs/pci-resolution-docs';
   import { acsCpeDocs } from '$lib/docs/acs-cpe-docs';
   import { cbrsManagementDocs } from '$lib/docs/cbrs-management-docs';
@@ -9,49 +10,50 @@
   let selectedTopic = 'overview';
   
   const topics = [
-    { id: 'overview', title: '📚 Overview', icon: '📚' },
-    { id: 'docs', title: '📖 Documentation & Project Status', icon: '📖', path: '/docs' },
-    { id: 'getting-started', title: '🚀 Getting Started', icon: '🚀' },
-    { id: 'user-management', title: '👥 User Management', icon: '👥' },
-    { id: 'help-desk', title: '🎧 Help Desk', icon: '🎧' },
-    { id: 'work-orders', title: '📋 Work Orders', icon: '📋' },
-    { id: 'inventory', title: '📦 Inventory', icon: '📦' },
-    { id: 'coverage-map', title: '🗺️ Coverage Map', icon: '🗺️' },
-    { id: 'hss-subscribers', title: '🔐 HSS & Subscribers', icon: '🔐' },
-    { id: 'acs-cpe', title: '📡 ACS CPE Management', icon: '📡' },
-    { id: 'pci-resolution', title: '📊 PCI Resolution', icon: '📊' },
-    { id: 'cbrs', title: '📡 CBRS Management', icon: '📡' },
-    { id: 'roles', title: '🔐 User Roles', icon: '🔐' },
-    { id: 'troubleshooting', title: '🔧 Troubleshooting', icon: '🔧' }
+    { id: 'overview', title: 'Overview', icon: '📚' },
+    { id: 'getting-started', title: 'Getting Started', icon: '🚀' },
+    { id: 'user-management', title: 'User Management', icon: '👥' },
+    { id: 'help-desk', title: 'Help Desk', icon: '🎧' },
+    { id: 'work-orders', title: 'Work Orders', icon: '📋' },
+    { id: 'customers-portal', title: 'Customers & Portal', icon: '👤' },
+    { id: 'inventory', title: 'Inventory', icon: '📦' },
+    { id: 'coverage-map', title: 'Coverage Map', icon: '🗺️' },
+    { id: 'hss-subscribers', title: 'HSS & Subscribers', icon: '🔐' },
+    { id: 'acs-cpe', title: 'ACS CPE Management', icon: '📡' },
+    { id: 'pci-resolution', title: 'PCI Resolution', icon: '📊' },
+    { id: 'cbrs', title: 'CBRS Management', icon: '📡' },
+    { id: 'wizards', title: 'Wizards & Quick Actions', icon: '🧙' },
+    { id: 'roles', title: 'User Roles', icon: '🔐' },
+    { id: 'troubleshooting', title: 'Troubleshooting', icon: '🔧' }
   ];
 </script>
 
 <div class="help-container">
   <div class="help-header">
-    <h1>📖 WISP Multitool Documentation</h1>
-    <p class="subtitle">Complete guide to using the platform. Documentation is integrated into the app.</p>
-    <a href="/docs" class="docs-link">📖 Documentation home & Project Status →</a>
+    <button type="button" class="help-back-link" title="Back to main app" on:click={() => goto('/dashboard')}>← Back to main app</button>
+    <div class="help-header-brand">
+      <div class="help-logo-section">
+        <img src="/wisptools-logo.svg" alt="WISPTools.io" class="help-logo" />
+        <div class="help-branding">
+          <h1 class="help-app-title">WISPTools.io</h1>
+          <p class="help-app-subtitle">Documentation</p>
+        </div>
+      </div>
+    </div>
+    <p class="help-header-desc">Complete guide to using the platform. Use the Help button in each module for context-specific tips.</p>
   </div>
   
   <div class="help-layout">
     <aside class="help-sidebar">
       <nav>
         {#each topics as topic}
-          {#if topic.path}
-            <a href={topic.path} class="topic-btn topic-link">
-              <span class="topic-icon">{topic.icon}</span>
-              <span class="topic-title">{topic.title}</span>
-            </a>
-          {:else}
-            <button
-              class="topic-btn"
-              class:active={selectedTopic === topic.id}
-              on:click={() => selectedTopic = topic.id}
-            >
-              <span class="topic-icon">{topic.icon}</span>
-              <span class="topic-title">{topic.title}</span>
-            </button>
-          {/if}
+          <button
+            class="topic-btn"
+            class:active={selectedTopic === topic.id}
+            on:click={() => selectedTopic = topic.id}
+          >
+            <span class="topic-title">{topic.title}</span>
+          </button>
         {/each}
       </nav>
     </aside>
@@ -59,7 +61,7 @@
     <main class="help-content">
       {#if selectedTopic === 'overview'}
         <article>
-          <h2>📚 Welcome to WISP Multitool</h2>
+          <h2>Welcome to WISP Multitool</h2>
           <p class="lead">Your complete wireless ISP management platform.</p>
           
           <section>
@@ -70,8 +72,10 @@
               <li><strong>Network Planning</strong> - PCI resolution, CBRS spectrum, coverage mapping</li>
               <li><strong>Field Operations</strong> - Mobile app for technicians, work orders, inventory</li>
               <li><strong>Customer Support</strong> - Help desk ticketing, subscriber management</li>
+              <li><strong>Customers & Portal</strong> - Customer records, branded customer portal, billing, support tickets</li>
               <li><strong>Device Management</strong> - ACS/TR-069 CPE management, HSS subscriber auth</li>
               <li><strong>Team Management</strong> - Role-based access, user invitations, permissions</li>
+              <li><strong>Wizards & Quick Tips</strong> - Guided wizards (site deployment, subscribers, RMA, onboarding) and in-module help</li>
             </ul>
           </section>
           
@@ -94,7 +98,7 @@
               <div class="component-card">
                 <div class="component-icon">☁️</div>
                 <h4>Cloud Backend</h4>
-                <p>Scalable backend APIs, push notifications, and data storage on Firebase and GCE.</p>
+                <p>Scalable cloud backend for APIs, push notifications, and data storage.</p>
               </div>
             </div>
           </section>
@@ -142,19 +146,15 @@
           
           <section>
             <h3>2. Dashboard Overview</h3>
-            <p>After login, you'll see the main dashboard with module cards:</p>
+            <p>After login, you'll see the main dashboard with module cards and a header with:</p>
             <ul>
-              <li><strong>PCI Resolution</strong> - Network optimization</li>
-              <li><strong>CBRS Management</strong> - Spectrum coordination</li>
-              <li><strong>ACS CPE Management</strong> - Customer equipment</li>
-              <li><strong>HSS Management</strong> - Subscriber authentication</li>
-              <li><strong>Coverage Map</strong> - Network visualization</li>
-              <li><strong>Inventory</strong> - Equipment tracking</li>
-              <li><strong>Work Orders</strong> - Field operations</li>
-              <li><strong>Help Desk</strong> - Customer support</li>
-              <li><strong>User Management</strong> - Team administration</li>
+              <li><strong>Docs</strong> (top right) - Opens this help page</li>
+              <li><strong>Settings</strong> - Theme (light/dark), branding, module access, tenant options</li>
+              <li><strong>Notifications</strong> - In-app and optional browser notifications (enable in the panel)</li>
+              <li><strong>Quick access</strong> dropdown - Jump to wizards (Plan, Deploy, CBRS, Customers, HSS, Inventory, etc.)</li>
             </ul>
-            <p><em>Note: Available modules depend on your user role and tenant configuration.</em></p>
+            <p>Module cards include: <strong>PCI Resolution</strong>, <strong>CBRS Management</strong>, <strong>ACS CPE Management</strong>, <strong>HSS Management</strong>, <strong>Coverage Map</strong>, <strong>Inventory</strong>, <strong>Work Orders</strong>, <strong>Help Desk</strong>, <strong>Customers</strong>, <strong>User Management</strong>, and more.</p>
+            <p><em>Note: Available modules depend on your user role and tenant configuration. First-time visitors see quick tips (Field App, Docs, Quick access).</em></p>
           </section>
           
           <section>
@@ -373,6 +373,61 @@
           </section>
         </article>
       
+      {:else if selectedTopic === 'customers-portal'}
+        <article>
+          <h2>Customers & Customer Portal</h2>
+          <p class="lead">Customer records, branded portal, billing, and support tickets.</p>
+          
+          <section>
+            <h3>Customers Module</h3>
+            <p>Manage customer records with service type (4G/5G, FWA, WiFi, Fiber), LTE auth (IMSI, Ki, OPc), MAC address, and QoS. Use the <strong>Customer Onboarding</strong> wizard from Quick access or the Customers module for guided setup.</p>
+          </section>
+          
+          <section>
+            <h3>Customer Portal Setup</h3>
+            <p>Enable a branded customer portal so customers can sign in and access:</p>
+            <ul>
+              <li><strong>Dashboard</strong> - Overview and quick links</li>
+              <li><strong>Billing</strong> - View account and billing information</li>
+              <li><strong>Tickets</strong> - Open and track support tickets</li>
+              <li><strong>Knowledge base / FAQ</strong> - Self-service help</li>
+            </ul>
+            <p>Configure portal branding (logo, colors) and enable the portal in <strong>Customers → Portal setup</strong>. Use <strong>Settings</strong> for organization-wide branding if needed.</p>
+          </section>
+          
+          <section>
+            <h3>Billing</h3>
+            <p>Customer billing is available from the Customers module (billing modal per customer) and in the customer portal. Billing cycles and invoicing can be extended when prioritized.</p>
+          </section>
+        </article>
+      
+      {:else if selectedTopic === 'wizards'}
+        <article>
+          <h2>Wizards & Quick Actions</h2>
+          <p class="lead">Guided flows and in-module quick tips.</p>
+          
+          <section>
+            <h3>Available Wizards</h3>
+            <p>Open wizards from the dashboard <strong>Quick access</strong> dropdown or from the <strong>Wizards</strong> page:</p>
+            <ul>
+              <li><strong>Site Deployment</strong> - Deploy and configure sites</li>
+              <li><strong>Subscriber Creation / Group / Bandwidth Plan</strong> - HSS subscriber management</li>
+              <li><strong>RMA Tracking</strong> - Inventory returns and tracking</li>
+              <li><strong>Customer Onboarding</strong> - Guided customer setup</li>
+              <li><strong>Device Onboarding / Registration</strong> - ACS and CBRS device registration</li>
+              <li><strong>Conflict Resolution</strong> - PCI conflict resolution</li>
+              <li><strong>Work Order Creation</strong> - Create work orders</li>
+              <li><strong>Troubleshooting (ACS)</strong> - CPE diagnostics and steps</li>
+              <li><strong>First-time / Organization / Initial Configuration</strong> - Setup and tenant wizards</li>
+            </ul>
+          </section>
+          
+          <section>
+            <h3>Quick Tips in Modules</h3>
+            <p>Each module can show a <strong>Help</strong> button that opens context-specific tips (e.g. Monitoring, Deploy, CBRS, Plan, Inventory). Use it for step-by-step guidance without leaving the module.</p>
+          </section>
+        </article>
+      
       {:else if selectedTopic === 'work-orders'}
         <article>
           <h2>📋 Work Orders & Field Operations</h2>
@@ -453,6 +508,16 @@
             </div>
             
             <div class="troubleshoot-item">
+              <h4>❌ Browser notifications not showing</h4>
+              <p><strong>Solution:</strong> Open the <strong>Notifications</strong> panel (bell icon on dashboard), click <strong>Enable notifications</strong>, and allow when the browser prompts. Notifications then appear for new unread items.</p>
+            </div>
+            
+            <div class="troubleshoot-item">
+              <h4>❌ Want to change light/dark theme</h4>
+              <p><strong>Solution:</strong> Click the <strong>Settings</strong> (gear) icon on the dashboard header and choose theme in the settings modal.</p>
+            </div>
+            
+            <div class="troubleshoot-item">
               <h4>❌ Work order not appearing in mobile app</h4>
               <p><strong>Cause:</strong> Work order not assigned to your user</p>
               <p><strong>Solution:</strong> Field technicians only see tickets assigned to them. Ask help desk to assign the ticket.</p>
@@ -512,259 +577,3 @@
     </main>
   </div>
 </div>
-
-<style>
-  .help-container {
-    min-height: 100vh;
-    background: var(--bg-primary);
-  }
-  
-  .help-header {
-    background: white;
-    padding: 2rem;
-    border-bottom: 2px solid var(--border-color);
-    text-align: center;
-  }
-  
-  .help-header h1 {
-    margin: 0 0 0.5rem;
-    font-size: 2.5rem;
-    font-weight: 700;
-    color: var(--text-primary);
-  }
-  
-  .subtitle {
-    color: var(--text-secondary);
-    font-size: 1.125rem;
-    margin: 0;
-  }
-  
-  .docs-link {
-    display: inline-block;
-    margin-top: 0.75rem;
-    padding: 0.5rem 1rem;
-    background: var(--primary);
-    color: white;
-    text-decoration: none;
-    border-radius: var(--radius-md);
-    font-weight: 500;
-  }
-  
-  .docs-link:hover {
-    opacity: 0.9;
-  }
-  
-  .topic-link {
-    text-decoration: none;
-    color: inherit;
-  }
-  
-  .help-layout {
-    display: grid;
-    grid-template-columns: 300px 1fr;
-    max-width: 1400px;
-    margin: 0 auto;
-    gap: 2rem;
-    padding: 2rem;
-  }
-  
-  .help-sidebar {
-    position: sticky;
-    top: 2rem;
-    height: fit-content;
-  }
-  
-  .help-sidebar nav {
-    background: white;
-    border-radius: 0.75rem;
-    padding: 1rem;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-  }
-  
-  .topic-btn {
-    width: 100%;
-    text-align: left;
-    padding: 0.75rem 1rem;
-    border: none;
-    background: transparent;
-    cursor: pointer;
-    border-radius: 0.5rem;
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    transition: all 0.2s;
-    margin-bottom: 0.25rem;
-  }
-  
-  .topic-btn:hover {
-    background: var(--bg-hover);
-  }
-  
-  .topic-btn.active {
-    background: var(--primary);
-    color: white;
-  }
-  
-  .topic-icon {
-    font-size: 1.5rem;
-  }
-  
-  .topic-title {
-    font-weight: 500;
-  }
-  
-  .help-content {
-    background: white;
-    border-radius: 0.75rem;
-    padding: 2rem;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-  }
-  
-  article {
-    max-width: 900px;
-  }
-  
-  article h2 {
-    margin: 0 0 1rem;
-    font-size: 2rem;
-    font-weight: 700;
-  }
-  
-  .lead {
-    font-size: 1.25rem;
-    color: var(--text-secondary);
-    margin-bottom: 2rem;
-  }
-  
-  section {
-    margin-bottom: 3rem;
-  }
-  
-  section h3 {
-    margin: 0 0 1rem;
-    font-size: 1.5rem;
-    font-weight: 600;
-    color: var(--text-primary);
-  }
-  
-  section h4 {
-    margin: 0 0 0.5rem;
-    font-size: 1.125rem;
-    font-weight: 600;
-  }
-  
-  section p, section li {
-    line-height: 1.7;
-    color: var(--text-secondary);
-  }
-  
-  ol, ul {
-    margin: 1rem 0;
-    padding-left: 1.5rem;
-  }
-  
-  li {
-    margin-bottom: 0.5rem;
-  }
-  
-  code {
-    background: var(--bg-secondary);
-    padding: 0.2rem 0.4rem;
-    border-radius: 0.25rem;
-    font-family: monospace;
-    font-size: 0.9em;
-  }
-  
-  .tip {
-    background: #eff6ff;
-    border-left: 4px solid #3b82f6;
-    padding: 1rem;
-    border-radius: 0.5rem;
-    margin: 1rem 0;
-  }
-  
-  .warning {
-    background: #fef3c7;
-    border-left: 4px solid #f59e0b;
-    padding: 1rem;
-    border-radius: 0.5rem;
-    margin: 1rem 0;
-  }
-  
-  .component-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 1.5rem;
-    margin: 2rem 0;
-  }
-  
-  .component-card {
-    background: var(--bg-secondary);
-    padding: 1.5rem;
-    border-radius: 0.75rem;
-    text-align: center;
-  }
-  
-  .component-icon {
-    font-size: 3rem;
-    margin-bottom: 1rem;
-  }
-  
-  .component-card h4 {
-    margin: 0 0 0.5rem;
-  }
-  
-  .role-cards {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    gap: 1rem;
-    margin: 2rem 0;
-  }
-  
-  .role-card {
-    background: var(--bg-secondary);
-    padding: 1.5rem;
-    border-radius: 0.5rem;
-  }
-  
-  .role-card h4 {
-    margin: 0 0 0.5rem;
-  }
-  
-  .role-card p {
-    font-size: 0.875rem;
-  }
-  
-  .role-detail {
-    background: var(--bg-secondary);
-    padding: 1.5rem;
-    border-radius: 0.75rem;
-    margin-bottom: 1.5rem;
-    border-left: 4px solid var(--primary);
-  }
-  
-  .role-detail h4 {
-    margin: 0 0 1rem;
-    font-size: 1.25rem;
-  }
-  
-  .role-detail p {
-    margin: 0.5rem 0;
-  }
-  
-  .troubleshoot-item {
-    background: var(--bg-secondary);
-    padding: 1.5rem;
-    border-radius: 0.75rem;
-    margin-bottom: 1.5rem;
-  }
-  
-  .troubleshoot-item h4 {
-    margin: 0 0 0.75rem;
-  }
-  
-  .troubleshoot-item p {
-    margin: 0.5rem 0;
-  }
-</style>
-

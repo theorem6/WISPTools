@@ -1,5 +1,6 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
+  import { page } from '$app/stores';
   import { onMount } from 'svelte';
   import { browser } from '$app/environment';
   import TenantGuard from '$lib/components/admin/TenantGuard.svelte';
@@ -107,7 +108,7 @@ import { iframeCommunicationService } from '$lib/services/iframeCommunicationSer
   let showSiteDeploymentWizard = false;
   let deploymentWizardLocation: { latitude: number; longitude: number } | null = null;
   let deploymentWizardSiteId: string | null = null;
-  
+
   // Set up global handler IMMEDIATELY - don't wait for onMount
   // This function will be called directly from SharedMap when view-inventory action is received
   if (typeof window !== 'undefined') {
@@ -202,6 +203,17 @@ import { iframeCommunicationService } from '$lib/services/iframeCommunicationSer
   onMount(() => {
     if (!browser) {
       return;
+    }
+    // Open wizard when navigating from Wizards page / Jump to wizard with ?wizard=id
+    const wizardId = $page.url.searchParams.get('wizard');
+    if (wizardId === 'site-deployment') {
+      showSiteDeploymentWizard = true;
+      goto($page.url.pathname, { replaceState: true });
+    } else if (wizardId === 'deploy-equipment') {
+      showDeploymentWizard = true;
+      deploymentWizardLocation = null;
+      deploymentWizardSiteId = null;
+      goto($page.url.pathname, { replaceState: true });
     }
 
     (async () => {

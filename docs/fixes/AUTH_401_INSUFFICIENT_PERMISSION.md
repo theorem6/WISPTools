@@ -5,6 +5,10 @@ description: Cloud Function + INTERNAL_API_KEY for /api/user-tenants.
 
 # Fix: 401 Unauthorized / auth/insufficient-permission on /api/user-tenants
 
+**If you see 401 "Invalid or missing internal key":** run `.\scripts\set-internal-api-key-on-gce.ps1` (after `gcloud auth login`) so the backend and Cloud Function share the same INTERNAL_API_KEY.
+
+**If user-tenants works (200) but you still get 401 on `/api/tenant-settings`, `/api/plans`, or `/api/notifications`:** the backend must verify Firebase tokens for those routes. Set Firebase Admin on the backend once: get a Firebase service account JSON (Firebase Console → Project Settings → Service accounts → Generate new private key), then run `.\scripts\set-firebase-admin-on-gce.ps1 -KeyPath "C:\path\to\wisptools-production-xxxxx.json"`. See [401 on /api/tenant-settings](#401-on-apitenant-settings-apiplans-apinotifications-backend-token-verification) below.
+
 ## Fix in use: Cloud Function + INTERNAL_API_KEY (no backend Firebase needed)
 
 `/api/user-tenants/**` is served by the **userTenants** Cloud Function. The function verifies the Firebase token (it has Auth permission) and calls your backend’s internal route with a shared secret. You do **not** need Firebase Admin credentials on the backend for this route.

@@ -2,6 +2,7 @@
   /**
    * In-app notification center: bell icon + dropdown with recent notifications.
    * Uses notificationService and notificationStore.
+   * Supports browser (native) notifications when user approves.
    */
   import { onMount } from 'svelte';
   import { browser } from '$app/environment';
@@ -17,11 +18,45 @@
   import { authService } from '$lib/services/authService';
   import type { AppNotification } from '$lib/services/notificationService';
 
+  const BROWSER_NOTIFY_KEY = 'wisp_browser_notifications';
+
   let open = false;
   let panelEl: HTMLDivElement;
   let panelContentEl: HTMLDivElement | undefined;
+  let knownNotificationIds = new Set<string>();
+  let hasSeenInitialLoad = false;
+  let browserPermission: NotificationPermission = 'default';
 
   $: tenantId = $currentTenant?.id ?? (browser ? localStorage.getItem('selectedTenantId') ?? undefined : undefined);
+
+  $: if (browser && typeof Notification !== 'undefined') {
+    browserPermission = Notification.permission;
+  }
+
+  /** When notifications list updates and we have permission, show native notifications for new unread items (not on first load) */
+  $: if (browser && typeof Notification !== 'undefined' && browserPermission === 'granted' && $notifications.length > 0) {
+    if (!hasSeenInitialLoad) {
+      hasSeenInitialLoad = true;
+      $notifications.forEach((n) => knownNotificationIds.add(n.id));
+    } else {
+      const newUnread = $notifications.filter((n) => !n.read && !knownNotificationIds.has(n.id));
+      for (const n of newUnread) {
+        try {
+          const nat = new Notification(n.title, {
+            body: n.message || '',
+            icon: '/wisptools-logo.svg',
+            tag: n.id
+          });
+          nat.onclick = () => {
+            window.focus();
+            nat.close();
+          };
+        } catch (_) {}
+        knownNotificationIds.add(n.id);
+      }
+    }
+    $notifications.forEach((n) => knownNotificationIds.add(n.id));
+  }
 
   onMount(async () => {
     if (browser && tenantId) {
@@ -29,6 +64,15 @@
       if (user) refreshNotifications(tenantId);
     }
   });
+
+  async function requestBrowserNotifications() {
+    if (!browser || typeof Notification === 'undefined') return;
+    const permission = await Notification.requestPermission();
+    browserPermission = permission;
+    if (permission === 'granted') {
+      localStorage.setItem(BROWSER_NOTIFY_KEY, '1');
+    }
+  }
 
   async function toggle() {
     const willOpen = !open;
@@ -113,6 +157,12 @@
           <span class="unread-label">{$unreadCount} unread</span>
         {/if}
       </div>
+      {#if browser && typeof Notification !== 'undefined' && browserPermission === 'default'}
+        <div class="panel-browser-prompt">
+          <p class="browser-prompt-text">Enable browser notifications to get alerts even when the tab is in the background.</p>
+          <button type="button" class="browser-prompt-btn" onclick={requestBrowserNotifications}>Enable notifications</button>
+        </div>
+      {/if}
       <div class="panel-body">
         {#if $isLoading}
           <div class="empty">Loading…</div>
@@ -212,6 +262,32 @@
     margin: 0;
     font-size: 1rem;
     font-weight: 600;
+  }
+  .panel-browser-prompt {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border-color);
+    background: var(--bg-secondary, rgba(0, 0, 0, 0.03));
+  }
+  .browser-prompt-text {
+    margin: 0 0 10px 0;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    line-height: 1.4;
+  }
+  .browser-prompt-btn {
+    display: block;
+    width: 100%;
+    padding: 8px 12px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--text-inverse, #fff);
+    background: var(--primary-color, #3b82f6);
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  .browser-prompt-btn:hover {
+    background: var(--primary-hover, #2563eb);
   }
   .unread-label {
     font-size: 0.8rem;

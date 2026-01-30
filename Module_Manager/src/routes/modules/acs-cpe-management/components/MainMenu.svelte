@@ -53,6 +53,14 @@
       adminOnly: false
     },
     {
+      id: 'files',
+      name: 'Files',
+      icon: '📁',
+      description: 'Upload firmware and configuration files',
+      path: '/modules/acs-cpe-management/files',
+      adminOnly: false
+    },
+    {
       id: 'faults',
       name: 'Faults',
       icon: '⚠️',

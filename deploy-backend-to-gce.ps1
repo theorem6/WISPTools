@@ -143,6 +143,7 @@ sudo mkdir -p "`$PARENT" 2>/dev/null
 sudo chown -R `$USER:`$USER "`$PARENT" 2>/dev/null
 mv "`$TARGET" "`$TARGET.bak" 2>/dev/null
 mv /tmp/backend-services-deploy "`$TARGET"
+if [ -f "`${TARGET}.bak/.env" ]; then cp "`${TARGET}.bak/.env" "`$TARGET/.env"; echo "Preserved .env from previous deploy"; fi
 cd "`$TARGET" && npm install --omit=dev
 command -v pm2 >/dev/null 2>&1 || sudo npm install -g pm2
 pm2 reload ecosystem.config.js 2>/dev/null || (cd "`$TARGET" && pm2 start ecosystem.config.js)

@@ -151,6 +151,11 @@
   }
   
   onMount(async () => {
+    if (browser) {
+      const wizardId = $page.url.searchParams.get('wizard');
+      if (wizardId === 'inventory-checkin') { showCheckInWizard = true; goto($page.url.pathname, { replaceState: true }); }
+      else if (wizardId === 'rma-tracking') { showRMAWizard = true; goto($page.url.pathname, { replaceState: true }); }
+    }
     if (tenantId) {
       await loadData();
       await loadStats();

@@ -13,7 +13,7 @@ export const projectStatusContent = `
   <li><strong>Wizards:</strong> Site Deployment, Subscriber Creation, RMA Tracking, Customer Onboarding, Bandwidth Plan, Subscriber Group, Troubleshooting (ACS), Device Onboarding – all integrated in-app. Remaining: Deployment, ConflictResolution, CBRS DeviceRegistration, OrganizationSetup, InitialConfiguration.</li>
   <li><strong>Customer form:</strong> Add/Edit Customer includes service type (4G/5G, FWA, WiFi, Fiber), LTE auth (IMSI, Ki, OPc), MAC address, and QoS.</li>
   <li><strong>ACS:</strong> Preset Management at <code>/modules/acs-cpe-management/presets</code>. Parameter editor, customer link/unlink, diagnostics/reboot/refresh.</li>
-  <li><strong>Documentation:</strong> Integrated into this app at <code>/docs</code> and <code>/help</code>; no separate docs site.</li>
+  <li><strong>Documentation:</strong> Integrated into this app at <code>/help</code>; no separate docs site.</li>
 </ul>
 
 <h2>Next Items (Summary)</h2>

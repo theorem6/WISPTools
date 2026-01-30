@@ -12,8 +12,28 @@
   let isAuthenticated = false;
   let currentUser: any = null;
   
+  /** Routes that do not require authentication (login, signup, auth callbacks, etc.) */
+  function isPublicRoute(pathname: string): boolean {
+    return (
+      pathname === '/' ||
+      pathname === '/login' ||
+      pathname === '/signup' ||
+      pathname === '/reset-password' ||
+      pathname.startsWith('/auth/') ||
+      pathname.startsWith('/oauth/') ||
+      pathname.startsWith('/modules/customers/portal/login') ||
+      pathname.startsWith('/modules/customers/portal/signup') ||
+      pathname.startsWith('/portal/')
+    );
+  }
+  
   // Check if we're on an admin route
   $: isAdminRoute = $page.url.pathname.startsWith('/admin');
+  
+  // Redirect unauthenticated users to login (except on public routes)
+  $: if (browser && !isInitializing && !isAuthenticated && !isPublicRoute($page.url.pathname)) {
+    goto('/login', { replaceState: true });
+  }
   
   onMount(async () => {
     if (!browser) return;
@@ -23,10 +43,10 @@
     
     console.log('[Root Layout] Initializing authentication...');
     
-    // Wait for Firebase auth to initialize
-    await new Promise(resolve => setTimeout(resolve, 100));
+    // Wait briefly for Firebase auth to restore session
+    await new Promise(resolve => setTimeout(resolve, 150));
     
-    // Check Firebase authentication state
+    // Check Firebase authentication state (sync after init)
     const user = authService.getCurrentUser();
     isAuthenticated = !!user;
     currentUser = user;

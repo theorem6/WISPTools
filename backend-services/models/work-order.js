@@ -149,6 +149,7 @@ const WorkOrderSchema = new mongoose.Schema({
     resolutionTimeHours: Number, // Must resolve within X hours
     responseDeadline: Date,
     resolutionDeadline: Date,
+    firstResponseAt: Date,      // When staff first responded (for tracking)
     breached: Boolean
   },
   
@@ -256,15 +257,21 @@ WorkOrderSchema.pre('save', async function(next) {
   next();
 });
 
-// Calculate SLA deadlines
+// Calculate SLA deadlines and breach flag
 WorkOrderSchema.pre('save', function(next) {
+  const now = new Date();
   if (this.isNew && this.sla && !this.sla.responseDeadline) {
     if (this.sla.responseTimeHours) {
-      this.sla.responseDeadline = new Date(this.createdAt.getTime() + this.sla.responseTimeHours * 60 * 60 * 1000);
+      this.sla.responseDeadline = new Date((this.createdAt || now).getTime() + this.sla.responseTimeHours * 60 * 60 * 1000);
     }
     if (this.sla.resolutionTimeHours) {
-      this.sla.resolutionDeadline = new Date(this.createdAt.getTime() + this.sla.resolutionTimeHours * 60 * 60 * 1000);
+      this.sla.resolutionDeadline = new Date((this.createdAt || now).getTime() + this.sla.resolutionTimeHours * 60 * 60 * 1000);
     }
+  }
+  if (this.sla && this.status && !['resolved', 'closed', 'cancelled'].includes(this.status)) {
+    const responseBreach = this.sla.responseDeadline && !this.sla.firstResponseAt && this.sla.responseDeadline < now;
+    const resolutionBreach = this.sla.resolutionDeadline && !this.completedAt && this.sla.resolutionDeadline < now;
+    this.sla.breached = !!(responseBreach || resolutionBreach);
   }
   next();
 });
@@ -289,9 +296,14 @@ WorkOrderSchema.methods.startWork = function(userId) {
   return this.save();
 };
 
-// Add work log entry
+// Add work log entry (sets firstResponseAt when first staff response on customer-facing ticket)
 WorkOrderSchema.methods.addWorkLog = function(logEntry) {
   this.workPerformed.push(logEntry);
+  const customerIds = (this.affectedCustomers || []).map(c => c.customerId);
+  const isStaff = logEntry.performedBy && !customerIds.includes(logEntry.performedBy);
+  if (this.sla && !this.sla.firstResponseAt && isStaff && this.ticketCategory === 'customer-facing') {
+    this.sla.firstResponseAt = new Date();
+  }
   return this.save();
 };
 

@@ -142,6 +142,32 @@ const tenantSchema = new mongoose.Schema({
       enableTickets: { type: Boolean, default: true },
       enableLiveChat: { type: Boolean, default: false },
       enableKnowledgeBase: { type: Boolean, default: false }
+    },
+
+    // Billing Portal Admin: payment gateways & invoice customization
+    billingPortal: {
+      paymentGateways: {
+        stripe: {
+          enabled: { type: Boolean, default: false },
+          publicKey: { type: String },
+          note: { type: String }
+        },
+        paypal: {
+          enabled: { type: Boolean, default: false },
+          clientId: { type: String },
+          sandbox: { type: Boolean, default: true },
+          note: { type: String }
+        }
+      },
+      invoice: {
+        companyName: { type: String },
+        logoUrl: { type: String },
+        address: { type: String },
+        footerText: { type: String },
+        termsAndConditions: { type: String },
+        dueDays: { type: Number, default: 14 },
+        currency: { type: String, default: 'USD' }
+      }
     }
   },
   

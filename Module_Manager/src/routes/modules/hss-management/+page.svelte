@@ -1,5 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { goto } from '$app/navigation';
+  import { page } from '$app/stores';
   import { browser } from '$app/environment';
   import { auth } from '$lib/firebase';
   import { currentTenant } from '$lib/stores/tenantStore';
@@ -44,6 +46,15 @@
   // Subscriber Group Wizard
   let showGroupWizard = false;
   
+  onMount(() => {
+    if (browser) {
+      const wizardId = $page.url.searchParams.get('wizard');
+      if (wizardId === 'subscriber-creation') { showSubscriberWizard = true; goto($page.url.pathname, { replaceState: true }); }
+      else if (wizardId === 'bandwidth-plan') { showBandwidthPlanWizard = true; goto($page.url.pathname, { replaceState: true }); }
+      else if (wizardId === 'subscriber-group') { showGroupWizard = true; goto($page.url.pathname, { replaceState: true }); }
+    }
+  });
+
   // Watch for tenant changes and reload data
   $: if (browser && tenantId) {
     console.log('[HSS Module] Tenant loaded:', tenantId);

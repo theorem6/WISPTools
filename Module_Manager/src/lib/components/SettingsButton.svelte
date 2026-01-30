@@ -26,7 +26,7 @@
   }
   
   function openDocs() {
-    goto('/docs');
+    goto('/help');
   }
 </script>
 
@@ -35,7 +35,7 @@
     <button 
       class="docs-button"
       class:dashboard-mode={isDashboard}
-      on:click={openDocs}
+      onclick={openDocs}
       title="Documentation"
       aria-label="Open documentation"
       type="button"
@@ -45,7 +45,7 @@
     <button 
       class="settings-button" 
       class:dashboard-mode={isDashboard}
-      on:click={openSettings} 
+      onclick={openSettings} 
       title="Settings"
       aria-label="Open settings"
       type="button"
@@ -100,22 +100,21 @@
   }
   
   .settings-button {
-    background: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%);
-    border: 2px solid rgba(0, 217, 255, 0.3);
-    box-shadow: 0 4px 20px rgba(0, 217, 255, 0.4),
-                0 0 20px rgba(0, 242, 254, 0.2);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    box-shadow: none;
   }
   
   .settings-button:hover {
-    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-    transform: translateY(-2px) rotate(90deg);
-    box-shadow: 0 6px 25px rgba(0, 217, 255, 0.5),
-                0 0 30px rgba(0, 242, 254, 0.3);
-    border-color: #00d9ff;
+    background: var(--primary-color);
+    color: var(--text-inverse);
+    border-color: var(--primary-color);
+    transform: translateY(-1px);
   }
   
   .settings-button:active {
-    transform: translateY(0) rotate(90deg);
+    transform: translateY(0);
   }
 </style>
 

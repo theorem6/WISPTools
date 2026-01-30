@@ -363,7 +363,11 @@ router.post('/tickets', requireCustomerAuth, async (req, res) => {
     const ticketCount = await WorkOrder.countDocuments({ tenantId: customer.tenantId });
     const ticketNumber = `TKT-${new Date().getFullYear()}-${String(ticketCount + 1).padStart(3, '0')}`;
     
-    // Create work order
+    // Default SLA for portal tickets: 24h first response, 72h resolution
+    const responseHours = 24;
+    const resolutionHours = 72;
+
+    // Create work order (same records appear in Maintain/Help Desk)
     const workOrder = new WorkOrder({
       tenantId: customer.tenantId,
       ticketNumber,
@@ -399,6 +403,10 @@ router.post('/tickets', requireCustomerAuth, async (req, res) => {
               longitude: customer.serviceAddress.longitude
             }
           : undefined
+      },
+      sla: {
+        responseTimeHours: responseHours,
+        resolutionTimeHours: resolutionHours
       },
       createdAt: new Date()
     });
@@ -558,6 +566,51 @@ router.get('/billing', requireCustomerAuth, async (req, res) => {
   } catch (error) {
     console.error('Error fetching portal billing:', error);
     res.status(500).json({ error: 'Failed to fetch billing' });
+  }
+});
+
+/**
+ * POST /api/customer-portal/billing/create-payment-intent
+ * Create Stripe PaymentIntent for portal pay-now. Body: { amount, invoiceId? }.
+ * Returns { clientSecret } when Stripe is configured; otherwise { error: 'payments_not_configured' }.
+ */
+router.post('/billing/create-payment-intent', requireCustomerAuth, async (req, res) => {
+  try {
+    const customerId = req.customer?.customerId || req.customerId;
+    const tenantId = req.customer?.tenantId;
+    const { amount, invoiceId } = req.body || {};
+    if (!amount || Number(amount) <= 0) {
+      return res.status(400).json({ error: 'amount (positive number) is required' });
+    }
+    const stripeKey = process.env.STRIPE_SECRET_KEY;
+    if (!stripeKey) {
+      return res.status(200).json({
+        configured: false,
+        message: 'Online payments are not configured. Please pay by check or contact support.'
+      });
+    }
+    let Stripe;
+    try {
+      Stripe = require('stripe');
+    } catch (e) {
+      return res.status(200).json({
+        configured: false,
+        message: 'Online payments are not configured. Please pay by check or contact support.'
+      });
+    }
+    const stripe = new Stripe(stripeKey);
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: Math.round(Number(amount) * 100),
+      currency: 'usd',
+      metadata: { tenantId, customerId, invoiceId: invoiceId || '' }
+    });
+    res.json({
+      configured: true,
+      clientSecret: paymentIntent.client_secret
+    });
+  } catch (error) {
+    console.error('Error creating payment intent:', error);
+    res.status(500).json({ error: 'Failed to create payment intent', message: error.message });
   }
 });
 

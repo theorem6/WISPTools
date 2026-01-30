@@ -104,37 +104,36 @@
       <button type="submit" class="btn-primary" disabled={loading}>
         {loading ? 'Signing in...' : 'Sign In'}
       </button>
-      
-      <div class="login-links">
-        {#if showForgotPassword}
-          <div class="forgot-section">
-            <h3 class="forgot-title">Reset password</h3>
-            <p class="forgot-desc">Enter the email for your account and we'll send a reset link.</p>
-            {#if forgotSent}
-              <p class="success-message">Password reset email sent. Check your inbox and use the link to set a new password.</p>
-              <button type="button" class="link" onclick={() => { showForgotPassword = false; forgotSent = false; forgotEmail = ''; forgotError = ''; }}>Back to sign in</button>
-            {:else}
-              <form onsubmit={handleForgotSubmit} class="forgot-form">
-                {#if forgotError}
-                  <div class="error-message">{forgotError}</div>
-                {/if}
-                <div class="form-group">
-                  <label for="forgot-email">Email</label>
-                  <input id="forgot-email" type="email" bind:value={forgotEmail} placeholder="Your account email" required disabled={loading} />
-                </div>
-                <div class="forgot-actions">
-                  <button type="submit" class="btn-primary" disabled={loading}>Send reset link</button>
-                  <button type="button" class="link" disabled={loading} onclick={() => { showForgotPassword = false; forgotEmail = ''; forgotError = ''; }}>Cancel</button>
-                </div>
-              </form>
-            {/if}
-          </div>
-        {:else}
-          <a href="/modules/customers/portal/signup" class="link">Don't have an account? Sign up</a>
-          <button type="button" class="link" onclick={() => { showForgotPassword = true; forgotError = ''; forgotSent = false; }}>Forgot password?</button>
-        {/if}
-      </div>
     </form>
+    <div class="login-links">
+      {#if showForgotPassword}
+        <div class="forgot-section">
+          <h3 class="forgot-title">Reset password</h3>
+          <p class="forgot-desc">Enter the email for your account and we'll send a reset link.</p>
+          {#if forgotSent}
+            <p class="success-message">Password reset email sent. Check your inbox and use the link to set a new password.</p>
+            <button type="button" class="link" onclick={() => { showForgotPassword = false; forgotSent = false; forgotEmail = ''; forgotError = ''; }}>Back to sign in</button>
+          {:else}
+            <form onsubmit={handleForgotSubmit} class="forgot-form">
+              {#if forgotError}
+                <div class="error-message">{forgotError}</div>
+              {/if}
+              <div class="form-group">
+                <label for="forgot-email">Email</label>
+                <input id="forgot-email" type="email" bind:value={forgotEmail} placeholder="Your account email" required disabled={loading} />
+              </div>
+              <div class="forgot-actions">
+                <button type="submit" class="btn-primary" disabled={loading}>Send reset link</button>
+                <button type="button" class="link" disabled={loading} onclick={() => { showForgotPassword = false; forgotEmail = ''; forgotError = ''; }}>Cancel</button>
+              </div>
+            </form>
+          {/if}
+        </div>
+      {:else}
+        <a href="/modules/customers/portal/signup" class="link">Don't have an account? Sign up</a>
+        <button type="button" class="link" onclick={() => { showForgotPassword = true; forgotError = ''; forgotSent = false; }}>Forgot password?</button>
+      {/if}
+    </div>
   </div>
 </div>
 

@@ -47,6 +47,21 @@ export interface TenantBranding {
     enableLiveChat?: boolean;
     enableKnowledgeBase?: boolean;
   };
+  billingPortal?: {
+    paymentGateways?: {
+      stripe?: { enabled?: boolean; publicKey?: string; note?: string };
+      paypal?: { enabled?: boolean; clientId?: string; sandbox?: boolean; note?: string };
+    };
+    invoice?: {
+      companyName?: string;
+      logoUrl?: string;
+      address?: string;
+      footerText?: string;
+      termsAndConditions?: string;
+      dueDays?: number;
+      currency?: string;
+    };
+  };
 }
 
 class BrandingService {

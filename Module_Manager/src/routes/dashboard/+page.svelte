@@ -6,10 +6,13 @@
   import { tenantStore, currentTenant } from '$lib/stores/tenantStore';
   import { authService } from '$lib/services/authService';
   import { isCurrentUserPlatformAdmin, isPlatformAdminByUid, getCurrentUserUid, isPlatformAdmin } from '$lib/services/adminService';
-  import ThemeSwitcher from '$lib/components/ThemeSwitcher.svelte';
-  import SettingsButton from '$lib/components/SettingsButton.svelte';
+  import GlobalSettings from '$lib/components/GlobalSettings.svelte';
   import NotificationCenter from '$lib/components/common/NotificationCenter.svelte';
   import FirstTimeSetupWizard from '$lib/components/wizards/FirstTimeSetupWizard.svelte';
+  import TipsModal from '$lib/components/modals/TipsModal.svelte';
+  import { API_CONFIG } from '$lib/config/api';
+  import { getModuleTips, FIELD_APP_DOWNLOAD_PLACEHOLDER } from '$lib/config/moduleTips';
+  import { tipsService } from '$lib/services/tipsService';
 
   interface Module {
     id: string;
@@ -115,6 +118,18 @@
   let currentUser: any = null;
   let isLoggedIn = false;
   let showOnboardingWizard = false;
+  let showSettings = false;
+  let showTipsModal = false;
+  let tipsShown = false;
+  const dashboardTips = getModuleTips('dashboard').map((t) => {
+    if (t.id === 'dashboard-field-app') {
+      const linkHtml = API_CONFIG.MOBILE_APP_DOWNLOAD_URL
+        ? `<p><a href="${API_CONFIG.MOBILE_APP_DOWNLOAD_URL}" download>📥 Download Android APK</a></p>`
+        : '';
+      return { ...t, content: t.content.replace(`<p>${FIELD_APP_DOWNLOAD_PLACEHOLDER}</p>`, linkHtml).replace(FIELD_APP_DOWNLOAD_PLACEHOLDER, linkHtml) };
+    }
+    return t;
+  });
 
   onMount(async () => {
     if (browser) {
@@ -144,6 +159,13 @@
         // Show wizard if tenant setup is complete but onboarding isn't
         if (tenantSetupCompleted === 'true' && onboardingCompleted !== 'true') {
           showOnboardingWizard = true;
+        }
+        // Show Quick Tips on first visit if enabled
+        if (dashboardTips.length > 0 && tipsService.shouldShowTips('dashboard') && !tipsShown) {
+          setTimeout(() => {
+            showTipsModal = true;
+            tipsShown = true;
+          }, 800);
         }
       }
     }
@@ -214,50 +236,54 @@
   {/if}
   
   <div class="dashboard-container">
-    <!-- Header -->
+    <!-- Header: centered logo + text, icons directly below -->
     <div class="header">
       <div class="header-content">
-        <div class="logo-section">
-          <img src="/wisptools-logo.svg" alt="WISPTools.io" class="dashboard-logo" />
-          <div class="branding">
-            <h1 class="app-title">WISPTools.io</h1>
-            <p class="app-subtitle">WISP Management Platform</p>
+        <div class="header-brand">
+          <div class="logo-section">
+            <img src="/wisptools-logo.svg" alt="WISPTools.io" class="dashboard-logo" />
+            <div class="branding">
+              <h1 class="app-title">WISPTools.io</h1>
+              <p class="app-subtitle">WISP Management Platform</p>
+            </div>
           </div>
-        </div>
-        <!-- Minimal User Info and Power Button -->
-        <div class="user-controls">
-          {#if $currentTenant}
-            <div class="tenant-info">
-              <span class="tenant-icon">🏢</span>
-              <span class="tenant-name">{$currentTenant.displayName || $currentTenant.name}</span>
-            </div>
-          {/if}
-          <ThemeSwitcher />
-          {#if isLoggedIn && currentUser}
-            <NotificationCenter />
-            <div class="user-status">
-              {#if isAdmin}
-                <span class="admin-indicator">Admin</span>
-              {/if}
-            </div>
-            <button class="power-btn" on:click={handleLogout} title="Logout">
-              <svg class="power-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path>
-                <line x1="12" y1="2" x2="12" y2="12"></line>
+          <div class="header-icons">
+            <a href={API_CONFIG.MOBILE_APP_DOWNLOAD_URL} class="icon-btn apk-btn" title="Download Field App" aria-label="Download WISP Field App (APK)" download>
+              <span class="apk-icon">📱</span>
+            </a>
+            <a href="/help" class="icon-btn doc-btn" title="Help" aria-label="Open help">
+              <span class="doc-icon">📖</span>
+            </a>
+            <button class="icon-btn gear-btn" onclick={() => (showSettings = true)} title="Settings" aria-label="Open settings">
+              <svg class="gear-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="3"></circle>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
               </svg>
             </button>
-          {:else}
-            <button class="login-btn" on:click={() => goto('/login')}>
-              <span class="login-icon">🔑</span>
-              Login
-            </button>
-          {/if}
+            {#if isLoggedIn && currentUser}
+              <NotificationCenter />
+              {#if isAdmin}
+                <span class="admin-badge" title="Administrator">Admin</span>
+              {/if}
+              <button class="icon-btn power-btn" onclick={handleLogout} title="Logout" aria-label="Logout">
+                <svg class="power-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path>
+                  <line x1="12" y1="2" x2="12" y2="12"></line>
+                </svg>
+              </button>
+            {:else}
+              <button class="login-btn" onclick={() => goto('/login')}>
+                <span class="login-icon">🔑</span>
+                Login
+              </button>
+            {/if}
+          </div>
         </div>
       </div>
     </div>
 
-    <!-- Settings Button - Top Right -->
-    <SettingsButton />
+    <GlobalSettings bind:show={showSettings} on:close={() => (showSettings = false)} />
+    <TipsModal bind:show={showTipsModal} moduleId="dashboard" tips={dashboardTips} on:close={() => (showTipsModal = false)} />
 
     <!-- Main Content -->
     <div class="main-content">
@@ -269,8 +295,8 @@
               class="module-card" 
               class:active={module.status === 'active'}
               class:coming-soon={module.status === 'coming-soon'}
-              on:click={() => handleModuleClick(module)}
-              on:keydown={(e) => e.key === 'Enter' && handleModuleClick(module)}
+              onclick={() => handleModuleClick(module)}
+              onkeydown={(e) => e.key === 'Enter' && handleModuleClick(module)}
               role="button"
               tabindex="0"
               aria-label="Open {module.name}. {module.description}"
@@ -307,8 +333,8 @@
             {#each adminModules as module}
               <div 
                 class="admin-card" 
-                on:click={() => handleModuleClick(module)}
-                on:keydown={(e) => e.key === 'Enter' && handleModuleClick(module)}
+                onclick={() => handleModuleClick(module)}
+                onkeydown={(e) => e.key === 'Enter' && handleModuleClick(module)}
                 role="button"
                 tabindex="0"
                 aria-label="Open {module.name}. {module.description}"
@@ -340,9 +366,9 @@
   .header {
     background: linear-gradient(90deg, #1a2332 0%, #1e3a4f 100%);
     backdrop-filter: blur(10px);
-    border-bottom: 2px solid #00d9ff;
-    box-shadow: 0 4px 20px rgba(0, 217, 255, 0.2);
-    padding: 1rem 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.2);
+    padding: 1rem 0 0.75rem;
   }
 
   .header-content {
@@ -350,20 +376,28 @@
     margin: 0 auto;
     padding: 0 2rem;
     display: flex;
-    justify-content: space-between;
+    justify-content: center;
     align-items: center;
+  }
+
+  .header-brand {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
   }
 
   .logo-section {
     display: flex;
     align-items: center;
-    gap: 1.5rem;
+    gap: 1.25rem;
+    padding: 0.5rem 0 0;
   }
 
   .dashboard-logo {
-    width: 60px;
-    height: 60px;
-    filter: drop-shadow(0 0 10px rgba(0, 217, 255, 0.5));
+    width: 72px;
+    height: 72px;
+    filter: drop-shadow(0 0 12px rgba(0, 217, 255, 0.5));
     transition: transform 0.3s ease;
   }
 
@@ -374,11 +408,11 @@
   .branding {
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
+    gap: 0.2rem;
   }
 
   .app-title {
-    font-size: 1.8rem;
+    font-size: 2rem;
     font-weight: 700;
     margin: 0;
     background: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%);
@@ -386,42 +420,22 @@
     -webkit-text-fill-color: transparent;
     background-clip: text;
     letter-spacing: 1px;
+    line-height: 1.2;
   }
 
   .app-subtitle {
-    font-size: 0.85rem;
+    font-size: 0.95rem;
     color: #00d9ff;
     margin: 0;
     font-weight: 500;
     letter-spacing: 0.5px;
   }
 
-  .tenant-info {
+  .header-icons {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    padding: 0.5rem 1rem;
-    background: rgba(0, 217, 255, 0.1);
-    border: 1px solid #00d9ff;
-    border-radius: 8px;
-    font-size: 0.9rem;
-    font-weight: 500;
-    order: 3;
-  }
-
-  .tenant-icon {
-    font-size: 1.1rem;
-  }
-
-  .tenant-name {
-    color: #00f2fe;
-  }
-
-  .user-controls {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    margin-left: auto;
+    justify-content: center;
+    gap: 0.4rem;
   }
 
   .user-status {
@@ -441,14 +455,14 @@
   }
 
   .power-btn {
-    background: var(--secondary);
-    color: white;
-    border: none;
-    border-radius: 50%;
-    width: 40px;
-    height: 40px;
+    background: var(--bg-secondary, #1a2332);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color, #334155);
+    border-radius: 8px;
+    width: 36px;
+    height: 36px;
     cursor: pointer;
-    display: flex;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
     transition: all 0.2s ease;
@@ -456,9 +470,9 @@
   }
 
   .power-btn:hover {
-    background: var(--danger);
-    transform: scale(1.05);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+    background: rgba(239, 68, 68, 0.15);
+    border-color: var(--danger, #ef4444);
+    color: var(--danger);
   }
 
   .power-icon {
@@ -782,8 +796,11 @@
 
   @media (max-width: 768px) {
     .header-content {
+      padding: 0 1rem;
+    }
+
+    .logo-section {
       flex-direction: column;
-      gap: 1rem;
       text-align: center;
     }
 
@@ -802,5 +819,45 @@
     .actions-grid {
       grid-template-columns: repeat(2, 1fr);
     }
+  }
+
+  .icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border: 1px solid var(--border-color, #334155);
+    border-radius: 8px;
+    background: var(--bg-secondary, #1a2332);
+    color: var(--text-primary);
+    cursor: pointer;
+  }
+  .icon-btn:hover {
+    background: rgba(0, 217, 255, 0.12);
+    border-color: var(--primary);
+    color: var(--primary);
+  }
+  .admin-badge {
+    font-size: 0.7rem;
+    padding: 0.2rem 0.5rem;
+    background: rgba(239, 68, 68, 0.15);
+    color: #f87171;
+    border-radius: 4px;
+    font-weight: 600;
+  }
+
+  .doc-btn,
+  .apk-btn {
+    text-decoration: none;
+  }
+  .doc-icon,
+  .apk-icon {
+    font-size: 1.1rem;
+  }
+  .gear-icon {
+    width: 18px;
+    height: 18px;
   }
 </style>

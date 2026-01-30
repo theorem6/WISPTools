@@ -7,6 +7,7 @@
   import TenantGuard from '$lib/components/admin/TenantGuard.svelte';
   import OrganizationSetupWizard from '$lib/components/wizards/OrganizationSetupWizard.svelte';
   import InitialConfigurationWizard from '$lib/components/wizards/InitialConfigurationWizard.svelte';
+  import { ALL_WIZARDS } from '$lib/config/wizardCatalog';
 
   interface WizardEntry {
     id: string;
@@ -21,6 +22,7 @@
 
   let showOrgWizard = false;
   let showConfigWizard = false;
+  let wizardsPulldownOpen = false;
 
   const wizards: WizardEntry[] = [
     {
@@ -290,8 +292,33 @@
       <button class="back-btn" onclick={() => goto('/dashboard')} type="button">
         ← Dashboard
       </button>
-      <h1>🧙 List of wizards</h1>
-      <p class="subtitle">Guided flows for setup, deployment, and operations. Each wizard runs inside its module. <strong>How to start one:</strong> click "Open in [Module]" below to go to that module, then click the wizard button in that module's header (e.g. "Setup Wizard", "Conflict Wizard").</p>
+      <div class="wizards-header-row">
+        <h1>🧙 List of wizards</h1>
+        <div class="wizards-pulldown-wrap">
+          <button
+            type="button"
+            class="wizards-pulldown-trigger"
+            class:open={wizardsPulldownOpen}
+            onclick={() => (wizardsPulldownOpen = !wizardsPulldownOpen)}
+            onblur={() => setTimeout(() => (wizardsPulldownOpen = false), 150)}
+            aria-haspopup="true"
+            aria-expanded={wizardsPulldownOpen}
+          >
+            Jump to wizard ▼
+          </button>
+          {#if wizardsPulldownOpen}
+            <div class="wizards-pulldown-menu" role="menu">
+              {#each ALL_WIZARDS as w}
+                <button type="button" role="menuitem" class="wizards-pulldown-item" onclick={() => { const url = w.path + (w.path.includes('?') ? '&' : '?') + 'wizard=' + encodeURIComponent(w.id); goto(url); wizardsPulldownOpen = false; }}>
+                  <span class="wizards-pulldown-icon">{w.icon}</span>
+                  <span>{w.label}</span>
+                </button>
+              {/each}
+            </div>
+          {/if}
+        </div>
+      </div>
+      <p class="subtitle">Guided flows for setup, deployment, and operations. Each wizard runs inside its module. Use <strong>Jump to wizard</strong> above or "Open in [Module]" below to go to that module, then click the wizard button in the module header.</p>
     </header>
 
     <div class="wizards-grid">
@@ -305,7 +332,12 @@
           </p>
           <button
             class="open-in-module"
-            onclick={() => w.openHere && w.id === 'organization-setup' ? (showOrgWizard = true) : w.openHere && w.id === 'initial-configuration' ? (showConfigWizard = true) : goto(w.modulePath)}
+            onclick={() => {
+              if (w.openHere && w.id === 'organization-setup') { showOrgWizard = true; return; }
+              if (w.openHere && w.id === 'initial-configuration') { showConfigWizard = true; return; }
+              const url = w.modulePath + '?wizard=' + encodeURIComponent(w.id);
+              goto(url);
+            }}
             type="button"
           >
             {#if w.openHere}
@@ -420,4 +452,55 @@
   .open-in-module:hover {
     filter: brightness(1.1);
   }
+
+  .wizards-header-row {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.5rem;
+  }
+  .wizards-pulldown-wrap { position: relative; display: inline-block; }
+  .wizards-pulldown-trigger {
+    padding: 0.5rem 0.75rem;
+    background: var(--primary, #00d9ff);
+    color: #0f1419;
+    border: none;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .wizards-pulldown-trigger:hover { filter: brightness(1.1); }
+  .wizards-pulldown-trigger.open { box-shadow: 0 0 0 2px rgba(0, 217, 255, 0.5); }
+  .wizards-pulldown-menu {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    margin-top: 4px;
+    min-width: 240px;
+    max-height: 60vh;
+    overflow-y: auto;
+    background: var(--bg-secondary, #1a2332);
+    border: 1px solid var(--border, #334155);
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    z-index: 100;
+    padding: 4px 0;
+  }
+  .wizards-pulldown-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    border: none;
+    background: transparent;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    text-align: left;
+    cursor: pointer;
+  }
+  .wizards-pulldown-item:hover { background: rgba(0, 217, 255, 0.15); color: var(--primary); }
+  .wizards-pulldown-icon { font-size: 1rem; }
 </style>

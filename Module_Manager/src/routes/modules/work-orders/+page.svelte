@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
+  import { page } from '$app/stores';
   import { browser } from '$app/environment';
   import { currentTenant } from '$lib/stores/tenantStore';
   import TenantGuard from '$lib/components/admin/TenantGuard.svelte';
@@ -41,6 +42,10 @@
   const types = ['installation', 'repair', 'maintenance', 'upgrade', 'removal', 'troubleshoot', 'inspection'];
   
   onMount(async () => {
+    if (browser) {
+      const wizardId = $page.url.searchParams.get('wizard');
+      if (wizardId === 'work-order-creation') { showWorkOrderWizard = true; goto($page.url.pathname, { replaceState: true }); }
+    }
     if (tenantId) {
       await loadData();
     }

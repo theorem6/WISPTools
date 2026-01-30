@@ -434,7 +434,12 @@ $: if (showTicketDetails) {
           </div>
           
           <div class="stat-card">
-            <div class="stat-icon">â±ï¸</div>
+            <div class="stat-icon stat-icon-svg" aria-hidden="true">
+              <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <polyline points="12 6 12 12 16 14"/>
+              </svg>
+            </div>
             <div class="stat-info">
               <div class="stat-value">{dashboardStats.avgResponseTime}</div>
               <div class="stat-label">Avg Response Time</div>
@@ -737,6 +742,17 @@ $: if (showTicketDetails) {
   
   .stat-icon {
     font-size: 2.5rem;
+  }
+  
+  .stat-icon-svg {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .stat-icon-svg svg {
+    width: 2.5rem;
+    height: 2.5rem;
+    color: var(--color-primary, #3b82f6);
   }
   
   .stat-value {

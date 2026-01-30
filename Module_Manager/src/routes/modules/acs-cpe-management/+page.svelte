@@ -4,10 +4,10 @@
   import { page } from '$app/stores';
   import { browser } from '$app/environment';
   import MainMenu from './components/MainMenu.svelte';
-  import HelpModal from '$lib/components/modals/HelpModal.svelte';
+  import TipsModal from '$lib/components/modals/TipsModal.svelte';
   import TenantGuard from '$lib/components/admin/TenantGuard.svelte';
   import { currentTenant } from '$lib/stores/tenantStore';
-  import { acsCpeDocs } from '$lib/docs/acs-cpe-docs';
+  import { getModuleTips } from '$lib/config/moduleTips';
   import { loadCPEDevices, syncCPEDevices as syncCPEDevicesService } from './lib/cpeDataService';
   import { syncACSCPEToInventory } from '$lib/services/acsInventorySync';
   import ACSSetupWizard from '$lib/components/wizards/ACSSetupWizard.svelte';
@@ -76,24 +76,39 @@
   }
   
   // Documentation content
-  const helpContent = acsCpeDocs;
+  const acsTips = getModuleTips('acs-cpe-management');
 
   onMount(async () => {
+    // Open wizard when navigating from Wizards page / Jump to wizard with ?wizard=id
+    if (browser) {
+      const wizardId = $page.url.searchParams.get('wizard');
+      if (wizardId) {
+        const id = wizardId === 'acs-setup' ? 'setup' : wizardId;
+        if (id === 'setup') showSetupWizard = true;
+        else if (id === 'device-onboarding') showDeviceOnboardingWizard = true;
+        else if (id === 'troubleshooting') showTroubleshootingWizard = true;
+        else if (id === 'preset-creation') showPresetWizard = true;
+        else if (id === 'bulk-operations') showBulkWizard = true;
+        else if (id === 'firmware-update') showFirmwareWizard = true;
+        else if (id === 'device-registration') showDeviceRegistrationWizard = true;
+        goto($page.url.pathname, { replaceState: true });
+      }
+    }
     try {
       if (browser) {
         console.log('[ACS Module] Initializing...');
         console.log('[ACS Module] Tenant:', tenantName);
       }
       
-      // Wait for tenant to be available - reactive statement will handle loading
-      if (!tenantId) {
-        console.log('[ACS Module] Waiting for tenant selection...');
-        isLoading = false;
-        return;
-      }
-      
-      // Load CPE devices using authenticated multi-tenant service
-      await loadDevices();
+    // Wait for tenant to be available - reactive statement will handle loading
+    if (!tenantId) {
+      console.log('[ACS Module] Waiting for tenant selection...');
+      isLoading = false;
+      return;
+    }
+    
+    // Load CPE devices using authenticated multi-tenant service
+    await loadDevices();
       
       // Initialize map
       await initializeMap();
@@ -854,11 +869,11 @@
     on:close={closePerformanceModal}
   />
   
-  <!-- Help Modal -->
-  <HelpModal 
+  <!-- Help / Tips Modal -->
+  <TipsModal 
     show={showHelpModal}
-    title="ACS CPE Management Help"
-    content={helpContent}
+    moduleId="acs-cpe-management"
+    tips={acsTips}
     on:close={() => showHelpModal = false}
   />
 
