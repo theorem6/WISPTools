@@ -29,6 +29,14 @@ jobs:
       pull-requests: read
     
     steps:
+      - name: Check required secret
+        run: |
+          if [ -z "${{ secrets.FIREBASE_TOKEN }}" ]; then
+            echo "::error::FIREBASE_TOKEN is not set. Add it at: repo Settings → Secrets and variables → Actions → New repository secret. Get a token with: firebase login:ci"
+            exit 1
+          fi
+          echo "FIREBASE_TOKEN is set"
+
       - name: Checkout code
         uses: actions/checkout@v4
 

@@ -24,6 +24,14 @@ jobs:
       id-token: write
 
     steps:
+      - name: Check required secret
+        run: |
+          if [ -z "${{ secrets.GCP_SA_KEY }}" ]; then
+            echo "::error::GCP_SA_KEY is not set. Add the GCP service account JSON at: repo Settings → Secrets and variables → Actions → New repository secret."
+            exit 1
+          fi
+          echo "GCP_SA_KEY is set"
+
       - name: Checkout
         uses: actions/checkout@v4
 

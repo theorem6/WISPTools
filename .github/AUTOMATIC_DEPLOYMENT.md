@@ -42,6 +42,15 @@ This project is configured for **automatic deployment** to Firebase when you pus
 
 ## ⚙️ One-Time Setup Required
 
+### Required GitHub Secrets (Actions → Settings → Secrets and variables → Actions)
+
+| Secret | Used by | How to get |
+|--------|---------|------------|
+| **FIREBASE_TOKEN** | Deploy to Firebase Hosting | Run `firebase login:ci` (see Step 1 below) |
+| **GCP_SA_KEY** | Deploy Backend to GCE | JSON key for a GCP service account with Compute Engine + IAP access |
+
+If a workflow run fails immediately with "X is not set", add the missing secret above.
+
 ### Step 1: Generate Firebase CI Token
 
 Run this command locally:
