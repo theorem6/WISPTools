@@ -9,6 +9,31 @@ Complete documentation for the LTE WISP Management Platform with HSS, GenieACS, 
 
 ---
 
+## 📋 **Status & Planning (start here)**
+
+| Document | Purpose |
+|----------|---------|
+| [WHERE_WE_ARE_AND_NEXT_STEPS.md](./WHERE_WE_ARE_AND_NEXT_STEPS.md) | Current state, deploy commands, next steps (priority) |
+| [NEXT_ITEMS_TO_ADD.md](./NEXT_ITEMS_TO_ADD.md) | Full list: wizards, portal, billing, ACS, docs, monitoring (all implemented or optional) |
+| [WHATS_MISSING_IN_APP.md](./WHATS_MISSING_IN_APP.md) | One-page checklist: done vs remaining (optional only) |
+| [ENHANCEMENTS.md](./ENHANCEMENTS.md) | Further enhancements; done vs future |
+| [OPTIONAL_ITEMS.md](./OPTIONAL_ITEMS.md) | **Optional work only** – documentation, portal, ACS, monitoring, field app, reporting |
+
+**In-app:** Dashboard → 📖 Help, or go to **/docs** and **/docs/reference/project-status**.
+
+---
+
+## ⚙️ **Operational setup**
+
+| Task | Document |
+|------|----------|
+| **Billing automation** (invoices + dunning) | [BILLING_CRON_AND_DUNNING_SCHEDULE.md](./BILLING_CRON_AND_DUNNING_SCHEDULE.md) – cron on GCE or Cloud Scheduler; internal route `POST /api/internal/cron/billing`; script `backend-services/scripts/cron-billing.sh` |
+| **Field App APK** (build + download URL) | [FIELD_APP_DOWNLOAD.md](./FIELD_APP_DOWNLOAD.md) – build APK, host it, set `MOBILE_APP_DOWNLOAD_URL`; dashboard 📱 link uses it |
+| **Backend deploy** (when script SSH fails) | [DEPLOY_BACKEND_FALLBACK.md](../DEPLOY_BACKEND_FALLBACK.md) – manual `gcloud compute ssh` steps |
+| **Backend deployment** (full) | [deployment/BACKEND_DEPLOYMENT_INSTRUCTIONS.md](./deployment/BACKEND_DEPLOYMENT_INSTRUCTIONS.md) – env vars (API_BASE_URL, INTERNAL_API_KEY), options |
+
+---
+
 ## 📚 **Documentation Structure**
 
 ```
@@ -238,11 +263,11 @@ HTTPS proxy solutions:
 
 ## 📊 **Documentation Statistics**
 
-- **Total Documents:** 45+ files
-- **Total Lines:** ~15,000 lines of documentation
-- **Categories:** 4 main categories
-- **Modules Covered:** HSS, GenieACS, CBRS, PCI, Tenant Management
-- **Last Updated:** October 16, 2025
+- **Total Documents:** 290+ markdown files in `docs/` and subfolders
+- **Categories:** Status & planning, deployment, guides, fixes, status, hss, distributed-epc, setup, workflows, archived
+- **Modules Covered:** HSS, GenieACS, CBRS, PCI, Tenant Management, Customer Portal, Wizards, ACS/CPE, Monitoring
+- **Key entry points:** This README, [WHERE_WE_ARE_AND_NEXT_STEPS.md](./WHERE_WE_ARE_AND_NEXT_STEPS.md), [NEXT_ITEMS_TO_ADD.md](./NEXT_ITEMS_TO_ADD.md), [OPTIONAL_ITEMS.md](./OPTIONAL_ITEMS.md)
+- **Last Updated:** January 2026
 
 ---
 
@@ -304,5 +329,30 @@ All documentation includes:
 
 **For the most up-to-date information, always check the main branch of the repository.**
 
-**Last Updated:** October 16, 2025
+---
+
+## 📑 **Full documentation index (key files)**
+
+### Root docs/
+- **Status & planning:** WHERE_WE_ARE_AND_NEXT_STEPS.md, NEXT_ITEMS_TO_ADD.md, WHATS_MISSING_IN_APP.md, ENHANCEMENTS.md, OPTIONAL_ITEMS.md, NEXT_STEPS_FOR_APP.md
+- **Operational:** BILLING_CRON_AND_DUNNING_SCHEDULE.md, FIELD_APP_DOWNLOAD.md, FIELD_APP_MY_PROJECTS.md
+- **Portal & billing:** CUSTOMER_PORTAL_IMPLEMENTATION_PLAN.md, CUSTOMER_PORTAL_ACCESS_AND_PAGES.md, COMPLETION_DOC.md
+- **Wizards:** WIZARD_IMPLEMENTATION_ADVISORY.md, WIZARD_ACCESS_GUIDE.md, WIZARD_INTEGRATION_COMPLETE.md, WIZARD_HIGH_PRIORITY_COMPLETE.md, WIZARD_DOCUMENTATION_COMPLETE.md
+- **Architecture & workflow:** BACKEND_ARCHITECTURE.md, PROJECT_WORKFLOW_STATUS.md, PROJECT_WORKFLOW_QUICK_START.md, BACKEND_INTEGRATIONS.md
+- **Deploy & EPC:** DEPLOYMENT_READY_SUMMARY.md, EPC_AUTO_UPDATE_SYSTEM.md, DEPLOYMENT_COMPLETE.md
+- **Other:** DOCUMENTATION_SYSTEM_PLAN.md, DOCUMENTATION_PLAN_SUMMARY.md, IMPLEMENTATION_STATUS.md, LTE_5G_INTEGRATION_COMPLETE.md, ACS_FINAL_COMPLETION.md, ONBOARDING_IMPLEMENTATION_STATUS.md, FIREBASE_ADMIN_SDK_SETUP.md, OAUTH_REDIRECT_URIS.md, FIX_GOOGLE_OAUTH_REDIRECT_ERROR.md
+
+### docs/deployment/
+- BACKEND_DEPLOYMENT_INSTRUCTIONS.md, COMPLETE_DEPLOYMENT_NOW.md, and other deployment guides
+
+### docs/guides/
+- MULTI_TENANT_ARCHITECTURE.md, MULTI_TENANT_SETUP_GUIDE.md, CBRS_MODULE_COMPLETE.md, TR069_FIRMWARE_UPGRADE_GUIDE.md, MONITORING_AND_ALERTING.md, and other guides
+
+### docs/fixes/
+- BILLING_404_FIX.md, AUTH_401_INSUFFICIENT_PERMISSION.md, CRITICAL_FIX_SUMMARY.md, and other fix docs
+
+### docs/status/, docs/hss/, docs/setup/, docs/workflows/
+- Status reports, HSS guides, setup steps, field operations
+
+**Last Updated:** January 2026
 

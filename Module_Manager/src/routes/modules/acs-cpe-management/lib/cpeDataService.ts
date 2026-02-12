@@ -17,6 +17,7 @@ export interface CPEDevice {
   serialNumber?: string;
   ipAddress?: string;
   firmware?: string;
+  tags?: string[];
 }
 
 /**
@@ -36,7 +37,7 @@ export async function loadCPEDevices(): Promise<CPEDevice[]> {
       throw new Error('Not authenticated');
     }
     
-    const token = await user.getIdToken();
+    const token = await authService.getAuthTokenForApi();
     const tenantId = get(currentTenant)?.id;
     
     if (!tenantId) {
@@ -149,7 +150,8 @@ function convertGenieACSDevice(device: any): CPEDevice {
     firmware: device.firmware ||
               device.parameters?.['InternetGatewayDevice.DeviceInfo.SoftwareVersion']?._value ||
               device.parameters?.['InternetGatewayDevice.DeviceInfo.SoftwareVersion'] ||
-              ''
+              '',
+    tags: Array.isArray(device.tags) ? device.tags : []
   };
 }
 
@@ -180,7 +182,7 @@ export async function syncCPEDevices(): Promise<{ success: boolean; message: str
       throw new Error('Not authenticated');
     }
     
-    const token = await user.getIdToken();
+    const token = await authService.getAuthTokenForApi();
     const tenantId = get(currentTenant)?.id;
     
     if (!tenantId) {

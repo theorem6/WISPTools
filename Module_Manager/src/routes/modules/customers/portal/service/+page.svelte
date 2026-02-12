@@ -56,6 +56,7 @@
   <div class="error">{error}</div>
 {:else}
   <div class="service-page">
+    <p class="back-link"><a href="/modules/customers/portal/dashboard">← Back to Dashboard</a></p>
     <h1>Service Information</h1>
     
     <div class="service-details">
@@ -125,6 +126,17 @@
   .service-page {
     max-width: 900px;
     margin: 0 auto;
+  }
+  
+  .back-link {
+    margin-bottom: 1rem;
+  }
+  .back-link a {
+    color: var(--brand-primary, #3b82f6);
+    text-decoration: none;
+  }
+  .back-link a:hover {
+    text-decoration: underline;
   }
   
   .service-page h1 {

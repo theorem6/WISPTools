@@ -223,10 +223,10 @@ You'll be able to:
 ## 📖 **Quick Reference**
 
 ### **Documentation:**
-👉 Start: [docs/README.md](docs/README.md)  
-👉 Deploy: [docs/deployment/COMPLETE_DEPLOYMENT_NOW.md](docs/deployment/COMPLETE_DEPLOYMENT_NOW.md)  
-👉 HSS Guide: [docs/hss/HSS_PRODUCTION_GUIDE.md](docs/hss/HSS_PRODUCTION_GUIDE.md)  
-👉 MME Setup: [docs/hss/MME_CONNECTION_GUIDE.md](docs/hss/MME_CONNECTION_GUIDE.md)  
+👉 Start: [docs/README.md](../README.md)  
+👉 Deploy: [docs/deployment/COMPLETE_DEPLOYMENT_NOW.md](../deployment/COMPLETE_DEPLOYMENT_NOW.md)  
+👉 HSS Guide: [docs/hss/HSS_PRODUCTION_GUIDE.md](../hss/HSS_PRODUCTION_GUIDE.md)  
+👉 MME Setup: [docs/hss/MME_CONNECTION_GUIDE.md](../hss/MME_CONNECTION_GUIDE.md)  
 
 ### **URLs:**
 - Web UI: `https://lte-pci-mapper--lte-pci-mapper-65450042-bbf71.us-east4.hosted.app`

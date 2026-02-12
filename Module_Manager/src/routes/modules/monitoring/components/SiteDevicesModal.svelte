@@ -1,5 +1,6 @@
 <script lang="ts">
   import { auth } from '$lib/firebase';
+  import { authService } from '$lib/services/authService';
   import { API_CONFIG } from '$lib/config/api';
   import { currentTenant } from '$lib/stores/tenantStore';
 
@@ -118,7 +119,7 @@
       loadingUptimes = false;
       return;
     }
-    const token = await user.getIdToken();
+    const token = await authService.getAuthTokenForApi();
 
     const newDeviceUptimes = new Map();
     for (const device of siteDevices) {

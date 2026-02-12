@@ -18,6 +18,7 @@
   import FirmwareUpdateWizard from '$lib/components/wizards/acs/FirmwareUpdateWizard.svelte';
   import DeviceRegistrationWizard from '$lib/components/wizards/acs/DeviceRegistrationWizard.svelte';
   import ModuleWizardMenu from '$lib/components/wizards/ModuleWizardMenu.svelte';
+  import { getWizardsForPath } from '$lib/config/wizardCatalog';
   import CPEPerformanceModal from './components/CPEPerformanceModal.svelte';
   import { formatUptime } from './lib/tr069MetricsService';
 
@@ -562,19 +563,11 @@
         </button>
 
         <ModuleWizardMenu
-          wizards={[
-            { id: 'setup', label: 'Setup ACS', icon: '⚙️' },
-            { id: 'device-onboarding', label: 'Onboard Device', icon: '👋' },
-            { id: 'troubleshooting', label: 'Troubleshoot', icon: '🔍' },
-            { id: 'preset-creation', label: 'Preset Creation', icon: '⚙️' },
-            { id: 'bulk-operations', label: 'Bulk Operations', icon: '📦' },
-            { id: 'firmware-update', label: 'Firmware Update', icon: '💾' },
-            { id: 'device-registration', label: 'Device Registration', icon: '📱' }
-          ]}
+          wizards={getWizardsForPath('/modules/deploy')}
           disabled={isLoading}
           on:select={(e) => {
             const id = e.detail.id;
-            if (id === 'setup') showSetupWizard = true;
+            if (id === 'acs-setup') showSetupWizard = true;
             else if (id === 'device-onboarding') showDeviceOnboardingWizard = true;
             else if (id === 'troubleshooting') {
               if (selectedCPE) selectedDeviceForTroubleshooting = { id: selectedCPE.id || selectedCPE._id, serial: selectedCPE.serialNumber || selectedCPE._deviceId?.SerialNumber || '' };

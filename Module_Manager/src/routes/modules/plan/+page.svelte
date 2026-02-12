@@ -24,6 +24,7 @@ import { getCapabilitiesForMode, type MapCapabilities, type MapModuleMode } from
   import { getModuleTips } from '$lib/config/moduleTips';
   import { tipsService } from '$lib/services/tipsService';
   import ModuleWizardMenu from '$lib/components/wizards/ModuleWizardMenu.svelte';
+  import { getWizardsForPath } from '$lib/config/wizardCatalog';
 
 interface MapViewExtentPayload {
   center?: { lat: number; lon: number };
@@ -1868,7 +1869,7 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
           <span class="control-label">Projects</span>
         </button>
         <ModuleWizardMenu
-          wizards={[{ id: 'marketing-discovery', label: 'Marketing Discovery', icon: '📍' }]}
+          wizards={getWizardsForPath('/modules/plan')}
           on:select={() => openMarketingTools()}
         />
         <button

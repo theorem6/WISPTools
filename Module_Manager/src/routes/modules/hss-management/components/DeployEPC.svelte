@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { auth } from '$lib/firebase';
+  import { authService } from '$lib/services/authService';
   
   export let tenantId: string;
   export let HSS_API: string;
@@ -62,7 +63,7 @@
       const user = auth().currentUser;
       if (!user) return;
       
-      const token = await user.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       const response = await fetch(`${HSS_API}/epc/list`, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -86,7 +87,7 @@
       const user = auth().currentUser;
       if (!user) return;
       
-      const token = await user.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       const response = await fetch(`${NETWORK_API}/api/network/sites`, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -159,7 +160,7 @@
         return;
       }
       
-      const token = await user.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       const response = await fetch(`${HSS_API}/epc/register`, {
         method: 'POST',
         headers: {
@@ -229,7 +230,7 @@
       const user = auth().currentUser;
       if (!user) return;
       
-      const token = await user.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       const response = await fetch(`${HSS_API}/epc/${epc.epc_id}/deployment-script`, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -273,7 +274,7 @@
       const user = auth().currentUser;
       if (!user) return;
       
-      const token = await user.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       
       // Call ISO Generation API via Cloud Function proxy
       const response = await fetch(`${ISO_PROXY}/api/epc/${epc.epc_id}/generate-iso`, {

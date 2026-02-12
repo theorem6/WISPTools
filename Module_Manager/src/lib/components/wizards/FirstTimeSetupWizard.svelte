@@ -58,7 +58,7 @@
     try {
       // Check if tower sites exist
       const { authService } = await import('$lib/services/authService');
-      const token = await authService.getAuthToken();
+      const token = await authService.getAuthTokenForApi();
       const response = await fetch('/api/network/sites', {
         headers: {
           'Authorization': `Bearer ${token}`,

@@ -24,6 +24,9 @@
   let showCardForm = false;
   let clientSecretForStripe = '';
   let payAmount = 0;
+  let showInvoiceModal = false;
+  let selectedInvoice: { invoiceNumber: string; amount: number; status: string; dueDate: string; lineItems?: Array<{ description: string; quantity: number; unitPrice: number; total: number }> } | null = null;
+  let invoiceDetailLoading = false;
 
   $: featureEnabled = ($portalBranding?.features?.enableBilling !== false);
   $: stripePublishableKey = $portalBranding?.billingPortal?.paymentGateways?.stripe?.publicKey ?? '';
@@ -108,6 +111,24 @@
   function onPaymentError(e: { detail: { message: string } }) {
     payMessage = e.detail?.message || 'Payment failed.';
   }
+
+  async function openInvoiceDetail(invoiceId: string) {
+    invoiceDetailLoading = true;
+    selectedInvoice = null;
+    showInvoiceModal = true;
+    try {
+      selectedInvoice = await customerPortalService.getInvoice(invoiceId, currentTenantId);
+    } catch (err: any) {
+      selectedInvoice = { invoiceNumber: '—', amount: 0, status: 'Error', dueDate: '', lineItems: [] };
+    } finally {
+      invoiceDetailLoading = false;
+    }
+  }
+
+  function closeInvoiceModal() {
+    showInvoiceModal = false;
+    selectedInvoice = null;
+  }
 </script>
 
 {#if loading}
@@ -122,7 +143,7 @@
 {:else}
   <div class="billing-page">
     <h1>Billing &amp; Account</h1>
-    <p class="subtitle">Your plan, billing cycle, and balance</p>
+    <p class="subtitle">Your plan, billing cycle, and balance. <a href="/modules/customers/portal/billing/settings" class="link-settings">Billing settings</a></p>
 
     {#if billing}
       <div class="billing-sections">
@@ -236,6 +257,7 @@
                     <span class="inv-amount">{formatCurrency(inv.amount)}</span>
                     <span class="inv-status">{inv.status}</span>
                     <span class="inv-due">Due {formatDate(inv.dueDate)}</span>
+                    <button type="button" class="btn-view" on:click={() => openInvoiceDetail(inv.invoiceId)}>View</button>
                   </li>
                 {/each}
               </ul>
@@ -264,6 +286,35 @@
       <div class="empty-state">
         <p>No billing record is set up for your account yet.</p>
         <p class="hint">Your provider may add a plan later, or you can contact support for details.</p>
+      </div>
+    {/if}
+
+    {#if showInvoiceModal}
+      <div class="modal-overlay" role="dialog" aria-modal="true" aria-label="Invoice detail" on:click={closeInvoiceModal} on:keydown={(e) => e.key === 'Escape' && closeInvoiceModal()}>
+        <div class="modal-content" on:click|stopPropagation>
+          <div class="modal-header">
+            <h2>Invoice detail</h2>
+            <button type="button" class="modal-close" on:click={closeInvoiceModal} aria-label="Close">&times;</button>
+          </div>
+          {#if invoiceDetailLoading}
+            <p>Loading…</p>
+          {:else if selectedInvoice}
+            <div class="invoice-detail">
+              <div class="detail-row"><span class="label">Invoice</span><span>{selectedInvoice.invoiceNumber}</span></div>
+              <div class="detail-row"><span class="label">Amount</span><span>{formatCurrency(selectedInvoice.amount)}</span></div>
+              <div class="detail-row"><span class="label">Status</span><span class="status">{selectedInvoice.status}</span></div>
+              <div class="detail-row"><span class="label">Due date</span><span>{formatDate(selectedInvoice.dueDate)}</span></div>
+              {#if selectedInvoice.lineItems && selectedInvoice.lineItems.length > 0}
+                <h3>Line items</h3>
+                <ul class="line-items">
+                  {#each selectedInvoice.lineItems as item}
+                    <li>{item.description} — {item.quantity} × {formatCurrency(item.unitPrice)} = {formatCurrency(item.total)}</li>
+                  {/each}
+                </ul>
+              {/if}
+            </div>
+          {/if}
+        </div>
       </div>
     {/if}
   </div>
@@ -399,5 +450,96 @@
   .feature-disabled h1 {
     color: var(--brand-text, #111827);
     margin-bottom: 0.5rem;
+  }
+  .link-settings {
+    color: var(--brand-primary, #3b82f6);
+    text-decoration: none;
+    font-weight: 500;
+  }
+  .link-settings:hover {
+    text-decoration: underline;
+  }
+  .btn-view {
+    background: transparent;
+    color: var(--brand-primary, #3b82f6);
+    border: 1px solid var(--brand-primary, #3b82f6);
+    padding: 0.25rem 0.6rem;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    cursor: pointer;
+    margin-left: auto;
+  }
+  .btn-view:hover {
+    background: var(--brand-primary, #3b82f6);
+    color: white;
+  }
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+  }
+  .modal-content {
+    background: var(--brand-background, #fff);
+    border-radius: 12px;
+    padding: 1.5rem;
+    max-width: 480px;
+    width: 90%;
+    max-height: 90vh;
+    overflow: auto;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  }
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+  }
+  .modal-header h2 {
+    font-size: 1.25rem;
+    color: var(--brand-text, #111827);
+    margin: 0;
+  }
+  .modal-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: var(--brand-text-secondary, #6b7280);
+    line-height: 1;
+  }
+  .modal-close:hover {
+    color: var(--brand-text, #111827);
+  }
+  .invoice-detail .detail-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #f3f4f6;
+  }
+  .invoice-detail .label {
+    font-weight: 500;
+    color: var(--brand-text-secondary, #6b7280);
+  }
+  .invoice-detail .status {
+    text-transform: capitalize;
+  }
+  .invoice-detail h3 {
+    font-size: 1rem;
+    margin: 1rem 0 0.5rem;
+    color: var(--brand-text, #111827);
+  }
+  .line-items {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    font-size: 0.9rem;
+    color: var(--brand-text-secondary, #6b7280);
+  }
+  .line-items li {
+    padding: 0.25rem 0;
   }
 </style>

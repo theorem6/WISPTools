@@ -119,12 +119,22 @@
       const tenants = tenantsResult.status === 'fulfilled' ? tenantsResult.value : [];
       const users = usersResult.status === 'fulfilled' ? usersResult.value : [];
       
-      // Log errors but don't throw
+      // Log errors and set user-friendly message for 401 (backend auth not configured)
       if (tenantsResult.status === 'rejected') {
-        console.error('[Admin Management] Error loading tenants:', tenantsResult.reason);
+        const err = tenantsResult.reason;
+        console.error('[Admin Management] Error loading tenants:', err);
+        const msg = String(err?.message || err);
+        if (msg.includes('401') || msg.includes('Unauthorized')) {
+          statusError = 'Backend authentication not configured. The server cannot verify your login. Run set-firebase-admin-on-gce.ps1 and ensure PLATFORM_ADMIN_EMAILS includes your email.';
+        } else {
+          statusError = (err as Error)?.message || 'Failed to load tenants';
+        }
       }
       if (usersResult.status === 'rejected') {
         console.error('[Admin Management] Error loading users:', usersResult.reason);
+        if (!statusError) {
+          statusError = (usersResult.reason as Error)?.message || 'Failed to load users';
+        }
       }
       
       // Update system status

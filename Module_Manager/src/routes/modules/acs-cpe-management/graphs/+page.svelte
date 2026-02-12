@@ -59,7 +59,7 @@
         throw new Error('Not authenticated');
       }
       
-      const token = await user.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       
       // Load metrics for each selected device
       for (const deviceId of selectedDevices) {

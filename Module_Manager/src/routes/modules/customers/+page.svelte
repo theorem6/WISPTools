@@ -9,6 +9,7 @@
   import CustomerBillingModal from './components/CustomerBillingModal.svelte';
   import CustomerOnboardingWizard from '$lib/components/wizards/customers/CustomerOnboardingWizard.svelte';
   import ModuleWizardMenu from '$lib/components/wizards/ModuleWizardMenu.svelte';
+  import { getWizardsForPath } from '$lib/config/wizardCatalog';
   import { goto } from '$app/navigation';
   import { page } from '$app/stores';
   import GroupManagement from '../hss-management/components/GroupManagement.svelte';
@@ -60,7 +61,7 @@
     billingActionLoading = 'invoices';
     billingActionMessage = '';
     try {
-      const token = await authService.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       const res = await fetch(`${getApiUrl()}/customer-billing/generate-invoices`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`, 'X-Tenant-ID': tenantId }
@@ -80,7 +81,7 @@
     billingActionLoading = 'dunning';
     billingActionMessage = '';
     try {
-      const token = await authService.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       const res = await fetch(`${getApiUrl()}/customer-billing/dunning/run`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`, 'X-Tenant-ID': tenantId }
@@ -283,8 +284,8 @@
       <div class="header-actions">
         {#if activeTab === 'customers'}
           <ModuleWizardMenu
-            wizards={[{ id: 'customer-onboarding', label: 'Customer Onboarding', icon: '👋' }]}
-            on:select={() => showOnboardingWizard = true}
+            wizards={getWizardsForPath('/modules/customers')}
+            on:select={(e) => { if (e.detail?.id === 'customer-onboarding') showOnboardingWizard = true; }}
           />
           <button class="btn-primary" on:click={handleAdd}>
             ➕ Add Customer

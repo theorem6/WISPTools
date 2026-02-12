@@ -1,6 +1,7 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
   import { auth } from '$lib/firebase';
+  import { authService } from '$lib/services/authService';
   
   export let show = false;
   export let site: any = null;
@@ -50,7 +51,7 @@
       const user = auth().currentUser;
       if (!user) return;
       
-      const token = await user.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       
       // Get devices for this site by site_name
       const response = await fetch(`${HSS_API}/epc/list?site_name=${encodeURIComponent(site.name)}`, {
@@ -99,7 +100,7 @@
       const user = auth().currentUser;
       if (!user) return;
       
-      const token = await user.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       
       const response = await fetch(`${HSS_API}/epc/${editingDevice.epc_id}`, {
         method: 'PUT',
@@ -140,7 +141,7 @@
       const user = auth().currentUser;
       if (!user) return;
       
-      const token = await user.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       
       // Create the device via the register-epc endpoint
       const response = await fetch(`${HSS_API}/deploy/register-epc`, {

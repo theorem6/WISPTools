@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
   import { auth } from '$lib/firebase';
+  import { authService } from '$lib/services/authService';
   import AddSubscriberModal from './AddSubscriberModal.svelte';
   import SubscriberDetailsModal from './SubscriberDetailsModal.svelte';
   
@@ -43,7 +44,7 @@
       const user = auth().currentUser;
       if (!user) return;
       
-      const token = await user.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       const response = await fetch(`${HSS_API}/groups`, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -66,7 +67,7 @@
       const user = auth().currentUser;
       if (!user) return;
       
-      const token = await user.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       
       let url = `${HSS_API}/subscribers?`;
       if (statusFilter !== 'all') url += `status=${statusFilter}&`;
@@ -103,7 +104,7 @@
       const user = auth().currentUser;
       if (!user) return;
       
-      const token = await user.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       const response = await fetch(`${HSS_API}/subscribers/${imsi}/${action}`, {
         method: 'POST',
         headers: {

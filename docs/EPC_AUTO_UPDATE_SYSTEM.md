@@ -1,3 +1,8 @@
+---
+title: EPC Auto-Update System
+description: How the EPC auto-update system deploys script updates to remote EPC devices.
+---
+
 # EPC Auto-Update System
 
 ## Overview

@@ -3,6 +3,7 @@
   import { createEventDispatcher } from 'svelte';
   import { coverageMapService } from '../../coverage-map/lib/coverageMapService.mongodb';
   import { auth } from '$lib/firebase';
+  import { authService } from '$lib/services/authService';
   import { API_CONFIG } from '$lib/config/api';
   import type { TowerSite } from '../../coverage-map/lib/models';
 
@@ -158,7 +159,7 @@
       const user = auth().currentUser;
       if (user) {
         try {
-          const token = await user.getIdToken();
+          const token = await authService.getAuthTokenForApi();
           const response = await fetch(`${API_CONFIG.PATHS.HSS}/epc/remote/list`, {
             headers: {
               'Authorization': `Bearer ${token}`,

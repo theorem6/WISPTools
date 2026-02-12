@@ -74,7 +74,7 @@ export interface CustomerBilling {
 
 async function apiCall(endpoint: string, options: RequestInit = {}): Promise<any> {
   if (!browser) throw new Error('Customer billing service can only be used in browser');
-  const token = await authService.getIdToken();
+  const token = await authService.getAuthTokenForApi();
   if (!token) throw new Error('Not authenticated');
   const tenantId = localStorage.getItem('selectedTenantId');
   if (!tenantId) throw new Error('No tenant selected');

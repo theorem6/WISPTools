@@ -139,7 +139,7 @@
   }
 
   async function getAuthToken(): Promise<string> {
-    const token = await authService.getAuthToken();
+    const token = await authService.getAuthTokenForApi();
     if (!token) {
       throw new Error('Not authenticated');
     }

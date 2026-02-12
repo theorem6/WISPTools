@@ -141,7 +141,9 @@ const tenantSchema = new mongoose.Schema({
       enableBilling: { type: Boolean, default: true },
       enableTickets: { type: Boolean, default: true },
       enableLiveChat: { type: Boolean, default: false },
-      enableKnowledgeBase: { type: Boolean, default: false }
+      enableKnowledgeBase: { type: Boolean, default: false },
+      /** HTML/script snippet for third-party chat (e.g. Tawk.to, Crisp). Injected when enableLiveChat is true. */
+      liveChatEmbedHtml: { type: String }
     },
 
     // Billing Portal Admin: payment gateways & invoice customization

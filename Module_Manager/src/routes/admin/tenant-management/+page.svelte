@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { auth } from '$lib/firebase';
+  import { authService } from '$lib/services/authService';
   import { goto } from '$app/navigation';
   import AdminBreadcrumb from '$lib/components/admin/AdminBreadcrumb.svelte';
   import { isCurrentUserPlatformAdmin, isPlatformAdminByUid } from '$lib/services/adminService';
@@ -31,7 +32,7 @@
   
   let newOwnerEmail = '';
   
-  const API_BASE = 'https://us-central1-wisptools-production.cloudfunctions.net/apiProxy';
+  const API_BASE = '/api'; // Same-origin, goes through Firebase Hosting rewrite to apiProxy
   
   onMount(async () => {
     // Check if user is platform admin (by UID)
@@ -55,7 +56,7 @@
   async function getAuthHeaders() {
     const user = auth().currentUser;
     if (!user) throw new Error('Not authenticated');
-    const token = await user.getIdToken();
+    const token = await authService.getAuthTokenForApi();
     return {
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json'
@@ -71,13 +72,20 @@
       const response = await fetch(`${API_BASE}/admin/tenants`, { headers });
       
       if (!response.ok) {
-        throw new Error('Failed to load tenants');
+        const err = new Error(response.status === 401 
+          ? 'Backend authentication not configured. Run set-firebase-admin-on-gce.ps1 and ensure PLATFORM_ADMIN_EMAILS includes your email.'
+          : 'Failed to load tenants');
+        (err as Error & { status?: number }).status = response.status;
+        throw err;
       }
       
       tenants = await response.json();
       console.log('Loaded tenants:', tenants);
     } catch (err: any) {
       error = err.message || 'Failed to load tenants';
+      if (err?.status === 401) {
+        error = 'Backend authentication not configured. Run set-firebase-admin-on-gce.ps1 and ensure PLATFORM_ADMIN_EMAILS includes your email.';
+      }
       console.error('Error loading tenants:', err);
     } finally {
       loading = false;

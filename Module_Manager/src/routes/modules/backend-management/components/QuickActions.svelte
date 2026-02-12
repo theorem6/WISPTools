@@ -1,5 +1,6 @@
 <script lang="ts">
   import { auth } from '$lib/firebase';
+  import { authService } from '$lib/services/authService';
   
   let isExecuting = false;
   
@@ -14,7 +15,7 @@
       const user = auth().currentUser;
       if (!user) throw new Error('Not authenticated');
       
-      const token = await user.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       
       const response = await fetch(`https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/apiProxy/api/system/${action}`, {
         method: 'POST',

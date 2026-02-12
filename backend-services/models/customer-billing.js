@@ -66,6 +66,12 @@ const customerBillingSchema = new mongoose.Schema({
     enum: ['credit_card', 'ach', 'paypal', 'none'],
     default: 'none'
   },
+  // Customer's PayPal email (for paying via PayPal when WISP has PayPal enabled)
+  paypalEmail: { type: String, trim: true },
+  // Invoice delivery preference: email, portal, or both
+  invoicePreferences: {
+    delivery: { type: String, enum: ['email', 'portal', 'both'], default: 'email' }
+  },
   // Stripe (when used)
   stripeCustomerId: String,
   stripePaymentMethodId: String,

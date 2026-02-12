@@ -128,6 +128,7 @@
             <h3>Billing &amp; Account</h3>
             <p>View your plan, billing cycle, balance, and next billing date.</p>
             <a class="support-link" href="/modules/customers/portal/billing">View Billing</a>
+            <a class="support-link secondary" href="/modules/customers/portal/billing/settings">Billing settings</a>
           </div>
         {/if}
         {#if featureFlags.serviceStatus}
@@ -314,7 +315,12 @@
   .support-link:hover {
     border-color: currentColor;
   }
-  
+
+  .support-link.secondary {
+    margin-left: 1rem;
+    font-weight: 500;
+  }
+
   .btn-primary {
     background: var(--brand-primary, #3b82f6);
     color: white;

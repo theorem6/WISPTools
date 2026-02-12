@@ -783,6 +783,26 @@ ssh root@136.112.111.167 "systemctl status hss-api.service"
 
 ---
 
+## 📧 **Alert email/SMS integration**
+
+To send email or SMS when an alert fires:
+
+1. **Email:** Use SendGrid, AWS SES, or your SMTP. In the backend monitoring service, when an alert is created or updated to `active`, call your email API with the alert details (rule name, severity, metric value, timestamp). Set `SENDGRID_API_KEY` (or equivalent) in backend env. The `alert_rules` schema supports `notifications.email` (array of addresses); ensure the evaluation loop reads this and triggers the send.
+2. **SMS:** Use Twilio, AWS SNS, or similar. Add a `notifications.sms` array (phone numbers) to the alert rule schema if needed. When an alert fires, call the SMS API from the same backend code path that would send email.
+3. **Unified flow:** In `monitoring-service.js` (or equivalent), after creating/updating an active alert, call a small `notifyAlert(alert, rule)` helper that sends email and/or SMS based on `rule.notifications`. This keeps alert evaluation and notification in one place.
+
+For ACS/TR-069 alerts specifically, the TR-069 alert rules (e.g. in `acs-alert-service.js`) can follow the same pattern: on alert create, call a shared notification helper with email/SMS config.
+
+---
+
+## 📈 **Advanced alerting and escalation**
+
+- **Escalation:** Add an `escalation_policy` to alert rules (e.g. after N minutes unresolved, notify a second list or create a higher-severity incident). In the monitoring loop, track `alert.created_at` and, if the alert is still active after the rule’s escalation delay, trigger the next level (e.g. additional emails, SMS, or create a ticket via your help-desk API).
+- **More rules:** Use the existing alert rules API to add rules for additional metrics (e.g. disk usage, API latency, device offline count). The same evaluation loop can evaluate all rules.
+- **Coverage map badges:** To show alert status on map objects (e.g. site or device has an active alert), the coverage map can call `GET /api/monitoring/alerts` (or a dedicated endpoint that returns alert counts per site/device) and render a small badge or icon next to the object. Backend: ensure alerts have a `resource_id` or `site_id` so the frontend can match them to map entities.
+
+---
+
 ## 📞 **Production Recommendations**
 
 ### **Before Going Live:**

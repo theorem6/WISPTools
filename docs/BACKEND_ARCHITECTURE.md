@@ -12,6 +12,37 @@ description: Node.js services on GCE, port allocation, and Firebase proxy.
 
 The backend consists of multiple Node.js services running on different ports on the GCE VM. Requests from the frontend go through Firebase Cloud Functions that proxy to these services.
 
+### Request flow (high level)
+
+```mermaid
+flowchart LR
+  subgraph Client
+    A[Browser / App]
+  end
+  subgraph Firebase
+    B[Hosting]
+    C[apiProxy Function]
+  end
+  subgraph GCE
+    D[Main API :3001]
+    E[EPC API :3002]
+  end
+  A --> B
+  B --> C
+  C --> D
+  C --> E
+```
+
+### Example: health check
+
+```bash
+# Direct to GCE (internal)
+curl http://localhost:3001/health
+
+# Via Firebase Hosting (public)
+curl https://wisptools.io/health
+```
+
 ---
 
 ## Service Architecture

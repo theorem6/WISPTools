@@ -9,6 +9,7 @@
  */
 
 import { auth } from '$lib/firebase';
+import { authService } from '$lib/services/authService';
 import type { UserRole, ModuleAccess } from '$lib/models/userRole';
 
 // Use relative URL to leverage Firebase Hosting rewrites
@@ -95,7 +96,7 @@ async function getAuthHeaders(tenantId: string): Promise<HeadersInit> {
     throw new Error('Not authenticated');
   }
 
-  const token = await user.getIdToken();
+  const token = await authService.getAuthTokenForApi();
   
   return {
     'Content-Type': 'application/json',
@@ -152,7 +153,7 @@ export async function getAllUsers(): Promise<TenantUser[]> {
       throw new Error('Not authenticated');
     }
 
-    const token = await user.getIdToken();
+    const token = await authService.getAuthTokenForApi();
     
     const headers = {
       'Content-Type': 'application/json',

@@ -34,7 +34,7 @@
 
     try {
       approving = true;
-      const token = await authService.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       const tenantId = $currentTenant?.id;
 
       const headers: HeadersInit = {
@@ -76,7 +76,7 @@
 
     try {
       approving = true;
-      const token = await authService.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       const tenantId = $currentTenant?.id;
 
       const headers: HeadersInit = {
@@ -119,7 +119,7 @@
 
     try {
       approvingPayment = true;
-      const token = await authService.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       const tenantId = $currentTenant?.id;
 
       const headers: HeadersInit = {

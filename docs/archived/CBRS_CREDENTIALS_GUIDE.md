@@ -261,9 +261,9 @@ Check the module documentation:
 
 ## 📚 Related Documentation
 
-- [CBRS Module Complete](./CBRS_MODULE_COMPLETE.md)
-- [CBRS API Key Setup](./CBRS_API_KEY_SETUP_GUIDE.md)
-- [CBRS Hybrid Model](./CBRS_HYBRID_MODEL_GUIDE.md)
+- [CBRS Module Complete](../guides/CBRS_MODULE_COMPLETE.md)
+- [CBRS API Key Setup](../guides/CBRS_API_KEY_SETUP_GUIDE.md)
+- [CBRS Hybrid Model](../guides/CBRS_HYBRID_MODEL_GUIDE.md)
 
 ---
 

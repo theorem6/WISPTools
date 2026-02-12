@@ -16,7 +16,7 @@ export class CoverageMapService {
       // Wait for auth to be ready (iframe might still be initializing)
       let attempts = 0;
       while (attempts < 5) {
-        const token = await authService.getAuthToken();
+        const token = await authService.getAuthTokenForApi();
         if (token) {
           return token;
         }

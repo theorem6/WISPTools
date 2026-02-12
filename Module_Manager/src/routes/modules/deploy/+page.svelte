@@ -34,6 +34,7 @@ import { iframeCommunicationService } from '$lib/services/iframeCommunicationSer
   import DeploymentWizard from '$lib/components/wizards/deployment/DeploymentWizard.svelte';
   import SiteDeploymentWizard from '$lib/components/wizards/deployment/SiteDeploymentWizard.svelte';
   import ModuleWizardMenu from '$lib/components/wizards/ModuleWizardMenu.svelte';
+  import { getWizardsForPath } from '$lib/config/wizardCatalog';
 
   let currentUser: any = null;
   let showEPCDeploymentModal = false;
@@ -1314,14 +1315,9 @@ import { iframeCommunicationService } from '$lib/services/iframeCommunicationSer
         </button>
         
         <ModuleWizardMenu
-          wizards={[
-            { id: 'add-site', label: 'Add Site', icon: '📍' },
-            { id: 'deploy-equipment', label: 'Deploy Equipment', icon: '📦' },
-            { id: 'pci-planner', label: 'PCI Planner', icon: '📊' },
-            { id: 'frequency-planner', label: 'Frequency Planner', icon: '📡' }
-          ]}
+          wizards={getWizardsForPath('/modules/deploy')}
           on:select={(e) => {
-            if (e.detail.id === 'add-site') showSiteDeploymentWizard = true;
+            if (e.detail.id === 'site-deployment') showSiteDeploymentWizard = true;
             else if (e.detail.id === 'deploy-equipment') {
               showDeploymentWizard = true;
               deploymentWizardLocation = null;

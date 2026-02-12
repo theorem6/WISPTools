@@ -51,7 +51,7 @@ export type FCAPSOperation = typeof FCAPS_OPERATIONS[number];
  */
 class PermissionService {
   private async apiCall(endpoint: string, options: RequestInit = {}): Promise<any> {
-    const token = await authService.getAuthToken();
+    const token = await authService.getAuthTokenForApi();
     if (!token) {
       throw new Error('Authentication token not available');
     }

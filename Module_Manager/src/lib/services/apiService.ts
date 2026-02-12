@@ -14,24 +14,11 @@ export class ApiService {
   }
 
   /**
-   * Get Firebase ID token for authenticated requests
+   * Get Firebase ID token for authenticated requests.
+   * Uses getAuthTokenForApi for robust token retrieval (wait, force refresh, retries).
    */
   private async getAuthToken(): Promise<string | null> {
-    if (!browser) return null;
-
-    const user = authService.getCurrentUser();
-    if (!user) {
-      console.warn('No authenticated user found');
-      return null;
-    }
-
-    try {
-      const token = await user.getIdToken();
-      return token;
-    } catch (error) {
-      console.error('Failed to get auth token:', error);
-      return null;
-    }
+    return authService.getAuthTokenForApi();
   }
 
   /**

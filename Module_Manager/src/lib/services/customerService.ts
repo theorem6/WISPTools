@@ -95,7 +95,7 @@ class CustomerService {
       throw new Error('Customer service can only be used in browser');
     }
 
-    const token = await authService.getIdToken();
+    const token = await authService.getAuthTokenForApi();
     if (!token) {
       throw new Error('Not authenticated');
     }

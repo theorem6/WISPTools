@@ -4,6 +4,14 @@
 
 When `deploy-backend-to-gce.ps1` uploads files but the **SSH step fails** (e.g. plink/IAP on Windows), finish the deploy manually.
 
+**Windows / plink failing:** Run upload-only so the script exits successfully, then run the remote command from **Cloud Shell** (browser):
+
+```powershell
+.\deploy-backend-to-gce.ps1 -DeployMethod Upload -SkipRemote
+```
+
+Then in [Cloud Shell](https://console.cloud.google.com) run Option A below (files are in `/tmp/backend-services-deploy`).
+
 ## Prerequisites
 
 - Files already uploaded to the VM (script printed “Running remote install and pm2…” then failed).
@@ -55,7 +63,7 @@ gcloud compute ssh acs-hss-server \
   --command "cd /opt/lte-pci-mapper/backend-services && npm install --omit=dev && pm2 reload ecosystem.config.js && pm2 save"
 ```
 
-Replace the project ID with yours if different. After this, backend (including deployment photos/GridFS) will be running the latest code.
+Replace the project ID with yours if different. After this, backend (including deployment photos/GridFS) will be running the latest code. Ensure **API_BASE_URL** is set in the backend `.env` if the app generates public URLs (e.g. for deployment photos); see `backend-services/.env.example`.
 
 ## Option C: From Google Cloud Shell
 

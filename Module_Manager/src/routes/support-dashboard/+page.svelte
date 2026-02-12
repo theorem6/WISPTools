@@ -59,7 +59,7 @@
   async function loadDashboardData() {
     loading = true;
     try {
-      const token = await authService.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       
       // Load alerts
       try {

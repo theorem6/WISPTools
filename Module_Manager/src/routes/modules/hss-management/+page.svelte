@@ -4,6 +4,7 @@
   import { page } from '$app/stores';
   import { browser } from '$app/environment';
   import { auth } from '$lib/firebase';
+  import { authService } from '$lib/services/authService';
   import { currentTenant } from '$lib/stores/tenantStore';
   import TenantGuard from '$lib/components/admin/TenantGuard.svelte';
   import GroupManagement from './components/GroupManagement.svelte';
@@ -21,6 +22,7 @@
   import BandwidthPlanWizard from '$lib/components/wizards/hss/BandwidthPlanWizard.svelte';
   import SubscriberGroupWizard from '$lib/components/wizards/hss/SubscriberGroupWizard.svelte';
   import ModuleWizardMenu from '$lib/components/wizards/ModuleWizardMenu.svelte';
+  import { getWizardsForPath } from '$lib/config/wizardCatalog';
 
   type HSSManagementTab = 'dashboard' | 'groups' | 'plans' | 'mme' | 'import' | 'remote-epcs';
   
@@ -85,7 +87,7 @@
       const user = auth().currentUser;
       if (!user) return;
       
-      const token = await user.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       
       const response = await fetch(`${HSS_API}/dashboard/stats`, {
         headers: {
@@ -169,15 +171,11 @@
             ← Back to Dashboard
           </button>
           <ModuleWizardMenu
-            wizards={[
-              { id: 'subscriber', label: 'Add Subscriber Wizard', icon: '🧙' },
-              { id: 'plan', label: 'Add Plan Wizard', icon: '📶' },
-              { id: 'group', label: 'Add Group Wizard', icon: '📦' }
-            ]}
+            wizards={getWizardsForPath('/modules/monitor')}
             on:select={(e) => {
-              if (e.detail.id === 'subscriber') showSubscriberWizard = true;
-              else if (e.detail.id === 'plan') showBandwidthPlanWizard = true;
-              else if (e.detail.id === 'group') showGroupWizard = true;
+              if (e.detail.id === 'subscriber-creation') showSubscriberWizard = true;
+              else if (e.detail.id === 'bandwidth-plan') showBandwidthPlanWizard = true;
+              else if (e.detail.id === 'subscriber-group') showGroupWizard = true;
             }}
           />
         </div>

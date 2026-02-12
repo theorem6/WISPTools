@@ -334,9 +334,9 @@ docs/
 ### **For Operators:**
 
 **Start Here:**
-1. [docs/deployment/COMPLETE_DEPLOYMENT_NOW.md](docs/deployment/COMPLETE_DEPLOYMENT_NOW.md)
-2. [docs/hss/HSS_PRODUCTION_GUIDE.md](docs/hss/HSS_PRODUCTION_GUIDE.md)
-3. [docs/guides/MONITORING_AND_ALERTING.md](docs/guides/MONITORING_AND_ALERTING.md)
+1. [docs/deployment/COMPLETE_DEPLOYMENT_NOW.md](../deployment/COMPLETE_DEPLOYMENT_NOW.md)
+2. [docs/hss/HSS_PRODUCTION_GUIDE.md](../hss/HSS_PRODUCTION_GUIDE.md)
+3. [docs/guides/MONITORING_AND_ALERTING.md](../guides/MONITORING_AND_ALERTING.md)
 
 **Daily Operations:**
 - Check monitoring dashboard daily
@@ -347,8 +347,8 @@ docs/
 ### **For Network Engineers:**
 
 **Start Here:**
-1. [docs/hss/MME_CONNECTION_GUIDE.md](docs/hss/MME_CONNECTION_GUIDE.md)
-2. [docs/hss/HSS_PRODUCTION_GUIDE.md](docs/hss/HSS_PRODUCTION_GUIDE.md)
+1. [docs/hss/MME_CONNECTION_GUIDE.md](../hss/MME_CONNECTION_GUIDE.md)
+2. [docs/hss/HSS_PRODUCTION_GUIDE.md](../hss/HSS_PRODUCTION_GUIDE.md)
 
 **Key Tasks:**
 - Configure remote MMEs
@@ -359,9 +359,9 @@ docs/
 ### **For Administrators:**
 
 **Start Here:**
-1. [docs/guides/MULTI_TENANT_SETUP_GUIDE.md](docs/guides/MULTI_TENANT_SETUP_GUIDE.md)
-2. [docs/guides/ADMIN_AND_USER_MANAGEMENT.md](docs/guides/ADMIN_AND_USER_MANAGEMENT.md)
-3. [docs/guides/EMAIL_ALERTS_SETUP.md](docs/guides/EMAIL_ALERTS_SETUP.md)
+1. [docs/guides/MULTI_TENANT_SETUP_GUIDE.md](../guides/MULTI_TENANT_SETUP_GUIDE.md)
+2. [docs/guides/ADMIN_AND_USER_MANAGEMENT.md](../guides/ADMIN_AND_USER_MANAGEMENT.md)
+3. [docs/guides/EMAIL_ALERTS_SETUP.md](../guides/EMAIL_ALERTS_SETUP.md)
 
 **Key Tasks:**
 - Manage tenants and users
@@ -417,7 +417,7 @@ bash <(curl -s https://raw.githubusercontent.com/theorem6/lte-pci-mapper/main/de
 
 **2. Configure Email Alerts (10 min):**
 
-Follow: [docs/guides/EMAIL_ALERTS_SETUP.md](docs/guides/EMAIL_ALERTS_SETUP.md)
+Follow: [docs/guides/EMAIL_ALERTS_SETUP.md](../guides/EMAIL_ALERTS_SETUP.md)
 
 **3. Initialize Monitoring (2 min):**
 
@@ -500,15 +500,15 @@ https://lte-pci-mapper--lte-pci-mapper-65450042-bbf71.us-east4.hosted.app
 
 ## 📚 **Documentation Hub**
 
-**Main Index:** [docs/README.md](docs/README.md)
+**Main Index:** [docs/README.md](../README.md)
 
 **Quick Links:**
-- 🚀 [Start Deployment](docs/deployment/COMPLETE_DEPLOYMENT_NOW.md)
-- 🔐 [HSS Guide](docs/hss/HSS_PRODUCTION_GUIDE.md)
-- 📡 [MME Setup](docs/hss/MME_CONNECTION_GUIDE.md)
-- 🔍 [Monitoring](docs/guides/MONITORING_AND_ALERTING.md)
-- 📧 [Email Alerts](docs/guides/EMAIL_ALERTS_SETUP.md)
-- 📖 [Full Index](DOCUMENTATION_INDEX.md)
+- 🚀 [Start Deployment](../deployment/COMPLETE_DEPLOYMENT_NOW.md)
+- 🔐 [HSS Guide](../hss/HSS_PRODUCTION_GUIDE.md)
+- 📡 [MME Setup](../hss/MME_CONNECTION_GUIDE.md)
+- 🔍 [Monitoring](../guides/MONITORING_AND_ALERTING.md)
+- 📧 [Email Alerts](../guides/EMAIL_ALERTS_SETUP.md)
+- 📖 [Full Index](../README.md)
 
 ---
 

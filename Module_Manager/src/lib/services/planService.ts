@@ -305,7 +305,7 @@ export interface PlanFeatureSummary {
 
 class PlanService {
   private async getAuthToken(): Promise<string> {
-    const token = await authService.getAuthToken();
+    const token = await authService.getAuthTokenForApi();
     if (!token) {
       throw new Error('Not authenticated');
     }
@@ -323,9 +323,10 @@ class PlanService {
       throw new Error('No tenant selected');
     }
     
-    // Use centralized API configuration
+    // Use centralized API configuration. Append path param so authProxy gets path when Hosting rewrites send req.url as '/'
     const apiPath = API_URL;
-    const fullUrl = `${apiPath}${endpoint}`;
+    const base = `${apiPath}${endpoint}`;
+    const fullUrl = base.includes('?') ? `${base}&path=${encodeURIComponent(API_URL)}` : `${base}?path=${encodeURIComponent(API_URL)}`;
     console.log('[planService] API URL:', { API_URL, apiPath, fullUrl, endpoint });
     const response = await fetch(fullUrl, {
       ...options,

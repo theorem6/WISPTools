@@ -51,7 +51,7 @@
         throw new Error('Not authenticated');
       }
       
-      const token = await user.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       
       const response = await fetch(`/api/tr069/device-metrics?deviceId=${device.id}&hours=6`, {
         headers: {
@@ -153,7 +153,7 @@
       const user = authService.getCurrentUser();
       if (!user) throw new Error('Not authenticated');
       
-      const token = await user.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       
       const response = await fetch(`/api/tr069/devices/${device.id}/customer`, {
         method: 'PUT',
@@ -208,7 +208,7 @@
       const user = authService.getCurrentUser();
       if (!user) throw new Error('Not authenticated');
 
-      const token = await user.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       const response = await fetch(`/api/tr069/devices/${device.id}/customer`, {
         method: 'DELETE',
         headers: {

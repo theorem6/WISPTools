@@ -3,6 +3,7 @@
   import ECharts from '$lib/components/ECharts.svelte';
   import type { EChartsOption } from 'echarts';
   import { auth } from '$lib/firebase';
+  import { authService } from '$lib/services/authService';
   import { currentTenant } from '$lib/stores/tenantStore';
   import { API_CONFIG } from '$lib/config/api';
   
@@ -57,7 +58,7 @@
         return;
       }
       
-      const token = await user.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       
       const response = await fetch(`${API_CONFIG.PATHS.MONITORING_GRAPHS}/devices`, {
         headers: {
@@ -140,7 +141,7 @@
       const user = auth().currentUser;
       if (!user) return;
       
-      const token = await user.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       const deviceId = selectedDevice.id;
       const hours = getHours();
       

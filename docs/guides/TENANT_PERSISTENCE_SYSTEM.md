@@ -220,7 +220,7 @@ When creating a new module, ensure:
 
 ## Related Documentation
 
-- [Tenant Setup Guide](./TENANT_SETUP.md)
-- [Multi-Tenant Architecture](../architecture/MULTI_TENANT.md)
-- [API Authentication](./API_AUTHENTICATION.md)
+- [Tenant Setup Guide](./MULTI_TENANT_SETUP_GUIDE.md)
+- [Multi-Tenant Architecture](./MULTI_TENANT_ARCHITECTURE.md)
+- [Admin and User Management](./ADMIN_AND_USER_MANAGEMENT.md)
 

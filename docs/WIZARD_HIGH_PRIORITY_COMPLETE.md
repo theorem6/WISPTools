@@ -1,3 +1,8 @@
+---
+title: High Priority Wizards – Implementation Complete
+description: All 5 high-priority wizards completed; locations and features.
+---
+
 # High Priority Wizards - Implementation Complete
 
 **Date:** January 2025  

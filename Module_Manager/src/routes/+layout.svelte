@@ -43,8 +43,8 @@
     
     console.log('[Root Layout] Initializing authentication...');
     
-    // Wait briefly for Firebase auth to restore session
-    await new Promise(resolve => setTimeout(resolve, 150));
+    // Wait for Firebase auth to restore session (prevents redirect loop on refresh)
+    await new Promise(resolve => setTimeout(resolve, 400));
     
     // Check Firebase authentication state (sync after init)
     const user = authService.getCurrentUser();

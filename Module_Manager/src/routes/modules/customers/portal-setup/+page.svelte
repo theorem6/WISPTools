@@ -39,6 +39,7 @@
   let enableTickets = true;
   let enableLiveChat = false;
   let enableKnowledgeBase = false;
+  let liveChatEmbedHtml = '';
 
   // Billing Portal Admin: payment gateways & invoice customization
   let stripeEnabled = false;
@@ -202,6 +203,7 @@
       enableTickets = branding.features?.enableTickets !== false;
       enableLiveChat = branding.features?.enableLiveChat || false;
       enableKnowledgeBase = branding.features?.enableKnowledgeBase || false;
+      liveChatEmbedHtml = branding.features?.liveChatEmbedHtml || '';
 
       const bp = branding.billingPortal;
       stripeEnabled = bp?.paymentGateways?.stripe?.enabled || false;
@@ -228,7 +230,7 @@
 
   async function loadAlerts() {
     try {
-      const token = await authService.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       const response = await fetch(`${API_URL}/portal-content/${tenantId}/alerts`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -242,7 +244,7 @@
 
   async function loadFAQItems() {
     try {
-      const token = await authService.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       const response = await fetch(`${API_URL}/portal-content/${tenantId}/faq`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -256,7 +258,7 @@
 
   async function loadKBArticles() {
     try {
-      const token = await authService.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       const response = await fetch(`${API_URL}/portal-content/${tenantId}/knowledge-base`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -270,7 +272,7 @@
 
   async function loadChatSettings() {
     try {
-      const token = await authService.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       const response = await fetch(`${API_URL}/portal-content/${tenantId}/chat-settings`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -310,7 +312,7 @@
           portalSubdomain: enableCustomDomain ? undefined : portalSubdomain,
           welcomeMessage: `Welcome to ${companyName}'s Customer Portal`
         },
-        features: { enableFAQ, enableServiceStatus, enableBilling, enableTickets, enableLiveChat, enableKnowledgeBase }
+        features: { enableFAQ, enableServiceStatus, enableBilling, enableTickets, enableLiveChat, enableKnowledgeBase, liveChatEmbedHtml: liveChatEmbedHtml.trim() || undefined }
       });
       
       portalUrl = getPortalUrl();
@@ -370,7 +372,7 @@
     
     try {
       await brandingService.updateTenantBranding(tenantId, {
-        features: { enableFAQ, enableServiceStatus, enableBilling, enableTickets, enableLiveChat, enableKnowledgeBase }
+        features: { enableFAQ, enableServiceStatus, enableBilling, enableTickets, enableLiveChat, enableKnowledgeBase, liveChatEmbedHtml: liveChatEmbedHtml.trim() || undefined }
       });
       
       success = 'Features saved successfully!';
@@ -387,7 +389,7 @@
     error = '';
     
     try {
-      const token = await authService.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       const method = editingAlertId ? 'PUT' : 'POST';
       const url = editingAlertId 
         ? `${API_URL}/portal-content/${tenantId}/alerts/${editingAlertId}`
@@ -419,7 +421,7 @@
     if (!confirm('Are you sure you want to delete this alert?')) return;
     
     try {
-      const token = await authService.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       const response = await fetch(`${API_URL}/portal-content/${tenantId}/alerts/${alertId}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
@@ -452,7 +454,7 @@
     error = '';
     
     try {
-      const token = await authService.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       const method = editingFAQId ? 'PUT' : 'POST';
       const url = editingFAQId 
         ? `${API_URL}/portal-content/${tenantId}/faq/${editingFAQId}`
@@ -484,7 +486,7 @@
     if (!confirm('Are you sure you want to delete this FAQ?')) return;
     
     try {
-      const token = await authService.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       const response = await fetch(`${API_URL}/portal-content/${tenantId}/faq/${faqId}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
@@ -517,7 +519,7 @@
     error = '';
     
     try {
-      const token = await authService.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       const method = editingArticleId ? 'PUT' : 'POST';
       const url = editingArticleId 
         ? `${API_URL}/portal-content/${tenantId}/knowledge-base/${editingArticleId}`
@@ -549,7 +551,7 @@
     if (!confirm('Are you sure you want to delete this article?')) return;
     
     try {
-      const token = await authService.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       const response = await fetch(`${API_URL}/portal-content/${tenantId}/knowledge-base/${articleId}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
@@ -596,7 +598,7 @@
     error = '';
     
     try {
-      const token = await authService.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       const response = await fetch(`${API_URL}/portal-content/${tenantId}/chat-settings`, {
         method: 'PUT',
         headers: {
@@ -928,6 +930,13 @@
                   <span class="toggle-description">Enable real-time chat with customers</span>
                 </div>
               </label>
+              {#if enableLiveChat}
+                <div class="form-group" style="margin-top: 0.75rem; margin-left: 2.5rem;">
+                  <label>Chat widget embed code (e.g. Tawk.to, Crisp, Intercom)</label>
+                  <textarea bind:value={liveChatEmbedHtml} rows="4" class="form-input" placeholder="Paste the &lt;script&gt;...&lt;/script&gt; snippet from your chat provider"></textarea>
+                  <p class="hint">Paste the full script tag(s) from your chat provider. The widget will load on all portal pages when Live Chat is enabled.</p>
+                </div>
+              {/if}
             </div>
           </div>
           

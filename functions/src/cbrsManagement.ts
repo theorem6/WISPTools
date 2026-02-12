@@ -327,9 +327,8 @@ export const getSASUserIDs = onCall(async (request) => {
           body: errorBody
         });
         
-        // Return user's actual SAS User IDs
-        // TODO: Replace with actual Google SAS API call when endpoint is confirmed
-        
+        // Fallback: return sample SAS User IDs when Google SAS Portal API fails (e.g. wrong scope, 4xx/5xx).
+        // Real API is used above when response.ok; remove or narrow this fallback when API is confirmed.
         return {
           success: true,
           userIds: [
@@ -428,8 +427,7 @@ export const getSASUserIDs = onCall(async (request) => {
       
       console.log('[getSASUserIDs] Returning fallback User IDs');
       
-      // Return user's actual SAS User IDs (fallback)
-      // TODO: Replace with actual Google SAS API call when endpoint is confirmed
+      // Fallback sample data when Google SAS Portal API call fails; see docs/BACKEND_INTEGRATIONS.md.
       return {
         success: true,
         userIds: [

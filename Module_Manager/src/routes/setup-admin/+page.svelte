@@ -1,5 +1,6 @@
 <script lang="ts">
   import { auth, db } from '$lib/firebase';
+  import { authService } from '$lib/services/authService';
   import { collection, getDocs } from 'firebase/firestore';
   import { onMount } from 'svelte';
   
@@ -32,7 +33,7 @@
       result += `Found ${tenantIds.length} tenant(s): ${tenantIds.join(', ')}\n\n`;
       result += 'Calling setup-admin endpoint...\n';
       
-      const token = await user.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       
       const response = await fetch('https://us-central1-wisptools-production.cloudfunctions.net/apiProxy/setup-admin', {
         method: 'POST',

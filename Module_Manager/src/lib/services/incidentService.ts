@@ -130,7 +130,7 @@ class IncidentService {
     if (!authService || typeof authService.getIdToken !== 'function') {
       throw new Error('AuthService not properly initialized');
     }
-    const token = await authService.getIdToken();
+    const token = await authService.getAuthTokenForApi();
     if (!token) {
       throw new Error('Not authenticated');
     }

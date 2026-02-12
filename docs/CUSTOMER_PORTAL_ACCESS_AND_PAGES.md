@@ -1,3 +1,8 @@
+---
+title: Customer Portal – Access and All Pages
+description: How customers reach the portal and a list of every page, URL, and how to access it.
+---
+
 # Customer Portal: Access and All Pages
 
 This document describes how customers reach the portal and lists every page, URL, and how to access it.

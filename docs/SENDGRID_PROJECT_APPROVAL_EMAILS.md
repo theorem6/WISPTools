@@ -1,3 +1,8 @@
+---
+title: SendGrid Setup for Project-Approval Emails
+description: Configure SendGrid so onNotificationCreated sends email when a plan is approved.
+---
+
 # SendGrid Setup for Project-Approval Emails
 
 When a plan is approved, the Firestore trigger `onNotificationCreated` (in `functions/src/notifications.ts`) can send an email to the user via SendGrid. Emails are only sent if the following environment variables are set for the Cloud Function.

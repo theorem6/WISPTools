@@ -4,6 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const appConfig = require('../config/app');
 const { Tenant } = require('../models/tenant');
+const DeviceTag = require('../models/device-tag');
 
 const router = express.Router();
 
@@ -71,6 +72,24 @@ const resolveGenieacsConfig = async (tenantId) => {
     genieacsApiUrl: saved.genieacsApiUrl || appConfig.externalServices.genieacs.nbiUrl
   };
 };
+
+/** Load device tags for tenant and return Map<deviceId, string[]> */
+async function loadDeviceTagsForTenant(tenantId) {
+  const docs = await DeviceTag.find({ tenantId }).lean();
+  const map = new Map();
+  for (const d of docs) {
+    map.set(d.deviceId, d.tags || []);
+  }
+  return map;
+}
+
+/** Merge tags from tagMap into devices (mutates devices) */
+function mergeDeviceTags(devices, tagMap) {
+  for (const d of devices) {
+    const id = d._id || d.id;
+    d.tags = tagMap.get(id) || d.tags || [];
+  }
+}
 
 // GET /api/tr069/configuration - Fetch saved GenieACS config
 router.get('/configuration', async (req, res) => {
@@ -420,6 +439,14 @@ router.get('/devices', async (req, res) => {
       _tenantId: device._tenantId || req.tenantId,
       tenantId: device.tenantId || req.tenantId
     }));
+
+    // Merge device tags from our DB
+    try {
+      const tagMap = await loadDeviceTagsForTenant(req.tenantId);
+      mergeDeviceTags(enrichedDevices, tagMap);
+    } catch (tagErr) {
+      console.warn('[TR069 API] Could not load device tags:', tagErr.message);
+    }
     
     res.json({
       success: true,
@@ -594,6 +621,51 @@ router.post('/devices/:deviceId/diagnostics', async (req, res) => {
   }
 });
 
+// GET /api/tr069/devices/:deviceId/tags - Get tags for a device
+router.get('/devices/:deviceId/tags', async (req, res) => {
+  try {
+    const { deviceId } = req.params;
+    const doc = await DeviceTag.findOne({ tenantId: req.tenantId, deviceId }).lean();
+    res.json({ success: true, tags: doc?.tags || [] });
+  } catch (error) {
+    console.error('[TR069 API] Get device tags failed:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// PUT /api/tr069/devices/:deviceId/tags - Set tags for a device
+router.put('/devices/:deviceId/tags', async (req, res) => {
+  try {
+    const { deviceId } = req.params;
+    const { tags } = req.body || {};
+    const tagArray = Array.isArray(tags) ? tags.map(String).filter(Boolean) : [];
+    await DeviceTag.findOneAndUpdate(
+      { tenantId: req.tenantId, deviceId },
+      { tags: tagArray, updatedAt: new Date() },
+      { upsert: true, new: true }
+    );
+    res.json({ success: true, tags: tagArray });
+  } catch (error) {
+    console.error('[TR069 API] Set device tags failed:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// GET /api/tr069/device-tags - List unique tags for tenant (for filter dropdown)
+router.get('/device-tags', async (req, res) => {
+  try {
+    const docs = await DeviceTag.find({ tenantId: req.tenantId }).lean();
+    const set = new Set();
+    for (const d of docs) {
+      (d.tags || []).forEach(t => set.add(t));
+    }
+    res.json({ success: true, tags: [...set].sort() });
+  } catch (error) {
+    console.error('[TR069 API] Get device tags list failed:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // GET /api/tr069/devices/:deviceId - Get single device (for verify step in troubleshooting)
 router.get('/devices/:deviceId', async (req, res) => {
   try {
@@ -608,6 +680,8 @@ router.get('/devices/:deviceId', async (req, res) => {
       return res.status(response.status).json({ success: false, error: 'Device not found' });
     }
     const device = await response.json();
+    const tagDoc = await DeviceTag.findOne({ tenantId: req.tenantId, deviceId }).lean();
+    if (device) device.tags = tagDoc?.tags || device.tags || [];
     res.json({ success: true, device });
   } catch (error) {
     console.error('[TR069 API] Get device failed:', error);
@@ -694,6 +768,40 @@ router.post('/devices/:deviceId/factory-reset', async (req, res) => {
   } catch (error) {
     console.error('[TR069 API] Factory reset failed:', error);
     res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// GET /api/tr069/tasks - List TR-069 task queue from GenieACS
+router.get('/tasks', async (req, res) => {
+  try {
+    const { device: deviceId } = req.query;
+    const config = await resolveGenieacsConfig(req.tenantId);
+    const nbiUrl = (config.genieacsApiUrl || getNbiUrl()).replace(/\/$/, '');
+    let tasksUrl = `${nbiUrl}/tasks`;
+    if (deviceId) {
+      tasksUrl += `?query=${encodeURIComponent(JSON.stringify({ device: deviceId }))}`;
+    }
+    const response = await fetch(tasksUrl, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    if (!response.ok) {
+      const errorText = await response.text();
+      return res.status(response.status).json({
+        success: false,
+        error: 'Failed to fetch tasks from GenieACS',
+        details: errorText
+      });
+    }
+    const tasks = await response.json();
+    res.json({ success: true, tasks: Array.isArray(tasks) ? tasks : (tasks.tasks || []) });
+  } catch (error) {
+    console.error('[TR069 API] Failed to fetch tasks:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch task queue',
+      details: error.message
+    });
   }
 });
 
@@ -1745,6 +1853,14 @@ router.get('/devices/filtered', async (req, res) => {
     }
     
     let devices = await response.json();
+
+    // Merge device tags from our DB before applying tag filter
+    try {
+      const tagMap = await loadDeviceTagsForTenant(req.tenantId);
+      mergeDeviceTags(devices, tagMap);
+    } catch (tagErr) {
+      console.warn('[TR069 API] Could not load device tags:', tagErr.message);
+    }
     
     // Apply filters
     if (manufacturer) {
@@ -1818,10 +1934,11 @@ router.get('/devices/filtered', async (req, res) => {
       });
     }
     
-    if (tags && Array.isArray(tags)) {
+    const tagList = Array.isArray(tags) ? tags : (tags ? [tags] : []);
+    if (tagList.length > 0) {
       devices = devices.filter(d => {
         const deviceTags = d.tags || [];
-        return tags.some(tag => deviceTags.includes(tag));
+        return tagList.some(tag => deviceTags.includes(tag));
       });
     }
     

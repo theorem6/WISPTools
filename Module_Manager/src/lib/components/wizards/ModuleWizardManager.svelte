@@ -100,7 +100,6 @@
   ];
   
   $: wizards = availableWizards.length > 0 ? availableWizards : defaultACSWizards;
-  $: wizards = availableWizards.length > 0 ? availableWizards : defaultACSWizards;
   $: activeWizardComponent = activeWizard 
     ? wizards.find((w: any) => w.id === activeWizard)?.component 
     : null;

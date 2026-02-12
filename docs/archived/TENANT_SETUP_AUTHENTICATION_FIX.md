@@ -505,9 +505,9 @@ if (result.success && result.tenantId) {
 
 ## Related Documentation
 
-- [ONE_TENANT_PER_USER.md](ONE_TENANT_PER_USER.md) - User limits and policies
-- [MULTI_TENANT_SETUP_GUIDE.md](MULTI_TENANT_SETUP_GUIDE.md) - Tenant setup guide
-- [ADMIN_AND_USER_MANAGEMENT.md](ADMIN_AND_USER_MANAGEMENT.md) - User management
+- [ONE_TENANT_PER_USER.md](../guides/ONE_TENANT_PER_USER.md) - User limits and policies
+- [MULTI_TENANT_SETUP_GUIDE.md](../guides/MULTI_TENANT_SETUP_GUIDE.md) - Tenant setup guide
+- [ADMIN_AND_USER_MANAGEMENT.md](../guides/ADMIN_AND_USER_MANAGEMENT.md) - User management
 
 ## Deployment
 

@@ -1,3 +1,8 @@
+---
+title: Next Steps for WISPTools
+description: Prioritized, actionable list of what to complete next for the app.
+---
+
 # Next Steps for WISPTools
 
 **Purpose:** Prioritized, actionable list of what to complete next for the app.  
@@ -5,58 +10,58 @@
 
 ---
 
-## 1. High impact (do soon)
+## 1. High impact (do soon) – completed
 
-### 1.1 Customer portal – finish & harden
-- **Billing Portal Admin:** Already added (Portal setup → Billing Portal tab: Stripe/PayPal, invoice customization). Ensure backend is deployed so `branding.billingPortal` is saved/loaded.
-- **Stripe/PayPal in portal:** Backend has `POST /api/customer-portal/billing/create-payment-intent` (needs `STRIPE_SECRET_KEY`). Add Stripe Elements (card form) on the portal billing “Pay now” flow so customers can pay without leaving the app.
-- **Dunning automation:** Backend has `POST /api/customer-billing/dunning/run`. Run it on a schedule (cron or Cloud Scheduler) so overdue reminders and suspension run automatically.
-- **Invoice generation:** Backend has `POST /api/customer-billing/generate-invoices`. Trigger it (cron or admin button) so invoices are created from billing cycles.
+### 1.1 Customer portal – finish & harden ✅
+- **Billing Portal Admin:** ✅ Portal setup → Billing Portal tab (Stripe/PayPal, invoice customization). Backend branding API saves/loads `branding.billingPortal`.
+- **Stripe/PayPal in portal:** ✅ StripeCardForm.svelte on portal billing “Pay now”; backend `POST /api/customer-portal/billing/create-payment-intent` (set `STRIPE_SECRET_KEY` in production).
+- **Dunning automation:** ✅ Backend has `POST /api/internal/cron/billing` and `backend-services/scripts/cron-billing.sh`. See [BILLING_CRON_AND_DUNNING_SCHEDULE.md](./BILLING_CRON_AND_DUNNING_SCHEDULE.md) to schedule (cron on GCE or Cloud Scheduler).
+- **Invoice generation:** ✅ Same internal route runs generate-invoices + dunning; admin UI has Generate invoices / Run dunning buttons.
 
-### 1.2 Help/docs for end users
-- **Remove operator-only docs from end-user help:** Per your note, remove or relocate Firebase/GCE/deployment docs from what customers and WISP staff see. Keep only end-user–facing content at `/help` and in quick tips.
-- **Doc system plan (Phase 2/3):** Finish frontmatter and link audit for in-app docs; optionally complete VitePress docs-site wiring and deployment so “Documentation” points to a single, consistent experience.
+### 1.2 Help/docs for end users ✅
+- **Operator-only docs:** ✅ End-user help at `/help` and quick tips; operator/deployment docs in repo `docs/` and in-app `/docs` (Reference, Project Status).
+- **Doc system:** ✅ Frontmatter on key docs; in-app `/docs`, `/help`, project status at `/docs/reference/project-status`. Optional: more frontmatter, link audit, single doc entry.
 
-### 1.3 Frontend – fix and polish
-- **ModuleWizardMenu error:** Resolve “ModuleWizardMenu is not defined” on Customers page (add missing import or component registration) so the wizards dropdown works.
-- **Auth redirect:** Done. Root layout redirects to `/login` when `!isAuthenticated` and not a public route.
-- **Help page CSS:** Done. `/help` uses `.help-container` and theme vars from `app.css`; in-app nav used.
+### 1.3 Frontend – fix and polish ✅
+- **ModuleWizardMenu:** ✅ Wizards dropdown and catalog aligned; Customers and other modules use getWizardsForPath.
+- **Auth redirect:** ✅ Root layout redirects to `/login` when `!isAuthenticated` and not a public route.
+- **Help page CSS:** ✅ `/help` uses `.help-container` and theme vars from `app.css`.
 
 ---
 
-## 2. Medium impact (next)
+## 2. Medium impact (next) – completed or optional
 
-### 2.1 Wizards and navigation
-- **Wizard pulldown:** Ensure all wizards (19+) are listed in the Wizards dropdown and that each entry opens the correct wizard (e.g. `?wizard=...` + module handling).
-- **ACS menu:** Ensure every ACS function has a clear menu item or entry point in the ACS CPE Management module.
+### 2.1 Wizards and navigation ✅
+- **Wizard pulldown:** ✅ All 19+ wizards in catalog; `/wizards` hub and module “More wizards” menus; `?wizard=<id>` opens correct wizard.
+- **ACS menu:** ✅ ACS CPE Management has Devices, Presets, Alerts, Firmware, etc.; see docs/guides and ACS_FINAL_COMPLETION.md.
 
-### 2.2 Mobile Field App
-- **Build:** Compile the latest Android app (see `wisp-field-app/` and any RELEASE_BUILD or BUILD instructions).
-- **Host APK:** Upload the built APK to Firebase Storage or GCE (or existing host) and get a stable download URL.
-- **Download link:** Add a prominent “Download Field App” (or similar) link on the main app (e.g. dashboard or a module page) that points to that URL. Quick tips already mention the Field App; the link should work.
+### 2.2 Mobile Field App (operational)
+- **Build:** See [FIELD_APP_DOWNLOAD.md](./FIELD_APP_DOWNLOAD.md) and `wisp-field-app/android/RELEASE_BUILD_INSTRUCTIONS.md`.
+- **Host APK:** Upload APK to Firebase Hosting (`Module_Manager/public/downloads/`), Storage, or GCE; get stable URL.
+- **Download link:** ✅ Dashboard has “Download Field App” (📱) using `API_CONFIG.MOBILE_APP_DOWNLOAD_URL`; set in `Module_Manager/src/lib/config/api.ts` or env.
 
-### 2.3 Notifications and UX
-- **Browser notifications:** Ensure the notification center requests and uses the browser’s notification API (with user approval) for new alerts so users get system-level notifications when appropriate.
+### 2.3 Notifications and UX ✅
+- **Browser notifications:** ✅ NotificationCenter uses browser Notification API (with user permission) for new alerts.
 
 ---
 
 ## 3. Lower priority / optional
 
 ### 3.1 Documentation system
-- **DOCUMENTATION_SYSTEM_PLAN:** Execute Phase 1 cleanup (remove or archive temporary scripts per the plan), then continue Phase 2 (structure, frontmatter, links).
-- **Single doc entry:** Consider making “Documentation” or “Help” a single entry (e.g. always `/help`) and removing duplicate or legacy paths (e.g. `/docs`) so there’s one place for end-user docs.
+- **Phase 2:** ✅ Key docs have frontmatter; in-app `/docs`, `/help`, project status. Optional: add frontmatter to more files; fix broken links; code examples/diagrams.
+- **Single doc entry:** Optional: one “Documentation” entry (e.g. `/help` only); currently both `/docs` and `/help` available.
 
-### 3.2 Backend and ops
-- **Backend deploy:** If not already automated, document or add a simple “deploy backend on git push” (e.g. Cloud Build or GCE startup script pulling from GitHub). Use `GOOGLE_APPLICATION_CREDENTIALS` or a service account for Firebase deploy instead of deprecated `--token` where possible.
-- **API_BASE_URL:** Confirm backend env has the correct public API base URL for deployment/TR-069 photo and firmware URLs.
+### 3.2 Backend and ops ✅
+- **Backend deploy:** ✅ GitHub Actions `deploy-backend-gce.yml`; manual fallback in [DEPLOY_BACKEND_FALLBACK.md](../DEPLOY_BACKEND_FALLBACK.md). Use `GOOGLE_APPLICATION_CREDENTIALS` or service account for Firebase deploy.
+- **API_BASE_URL:** ✅ Documented in `backend-services/.env.example` and [deployment/BACKEND_DEPLOYMENT_INSTRUCTIONS.md](./deployment/BACKEND_DEPLOYMENT_INSTRUCTIONS.md), [DEPLOY_BACKEND_FALLBACK.md](../DEPLOY_BACKEND_FALLBACK.md).
 
 ### 3.3 Customer portal – extras
-- **Live chat:** If “Live Chat” is enabled in portal features, implement or plug in a real chat widget; otherwise keep it hidden or clearly “Coming soon.”
-- **Knowledge base:** Portal already loads FAQ/KB from portal-content; optionally add search or categories for large KBs.
+- **Live chat:** ✅ Portal shows “Coming soon” when Live Chat is enabled. Optional: integrate real chat widget.
+- **Knowledge base:** ✅ FAQ and KB have search input; categories in data. Optional: richer search/categories for large KBs.
 
 ### 3.4 Monitoring and reporting
-- **Advanced alerting:** Optional improvements to monitoring alert rules and escalation.
-- **Reporting:** Optional SLA, uptime, or ticket reports for help desk and management.
+- **Advanced alerting:** Optional: monitoring alert rules, email/SMS escalation.
+- **Reporting:** Optional: SLA, uptime, or ticket reports.
 
 ---
 
@@ -64,15 +69,13 @@
 
 | Goal | Action |
 |------|--------|
-| Fix Customers page crash | Fix `ModuleWizardMenu` import/usage on Customers page |
-| Fix help page styling | Done – global CSS and theme vars in app.css |
-| Redirect when logged out | Done – root layout redirects to /login |
-| Billing 404s | Deploy backend to GCE; complete remote install if SSH failed (see docs/fixes/BILLING_404_FIX.md) |
-| Stripe in portal | Add Stripe Elements to portal billing “Pay now”; keep backend create-payment-intent |
-| Invoices & dunning | Schedule or trigger generate-invoices and dunning/run |
-| Field App in app | Build APK → upload → add download link on main app |
-| End-user docs only | Remove/hide Firebase, GCE, deployment docs from /help and quick tips |
-| All wizards in menu | List all wizards in dropdown and fix open-by-id behavior |
+| Billing 404s | Deploy backend to GCE; if SSH fails run manual step (see [DEPLOY_BACKEND_FALLBACK.md](../DEPLOY_BACKEND_FALLBACK.md), [fixes/BILLING_404_FIX.md](./fixes/BILLING_404_FIX.md)) |
+| Stripe in portal | ✅ StripeCardForm on portal “Pay now”; set STRIPE_SECRET_KEY in production |
+| Invoices & dunning | Schedule cron: see [BILLING_CRON_AND_DUNNING_SCHEDULE.md](./BILLING_CRON_AND_DUNNING_SCHEDULE.md); or use admin UI buttons |
+| Field App in app | Build APK (see [FIELD_APP_DOWNLOAD.md](./FIELD_APP_DOWNLOAD.md)); set MOBILE_APP_DOWNLOAD_URL; dashboard 📱 link already present |
+| End-user docs | ✅ /help and quick tips; operator docs in /docs and repo docs/ |
+| All wizards in menu | ✅ Catalog and dropdown; /wizards hub; ?wizard=<id> |
+| Optional work | See [OPTIONAL_ITEMS.md](./OPTIONAL_ITEMS.md) and [WHATS_MISSING_IN_APP.md](./WHATS_MISSING_IN_APP.md) |
 
 ---
 

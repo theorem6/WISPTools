@@ -39,27 +39,26 @@ description: Single list of remaining work, planned features, and TODOs for WISP
 
 ## 2. Customer Portal
 
-**Sources:** `docs/CUSTOMER_PORTAL_IMPLEMENTATION_PLAN.md`, `docs/COMPREHENSIVE_AUDIT_AND_COMPLETION_PLAN.md`, `docs/WISP_ACTIVITIES_DEEP_DIVE.md`
+**Sources:** `docs/CUSTOMER_PORTAL_IMPLEMENTATION_PLAN.md`, `docs/COMPREHENSIVE_AUDIT_AND_COMPLETION_PLAN.md`, `docs/WISP_ACTIVITIES_DEEP_DIVE.md`, `docs/CUSTOMER_PORTAL_ACCESS_AND_PAGES.md`
 
-- **Status:** Planned; routes and auth exist; full flow not implemented.
-- **Remaining:**
-  - Tenant branding (logo/colors) refinements
-  - Create branding schema in tenant model
-  - Build out portal route structure beyond placeholders
-  - Ticket system for customers (wire to maintain module)
-  - Branding customization UI for WISP admins
-  - Optional: live chat (future), multi-language (future), 2FA (future)
-- **Estimate:** 3–4 weeks for MVP.
+- **Status:** ✅ **Implemented.** Routes, auth, branding, tickets, billing, FAQ, KB, service status, and live-chat placeholder are in place.
+- **Done:**
+  - Tenant branding schema and Portal Setup UI (branding, features, billing gateways, alerts, FAQ/KB/chat toggles).
+  - Portal route structure: dashboard, billing, billing/settings, tickets, ticket detail, new ticket, FAQ, knowledge base, service status, live chat (placeholder).
+  - Ticket system wired to work orders (maintain module).
+  - Billing: Stripe/PayPal in portal (StripeCardForm), invoice list, dunning; internal cron route and script documented.
+  - Back-to-Dashboard links on service, FAQ, and KB (including when feature disabled).
+- **Optional (later):** Live chat integration (real widget), KB search enhancements, multi-language, 2FA.
 
 ---
 
 ## 3. Customer Billing
 
-**Sources:** `docs/WISP_ACTIVITIES_DEEP_DIVE.md`, `docs/COMPREHENSIVE_AUDIT_AND_COMPLETION_PLAN.md`
+**Sources:** `docs/WISP_ACTIVITIES_DEEP_DIVE.md`, `docs/COMPREHENSIVE_AUDIT_AND_COMPLETION_PLAN.md`, `docs/BILLING_CRON_AND_DUNNING_SCHEDULE.md`
 
-- **Status:** Phase 1 in place. Per-customer billing records with service plan, billing cycle, and SLA (response time, uptime %, notes) via `CustomerBillingModal` and backend `GET/POST/PUT /api/customer-billing`. Backend POST accepts `sla` on create.
-- **Done:** Billing cycles (monthly/annual, day of month), SLA tracking (response time hours, uptime percent, notes).
-- **To add (later):** Invoicing and payments UI, Stripe integration, invoice history.
+- **Status:** Phase 1 in place; portal billing and automation documented.
+- **Done:** Billing cycles (monthly/annual, day of month), SLA tracking (response time hours, uptime percent, notes). CustomerBillingModal and backend `GET/POST/PUT /api/customer-billing`. Portal billing: Stripe Elements (Pay now), invoice list, billing settings. Internal cron route `POST /api/internal/cron/billing` and script `backend-services/scripts/cron-billing.sh`; see BILLING_CRON_AND_DUNNING_SCHEDULE.md for scheduling.
+- **To add (later):** Full admin invoicing UI, Stripe admin-side flows, extended invoice history/reports.
 
 ---
 
@@ -144,14 +143,14 @@ description: Single list of remaining work, planned features, and TODOs for WISP
 | Priority | Area | Item |
 |----------|------|------|
 | ~~High~~ | ~~Wizards~~ | ✅ All implemented (OrganizationSetup, InitialConfiguration, and 17 others) |
-| High | Customer Portal | ✅ Branding + feature toggles (enableBilling, enableTickets); tickets wired to work orders. Remaining: route polish, optional live chat/KB |
+| ~~High~~ | ~~Customer Portal~~ | ✅ Branding, tickets, billing (Stripe/PayPal), FAQ, KB, service status, live-chat placeholder; route polish (Back to Dashboard on service/FAQ/KB). Optional: live chat integration, KB search enhancements |
 | ~~High~~ | ~~ACS~~ | ✅ Alerts UI + firmware UI/scheduling exist; optional: email/SMS integration |
 | ~~Medium~~ | ~~LTE/5G~~ | ✅ AddEditCustomerModal has service type, LTE auth (IMSI/Ki/OPc), MAC, QoS (QCI, data quota, priority) |
-| Medium | Documentation | Frontmatter added to key docs; remaining: more frontmatter, link audit (docs in app at /docs, /help) |
+| ~~Medium~~ | ~~Documentation~~ | ✅ Frontmatter on key docs; in-app /docs, /help, project status. Remaining: optional more frontmatter, link audit |
 | ~~Medium~~ | ~~Customer Billing~~ | ✅ Phase 1: cycles, SLA (response/uptime/notes); later: invoicing, Stripe |
 | Lower | Monitoring/Map | ✅ Topology in Monitoring module + ArcGIS links in coverage map; optional: advanced alerts, badges |
-| Lower | Field App | Branded app icon |
-| Lower | Backend | API_BASE_URL documented; deploy: run manual SSH step from Cloud Shell if Upload succeeds but plink fails (see DEPLOY_BACKEND_FALLBACK.md) |
+| Lower | Field App | Branded app icon (optional) |
+| ~~Lower~~ | ~~Backend~~ | ✅ API_BASE_URL in .env.example and deployment docs; DEPLOY_BACKEND_FALLBACK.md for manual SSH |
 
 ---
 

@@ -2,6 +2,7 @@
   import { onMount, onDestroy, tick } from 'svelte';
   import { Chart } from '$lib/chartSetup'; // Use centralized Chart.js setup
   import { auth } from '$lib/firebase';
+  import { authService } from '$lib/services/authService';
   import { currentTenant } from '$lib/stores/tenantStore';
   import { API_CONFIG } from '$lib/config/api';
   
@@ -73,7 +74,7 @@
         return;
       }
       
-      const token = await user.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       
       // Load devices from new monitoring graphs endpoint (includes both inventory and network equipment)
       const response = await fetch(`${API_CONFIG.PATHS.MONITORING_GRAPHS}/devices`, {
@@ -147,7 +148,7 @@
         return;
       }
       
-      const token = await user.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       const deviceId = selectedDevice.id;
       const hours = getHours();
       

@@ -8,6 +8,7 @@
   import { customerAuthService } from '$lib/services/customerAuthService';
   import BrandedHeader from './components/BrandedHeader.svelte';
   import BrandedFooter from './components/BrandedFooter.svelte';
+  import LiveChatEmbed from './components/LiveChatEmbed.svelte';
   
   let branding: TenantBranding | null = null;
   let loading = true;
@@ -101,6 +102,9 @@
     </main>
     
     <BrandedFooter {branding} />
+    {#if branding?.features?.enableLiveChat && branding?.features?.liveChatEmbedHtml}
+      <LiveChatEmbed embedHtml={branding.features.liveChatEmbedHtml} />
+    {/if}
   </div>
 {/if}
 

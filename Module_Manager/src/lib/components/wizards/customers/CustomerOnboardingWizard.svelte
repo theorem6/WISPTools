@@ -8,6 +8,7 @@
   import { currentTenant } from '$lib/stores/tenantStore';
   import { customerService, type Customer } from '$lib/services/customerService';
   import { auth } from '$lib/firebase';
+  import { authService } from '$lib/services/authService';
   import { API_CONFIG } from '$lib/config/api';
 
   export let show = false;
@@ -51,7 +52,7 @@
     if (!tenantId) return;
     const user = auth().currentUser;
     if (!user) return;
-    const token = await user.getIdToken();
+    const token = await authService.getAuthTokenForApi();
     try {
       const res = await fetch(`${HSS_API}/groups`, {
         headers: { 'Authorization': `Bearer ${token}`, 'X-Tenant-ID': tenantId }

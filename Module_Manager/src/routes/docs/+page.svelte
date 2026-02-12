@@ -35,5 +35,5 @@
 
 <section class="doc-section">
   <h2>In-app help</h2>
-  <p>Each module (Inventory, Deploy, ACS CPE, HSS, Plan, Coverage Map, CBRS, PCI Resolution, Monitoring) has a <strong>Help</strong> button that opens module-specific documentation. The <a href="/help">Help</a> page lists all topics in one place.</p>
+  <p>Each module (Inventory, Deploy, ACS CPE, HSS, Plan, Coverage Map, CBRS, PCI Resolution, Monitoring) has a <strong>Help</strong> button that opens module-specific documentation. The <a href="/help">Help by topic</a> page lists all topics in one place. For reference and project status, use the sidebar or <a href="/docs/reference/project-status">Project Status &amp; Next Steps</a>.</p>
 </section>

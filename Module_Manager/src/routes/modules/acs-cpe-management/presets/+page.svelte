@@ -61,7 +61,7 @@
       const user = authService.getCurrentUser();
       if (!user) throw new Error('Not authenticated');
       
-      const token = await user.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       
       const response = await fetch('/api/tr069/presets', {
         headers: {
@@ -176,7 +176,7 @@
       const user = authService.getCurrentUser();
       if (!user) throw new Error('Not authenticated');
       
-      const token = await user.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       
       const endpoint = selectedPreset 
         ? `/api/tr069/presets/${selectedPreset._id}`
@@ -228,7 +228,7 @@
       const user = authService.getCurrentUser();
       if (!user) throw new Error('Not authenticated');
       
-      const token = await user.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       
       const response = await fetch(`/api/tr069/presets/${preset._id}`, {
         method: 'DELETE',
@@ -262,7 +262,7 @@
       const user = authService.getCurrentUser();
       if (!user) throw new Error('Not authenticated');
       
-      const token = await user.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       
       const response = await fetch(`/api/tr069/presets/${preset._id}/toggle`, {
         method: 'POST',
@@ -298,7 +298,7 @@
       const user = authService.getCurrentUser();
       if (!user) throw new Error('Not authenticated');
       
-      const token = await user.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       
       const response = await fetch('/api/tr069/bulk-tasks', {
         method: 'POST',

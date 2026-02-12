@@ -472,9 +472,18 @@ export class AuthService {
   }
 
   /**
-   * Get current user
+   * Get current user - always prefer auth().currentUser as source of truth
+   * to avoid race where this.currentUser is null before auth state listener fires
    */
   getCurrentUser(): User | null {
+    if (!browser) return null;
+    const authUser = getAuth().currentUser;
+    if (authUser) {
+      if (!this.currentUser || this.currentUser.uid !== authUser.uid) {
+        this.currentUser = authUser;
+      }
+      return authUser;
+    }
     return this.currentUser;
   }
 
@@ -546,26 +555,50 @@ export class AuthService {
 
   /**
    * Get the current user's authentication token
+   * @param forceRefresh - If true, forces token refresh (recommended for API calls to avoid expired tokens)
    */
-  async getAuthToken(): Promise<string | null> {
-    if (!this.currentUser) {
-      return null;
-    }
-    
+  async getAuthToken(forceRefresh = true): Promise<string | null> {
+    const user = this.getCurrentUser();
+    if (!user) return null;
+
     try {
-      return await this.currentUser.getIdToken();
+      return await user.getIdToken(forceRefresh);
     } catch (error) {
-      console.error('Failed to get auth token:', error);
+      console.error('[AuthService] Failed to get auth token:', error);
       return null;
     }
   }
 
   /**
    * Get the current user's authentication token (alias for getAuthToken)
-   * This method exists for backward compatibility with existing code
    */
-  async getIdToken(): Promise<string | null> {
-    return this.getAuthToken();
+  async getIdToken(forceRefresh = true): Promise<string | null> {
+    return this.getAuthToken(forceRefresh);
+  }
+
+  /**
+   * Get a valid token for API calls - waits for auth, forces refresh, retries on failure.
+   * Use this for all backend/API requests to avoid 401 from expired or missing tokens.
+   */
+  async getAuthTokenForApi(): Promise<string | null> {
+    if (!browser) return null;
+
+    let user = this.getCurrentUser();
+    if (!user) {
+      await new Promise((r) => setTimeout(r, 150));
+      user = this.getCurrentUser();
+    }
+    if (!user) return null;
+
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const token = await user.getIdToken(true);
+        if (token && token.length > 100) return token;
+      } catch (e) {
+        if (attempt < 2) await new Promise((r) => setTimeout(r, 100 * (attempt + 1)));
+      }
+    }
+    return null;
   }
 
   /**

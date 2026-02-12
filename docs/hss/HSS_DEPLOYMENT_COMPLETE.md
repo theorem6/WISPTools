@@ -86,22 +86,12 @@ All documentation is in the repository:
    - Multi-site deployment
    - Debugging and troubleshooting
 
-3. **[SETUP_HSS_WITH_4GENGINEER.md](./SETUP_HSS_WITH_4GENGINEER.md)**
-   - Google Cloud Load Balancer setup
-   - Custom domain configuration (hss.4gengineer.com)
-   - SSL/TLS certificate management
-
-4. **[SIMPLE_CLOUD_HTTPS_FIX.md](./SIMPLE_CLOUD_HTTPS_FIX.md)**
-   - Firebase Functions proxy setup
-   - Cloud-to-cloud architecture
-   - HTTPS configuration
+3. **[HSS_PRODUCTION_GUIDE.md](./HSS_PRODUCTION_GUIDE.md)** – Production setup, Load Balancer, SSL/TLS
+4. **[deployment/BACKEND_DEPLOYMENT_INSTRUCTIONS.md](../deployment/BACKEND_DEPLOYMENT_INSTRUCTIONS.md)** – Backend and proxy deployment
 
 ### **Technical Documentation:**
 
-- **[deploy-hss-api.sh](./deploy-hss-api.sh)** - HSS Management API deployment script
-- **[clean-install-genieacs.sh](./clean-install-genieacs.sh)** - GenieACS installation
-- **[install-open5gs-hss-no-mongo.sh](./install-open5gs-hss-no-mongo.sh)** - Open5GS HSS installation
-- **[setup-gcp-load-balancer.sh](./setup-gcp-load-balancer.sh)** - GCP Load Balancer automation
+- **[scripts/deployment/README.md](../../scripts/deployment/README.md)** – Deployment scripts and automation
 
 ---
 

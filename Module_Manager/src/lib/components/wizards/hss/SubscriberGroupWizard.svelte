@@ -7,6 +7,7 @@
   import BaseWizard from '../BaseWizard.svelte';
   import { currentTenant } from '$lib/stores/tenantStore';
   import { auth } from '$lib/firebase';
+  import { authService } from '$lib/services/authService';
   import { API_CONFIG } from '$lib/config/api';
 
   export let show = false;
@@ -39,7 +40,7 @@
     const user = auth().currentUser;
     if (!user) return;
     try {
-      const token = await user.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       const response = await fetch(`${HSS_API}/bandwidth-plans`, {
         headers: { 'Authorization': `Bearer ${token}`, 'X-Tenant-ID': tenantId }
       });
@@ -118,7 +119,7 @@
     isLoading = true;
     error = '';
     try {
-      const token = await user.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       const body = {
         name: name.trim(),
         description: description.trim() || undefined,

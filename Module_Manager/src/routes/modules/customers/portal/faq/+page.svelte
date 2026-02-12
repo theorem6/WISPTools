@@ -36,7 +36,18 @@
   $: brandName = $portalBranding?.company?.displayName || $portalBranding?.company?.name || brandName;
   $: supportEmail = $portalBranding?.company?.supportEmail || 'support@example.com';
   $: supportPhone = $portalBranding?.company?.supportPhone || '';
-  $: displayFaqs = faqItems.length > 0 ? faqItems : defaultFaqs;
+  let faqSearch = '';
+  $: displayFaqs = (() => {
+    const list: FAQItem[] = faqItems.length > 0 ? faqItems : defaultFaqs;
+    if (!faqSearch.trim()) return list;
+    const q = faqSearch.trim().toLowerCase();
+    return list.filter(
+      (faq) =>
+        (faq.question || '').toLowerCase().includes(q) ||
+        (faq.answer || '').toLowerCase().includes(q) ||
+        ((faq as FAQItem).category || '').toLowerCase().includes(q)
+    );
+  })();
 
   onMount(async () => {
     const customer = await customerAuthService.getCurrentCustomer();
@@ -62,6 +73,7 @@
   <div class="loading">Loading FAQ...</div>
 {:else if !featureEnabled}
   <div class="feature-disabled">
+    <p class="back-link"><a href="/modules/customers/portal/dashboard">← Back to Dashboard</a></p>
     <h1>FAQ Unavailable</h1>
     <p>This tenant has disabled the FAQ &amp; Help Center module.</p>
     <p class="contact">
@@ -77,7 +89,13 @@
   <div class="faq-page">
     <h1>{brandName} Help Center</h1>
     <p class="subtitle">Quick answers to the most common questions from subscribers.</p>
-    
+    <input
+      type="search"
+      class="faq-search"
+      placeholder="Search FAQ…"
+      bind:value={faqSearch}
+      aria-label="Search FAQ"
+    />
     <div class="faq-list">
       {#each displayFaqs as faq}
         <details class="faq-item">
@@ -114,7 +132,23 @@
 
   .subtitle {
     color: var(--brand-text-secondary, #6b7280);
-    margin-bottom: 2rem;
+    margin-bottom: 1rem;
+  }
+
+  .faq-search {
+    width: 100%;
+    max-width: 400px;
+    padding: 0.6rem 1rem;
+    margin-bottom: 1.5rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    font-size: 1rem;
+  }
+
+  .faq-search:focus {
+    outline: none;
+    border-color: var(--brand-primary, #3b82f6);
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
   }
 
   .faq-list {
@@ -209,6 +243,16 @@
     margin-top: 1rem;
   }
 
+  .feature-disabled .back-link {
+    margin-bottom: 1rem;
+  }
+  .feature-disabled .back-link a {
+    color: var(--brand-primary, #3b82f6);
+    text-decoration: none;
+  }
+  .feature-disabled .back-link a:hover {
+    text-decoration: underline;
+  }
   .feature-disabled a {
     color: var(--brand-primary, #3b82f6);
     text-decoration: none;

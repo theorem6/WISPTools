@@ -1,3 +1,8 @@
+---
+title: Project Workflow – Quick Start
+description: Implemented project overlay, deploy integration, notifications, and field app flows.
+---
+
 # Project Workflow Implementation Summary
 
 **See also:** [PROJECT_WORKFLOW_STATUS.md](./PROJECT_WORKFLOW_STATUS.md) for detailed status and next steps.

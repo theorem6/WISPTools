@@ -1,3 +1,8 @@
+---
+title: Wizard Documentation – Online Help
+description: Online documentation for all wizards; accessible via Help in each module.
+---
+
 # Wizard Documentation - Online Help
 
 **Date:** January 2025  

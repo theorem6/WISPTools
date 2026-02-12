@@ -11,6 +11,7 @@
   import WorkOrderCard from './components/WorkOrderCard.svelte';
   import APKDownload from '$lib/components/common/APKDownload.svelte';
   import ModuleWizardMenu from '$lib/components/wizards/ModuleWizardMenu.svelte';
+  import { getWizardsForPath } from '$lib/config/wizardCatalog';
 
   let workOrders: WorkOrder[] = [];
   let isLoading = true;
@@ -134,7 +135,7 @@
         ➕ Quick Create
       </button>
       <ModuleWizardMenu
-        wizards={[{ id: 'create-work-order', label: 'Create Work Order Wizard', icon: '📋' }]}
+        wizards={getWizardsForPath('/modules/deploy')}
         on:select={() => showWorkOrderWizard = true}
       />
     </div>

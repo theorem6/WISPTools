@@ -15,6 +15,8 @@
   let modelFilter = '';
   let firmwareFilter = '';
   let customerFilter = '';
+  let tagFilter = '';
+  let availableTags: string[] = [];
   let showAdvancedFilters = false;
   let expandedDeviceId: string | null = null;
   let actionDevice: CPEDevice | null = null;
@@ -27,11 +29,33 @@
   let showPresetSelectModal = false;
   let availablePresets: any[] = [];
   let isLoadingPresets = false;
+  let showTagsModal = false;
+  let tagsDevice: CPEDevice | null = null;
+  let tagsInput = '';
+  let tagsSaving = false;
 
   onMount(async () => {
     await loadDevices();
     await loadPresets();
+    await loadDeviceTags();
   });
+
+  async function loadDeviceTags() {
+    if (!$currentTenant?.id) return;
+    try {
+      const { authService } = await import('$lib/services/authService');
+      const user = authService.getCurrentUser();
+      if (!user) return;
+      const token = await authService.getAuthTokenForApi();
+      const response = await fetch('/api/tr069/device-tags', {
+        headers: { 'Authorization': `Bearer ${token}`, 'X-Tenant-ID': $currentTenant.id }
+      });
+      const data = await response.json();
+      if (data.success) availableTags = data.tags || [];
+    } catch (err) {
+      console.error('Failed to load device tags:', err);
+    }
+  }
 
   async function loadPresets() {
     if (!$currentTenant?.id) return;
@@ -42,7 +66,7 @@
       const user = authService.getCurrentUser();
       if (!user) return;
       
-      const token = await user.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       
       const response = await fetch('/api/tr069/presets', {
         headers: {
@@ -81,25 +105,26 @@
     isLoading = true;
     try {
       // Use filtered endpoint if advanced filters are active
-      if (manufacturerFilter || modelFilter || firmwareFilter || customerFilter) {
+      if (manufacturerFilter || modelFilter || firmwareFilter || customerFilter || tagFilter) {
         const { authService } = await import('$lib/services/authService');
         const user = authService.getCurrentUser();
         if (!user) throw new Error('Not authenticated');
         
-        const token = await user.getIdToken();
+        const token = await authService.getAuthTokenForApi();
         const params = new URLSearchParams();
         
         if (manufacturerFilter) params.append('manufacturer', manufacturerFilter);
         if (modelFilter) params.append('model', modelFilter);
         if (firmwareFilter) params.append('firmware', firmwareFilter);
         if (customerFilter) params.append('customerId', customerFilter);
+        if (tagFilter) params.append('tags', tagFilter);
         if (statusFilter !== 'all') params.append('status', statusFilter);
         if (searchTerm) params.append('search', searchTerm);
         
         const response = await fetch(`/api/tr069/devices/filtered?${params.toString()}`, {
           headers: {
             'Authorization': `Bearer ${token}`,
-            'X-Tenant-ID': $currentTenant.id,
+            'X-Tenant-ID': $currentTenant?.id ?? '',
             'Content-Type': 'application/json'
           }
         });
@@ -183,16 +208,57 @@
     window.location.href = `/modules/acs-cpe-management/monitoring?deviceId=${device.id}`;
   }
 
+  function handleEditTags(event: CustomEvent) {
+    const device = event.detail;
+    tagsDevice = device;
+    tagsInput = (device.tags && Array.isArray(device.tags) ? device.tags : []).join(', ');
+    showTagsModal = true;
+  }
+
+  async function saveTags() {
+    const tenantId = $currentTenant?.id;
+    if (!tagsDevice || !tenantId) return;
+    tagsSaving = true;
+    try {
+      const { authService } = await import('$lib/services/authService');
+      const user = authService.getCurrentUser();
+      if (!user) throw new Error('Not authenticated');
+      const token = await authService.getAuthTokenForApi();
+      const tags = tagsInput.split(',').map((t) => t.trim()).filter(Boolean);
+      const response = await fetch(`/api/tr069/devices/${encodeURIComponent(tagsDevice.id)}/tags`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'X-Tenant-ID': tenantId
+        },
+        body: JSON.stringify({ tags })
+      });
+      const data = await response.json();
+      if (data.success) {
+        tagsDevice.tags = data.tags || [];
+        tagsDevice = tagsDevice;
+        showTagsModal = false;
+        await loadDeviceTags();
+      }
+    } catch (e) {
+      console.error('Save tags error:', e);
+    } finally {
+      tagsSaving = false;
+    }
+  }
+
   // Filtered devices
   $: filteredDevices = devices.filter(device => {
     // Basic search filter (if not using filtered endpoint)
-    if (!manufacturerFilter && !modelFilter && !firmwareFilter && !customerFilter) {
+    if (!manufacturerFilter && !modelFilter && !firmwareFilter && !customerFilter && !tagFilter) {
       const matchesSearch = !searchTerm || 
         device.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
         device.manufacturer?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         device.model?.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesStatus = statusFilter === 'all' || device.status === statusFilter;
-      return matchesSearch && matchesStatus;
+      const matchesTag = !tagFilter || (device.tags && Array.isArray(device.tags) && device.tags.includes(tagFilter));
+      return matchesSearch && matchesStatus && matchesTag;
     }
     // If using filtered endpoint, devices are already filtered
     return true;
@@ -254,7 +320,7 @@
       const user = authService.getCurrentUser();
       if (!user) throw new Error('Not authenticated');
       
-      const token = await user.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       
       const response = await fetch('/api/tr069/bulk-tasks', {
         method: 'POST',
@@ -367,6 +433,14 @@
         <option value="all">All Status</option>
         <option value="online">Online</option>
         <option value="offline">Offline</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <select bind:value={tagFilter} class="filter-select" on:change={loadDevices}>
+        <option value="">All Tags</option>
+        {#each availableTags as tag}
+          <option value={tag}>{tag}</option>
+        {/each}
       </select>
     </div>
     <button 
@@ -500,13 +574,14 @@
           <th class="col-ip">IP Address</th>
           <th class="col-firmware">Firmware</th>
           <th class="col-contact">Last Contact</th>
+          <th class="col-tags">Tags</th>
           <th class="col-actions">Actions</th>
         </tr>
       </thead>
       <tbody>
         {#if isLoading}
           <tr>
-            <td colspan="11" class="loading-cell">
+            <td colspan="12" class="loading-cell">
               <div class="loading-container">
                 <div class="spinner-large"></div>
                 <p>Loading devices...</p>
@@ -515,7 +590,7 @@
           </tr>
         {:else if filteredDevices.length === 0}
           <tr>
-            <td colspan="11" class="empty-cell">
+            <td colspan="12" class="empty-cell">
               <div class="empty-state">
                 <div class="empty-icon">📱</div>
                 <h3>No devices found</h3>
@@ -536,6 +611,7 @@
               on:refresh={handleRefresh}
               on:edit={handleEdit}
               on:monitoring={handleMonitoring}
+              on:editTags={handleEditTags}
             />
           {/each}
         {/if}
@@ -608,6 +684,28 @@
 
       <div class="modal-footer">
         <button class="btn btn-secondary" on:click={() => showPresetSelectModal = false}>Cancel</button>
+      </div>
+    </div>
+  </div>
+{/if}
+
+<!-- Edit Device Tags Modal -->
+{#if showTagsModal && tagsDevice}
+  <div class="modal-overlay" on:click={() => showTagsModal = false}>
+    <div class="modal-content" on:click|stopPropagation>
+      <div class="modal-header">
+        <h3>Edit tags – {tagsDevice.id}</h3>
+        <button class="close-btn" on:click={() => showTagsModal = false}>×</button>
+      </div>
+      <div class="modal-body">
+        <label>Tags (comma-separated)</label>
+        <input type="text" bind:value={tagsInput} class="form-input" placeholder="e.g. tower-1, customer-abc" />
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" on:click={() => showTagsModal = false}>Cancel</button>
+        <button class="btn btn-primary" on:click={saveTags} disabled={tagsSaving}>
+          {tagsSaving ? 'Saving…' : 'Save'}
+        </button>
       </div>
     </div>
   </div>

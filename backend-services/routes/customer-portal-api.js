@@ -10,6 +10,7 @@ const { Customer } = require('../models/customer');
 const { UserTenant } = require('../models/user');
 const { WorkOrder } = require('../models/work-order');
 const { CustomerBilling } = require('../models/customer-billing');
+const { Tenant } = require('../models/tenant');
 const { requireAuth } = require('../middleware/admin-auth');
 
 const router = express.Router();
@@ -566,6 +567,97 @@ router.get('/billing', requireCustomerAuth, async (req, res) => {
   } catch (error) {
     console.error('Error fetching portal billing:', error);
     res.status(500).json({ error: 'Failed to fetch billing' });
+  }
+});
+
+/**
+ * GET /api/customer-portal/billing/settings
+ * Get customer's billing settings (paypalEmail, invoicePreferences) and read-only invoice format from tenant branding.
+ */
+router.get('/billing/settings', requireCustomerAuth, async (req, res) => {
+  try {
+    const customerId = req.customer?.customerId || req.customerId;
+    const tenantId = req.customer?.tenantId;
+    if (!customerId || !tenantId) {
+      return res.status(400).json({ error: 'Customer context missing' });
+    }
+    const doc = await CustomerBilling.findOne({ tenantId, customerId }).lean();
+    const tenant = await Tenant.findById(tenantId).select('branding displayName').lean();
+    const bp = tenant?.branding?.billingPortal || {};
+    const invoiceFormat = {
+      companyName: bp.invoice?.companyName || tenant?.displayName || '',
+      dueDays: bp.invoice?.dueDays ?? 14,
+      currency: bp.invoice?.currency || 'USD'
+    };
+    res.json({
+      paypalEmail: doc?.paypalEmail || '',
+      paymentMethod: doc?.paymentMethod || 'none',
+      invoicePreferences: doc?.invoicePreferences?.delivery ? { delivery: doc.invoicePreferences.delivery } : { delivery: 'email' },
+      invoiceFormat
+    });
+  } catch (error) {
+    console.error('Error fetching billing settings:', error);
+    res.status(500).json({ error: 'Failed to fetch billing settings' });
+  }
+});
+
+/**
+ * PATCH /api/customer-portal/billing/settings
+ * Update customer's billing settings (paypalEmail, invoicePreferences.delivery). Body: { paypalEmail?, invoicePreferences?: { delivery? } }.
+ */
+router.patch('/billing/settings', requireCustomerAuth, async (req, res) => {
+  try {
+    const customerId = req.customer?.customerId || req.customerId;
+    const tenantId = req.customer?.tenantId;
+    const { paypalEmail, invoicePreferences } = req.body || {};
+    if (!customerId || !tenantId) {
+      return res.status(400).json({ error: 'Customer context missing' });
+    }
+    let doc = await CustomerBilling.findOne({ tenantId, customerId });
+    if (!doc) {
+      doc = new CustomerBilling({ customerId, tenantId });
+    }
+    if (typeof paypalEmail === 'string') doc.paypalEmail = paypalEmail.trim() || undefined;
+    if (invoicePreferences && typeof invoicePreferences.delivery === 'string' && ['email', 'portal', 'both'].includes(invoicePreferences.delivery)) {
+      if (!doc.invoicePreferences) doc.invoicePreferences = {};
+      doc.invoicePreferences.delivery = invoicePreferences.delivery;
+    }
+    doc.updatedAt = new Date();
+    await doc.save();
+    res.json({
+      paypalEmail: doc.paypalEmail || '',
+      invoicePreferences: doc.invoicePreferences?.delivery ? { delivery: doc.invoicePreferences.delivery } : { delivery: 'email' }
+    });
+  } catch (error) {
+    console.error('Error updating billing settings:', error);
+    res.status(500).json({ error: 'Failed to update billing settings' });
+  }
+});
+
+/**
+ * GET /api/customer-portal/billing/invoices/:invoiceId
+ * Get a single invoice for the logged-in customer (for view/download).
+ */
+router.get('/billing/invoices/:invoiceId', requireCustomerAuth, async (req, res) => {
+  try {
+    const customerId = req.customer?.customerId || req.customerId;
+    const tenantId = req.customer?.tenantId;
+    const { invoiceId } = req.params;
+    if (!customerId || !tenantId || !invoiceId) {
+      return res.status(400).json({ error: 'Missing customer context or invoice id' });
+    }
+    const doc = await CustomerBilling.findOne({ tenantId, customerId }).lean();
+    if (!doc || !doc.invoices?.length) {
+      return res.status(404).json({ error: 'Invoice not found' });
+    }
+    const inv = doc.invoices.find(i => i.invoiceId === invoiceId || i.invoiceNumber === invoiceId);
+    if (!inv) {
+      return res.status(404).json({ error: 'Invoice not found' });
+    }
+    res.json(inv);
+  } catch (error) {
+    console.error('Error fetching invoice:', error);
+    res.status(500).json({ error: 'Failed to fetch invoice' });
   }
 });
 

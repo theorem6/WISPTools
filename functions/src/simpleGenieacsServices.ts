@@ -1,6 +1,15 @@
-// Simplified GenieACS Services (Firestore only)
-// Placeholder services for ACS integration
-
+/**
+ * Simplified GenieACS Services – INTENTIONALLY STUBBED
+ *
+ * These HTTP endpoints are placeholders only. They return a success payload with a note;
+ * they do not connect to GenieACS or MongoDB.
+ *
+ * Production GenieACS integration uses:
+ * - genieacsBridgeMultitenant.ts (proxy to real GenieACS NBI)
+ * - genieacsServicesMultitenant.ts (NBI/FS backed by GenieACS when configured)
+ *
+ * See docs/BACKEND_INTEGRATIONS.md for details.
+ */
 import { onRequest } from 'firebase-functions/v2/https';
 import cors from 'cors';
 

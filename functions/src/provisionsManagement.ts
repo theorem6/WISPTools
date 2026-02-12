@@ -2,13 +2,27 @@
 // Handles CRUD operations for JavaScript provisioning scripts
 
 // Import shared Firebase initialization (must be first)
-import { db } from './firebaseInit.js';
+import { db, auth } from './firebaseInit.js';
 
 import { onRequest } from 'firebase-functions/v2/https';
 import { FieldValue } from 'firebase-admin/firestore';
 import cors from 'cors';
 
 const corsHandler = cors({ origin: true });
+
+/** Get createdBy from Authorization Bearer token (Firebase ID token), or 'system' if missing/invalid. */
+async function getCreatedByFromRequest(req: { headers?: { authorization?: string } }): Promise<string> {
+  const authHeader = req.headers?.authorization;
+  if (typeof authHeader !== 'string' || !authHeader.startsWith('Bearer ')) return 'system';
+  const token = authHeader.split('Bearer ')[1];
+  if (!token) return 'system';
+  try {
+    const decoded = await auth.verifyIdToken(token);
+    return decoded.uid ?? 'system';
+  } catch {
+    return 'system';
+  }
+}
 
 // Get all provisions
 export const getProvisions = onRequest({
@@ -84,7 +98,7 @@ export const createProvision = onRequest({
         });
       }
       
-      // Create provision document
+      const createdBy = await getCreatedByFromRequest(req);
       const provision = {
         name: provisionData.name,
         description: provisionData.description,
@@ -93,7 +107,7 @@ export const createProvision = onRequest({
         tags: provisionData.tags || [],
         createdAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp(),
-        createdBy: 'system' // TODO: Get from auth context
+        createdBy
       };
       
       await db.collection('provisions').doc(provisionId).set(provision);

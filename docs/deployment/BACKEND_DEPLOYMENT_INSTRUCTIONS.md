@@ -92,6 +92,18 @@ echo "✅ Backend deployment complete!"
 
 ---
 
+## Environment variables
+
+Copy `backend-services/.env.example` to `backend-services/.env` and set at least:
+
+- **MONGODB_URI** – MongoDB connection string.
+- **INTERNAL_API_KEY** – Same value as in Firebase Functions (for internal/cron routes).
+- **API_BASE_URL** (optional) – Public base URL for the API (e.g. `https://hss.wisptools.io`). Used for deployment photo URLs (GridFS) and any links the backend generates. If the backend is behind a load balancer or custom domain, set this so generated URLs are correct.
+
+See `backend-services/.env.example` for all options.
+
+---
+
 ## What Gets Deployed
 
 **File Changed**: `backend-services/routes/monitoring-graphs.js`

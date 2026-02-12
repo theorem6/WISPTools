@@ -3,6 +3,7 @@
   import { browser } from '$app/environment';
   import { goto } from '$app/navigation';
   import { auth } from '$lib/firebase';
+  import { authService } from '$lib/services/authService';
   import { currentTenant } from '$lib/stores/tenantStore';
   import TenantGuard from '$lib/components/admin/TenantGuard.svelte';
   import MonitoringMap from './components/MonitoringMap.svelte';
@@ -27,6 +28,7 @@
   import { tipsService } from '$lib/services/tipsService';
   import MonitoringSetupWizard from '$lib/components/wizards/MonitoringSetupWizard.svelte';
   import ModuleWizardMenu from '$lib/components/wizards/ModuleWizardMenu.svelte';
+  import { getWizardsForPath } from '$lib/config/wizardCatalog';
   import { debug } from '$lib/utils/debug';
   
   // Use real backend data now that devices are created
@@ -239,7 +241,7 @@
         return;
       }
       
-      const token = await user.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       
       // Create AbortController for timeout
       const controller = new AbortController();
@@ -318,7 +320,7 @@
         return;
       }
       
-      const token = await user.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       
       // Create AbortController for timeout
       const controller = new AbortController();
@@ -644,7 +646,7 @@
             const user = authService.getCurrentUser();
             if (!user) throw new Error('Not authenticated');
             
-            const token = await user.getIdToken();
+            const token = await authService.getAuthTokenForApi();
             const response = await fetch('/api/tr069/devices', {
               headers: {
                 'Authorization': `Bearer ${token}`,
@@ -1078,7 +1080,7 @@
           </svg>
         </button>
         <ModuleWizardMenu
-          wizards={[{ id: 'setup', label: 'Setup Wizard', icon: '🚀' }]}
+          wizards={getWizardsForPath('/modules/monitor')}
           on:select={() => showSetupWizard = true}
         />
         <button class="module-control-btn" onclick={() => showSNMPConfig = true} title="Configuration">

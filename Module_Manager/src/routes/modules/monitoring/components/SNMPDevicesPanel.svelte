@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount, createEventDispatcher } from 'svelte';
   import { auth } from '$lib/firebase';
+  import { authService } from '$lib/services/authService';
   import { API_CONFIG } from '$lib/config/api';
   import { currentTenant } from '$lib/stores/tenantStore';
   import { monitoringService } from '$lib/services/monitoringService';
@@ -46,7 +47,7 @@
         return;
       }
       
-      const token = await user.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       
       // Load discovered devices
       // Use monitoringService which handles routing through Firebase Hosting
@@ -140,7 +141,7 @@
     if (!user) return;
     
     try {
-      const token = await user.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       device.enableGraphs = !device.enableGraphs;
       
       // Update device in backend
@@ -274,7 +275,7 @@
         return;
       }
       
-      const token = await user.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       // Use relative path through Firebase Hosting rewrites - updated to use deploymentId
       const response = await fetch(`/api/snmp/discovered/${device.id}/pair`, {
         method: 'POST',

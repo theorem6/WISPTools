@@ -1,3 +1,8 @@
+---
+title: Billing 404 Fix (generate-invoices and dunning)
+description: How to fix 404s for customer-billing generate-invoices and dunning/run.
+---
+
 # Billing 404 Fix: generate-invoices and dunning/run
 
 ## Symptom

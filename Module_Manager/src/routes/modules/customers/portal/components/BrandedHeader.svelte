@@ -58,6 +58,7 @@
         {/if}
         {#if featureFlags.billing}
           <a href="/modules/customers/portal/billing" class="nav-link">Billing</a>
+          <a href="/modules/customers/portal/billing/settings" class="nav-link">Billing settings</a>
         {/if}
         {#if featureFlags.serviceStatus}
           <a href="/modules/customers/portal/service" class="nav-link">Service Status</a>
@@ -82,7 +83,7 @@
 
 <style>
   .branded-header {
-    background: var(--brand-primary);
+    background: var(--brand-primary, #3b82f6);
     color: white;
     padding: 1rem 2rem;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);

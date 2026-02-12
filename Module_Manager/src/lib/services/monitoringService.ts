@@ -31,7 +31,7 @@ export class MonitoringService {
     }
 
     try {
-      const token = await user.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       return token;
     } catch (error) {
       console.error('Failed to get auth token:', error);

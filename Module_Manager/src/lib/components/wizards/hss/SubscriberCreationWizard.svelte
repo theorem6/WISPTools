@@ -7,6 +7,7 @@
   import BaseWizard from '../BaseWizard.svelte';
   import { currentTenant } from '$lib/stores/tenantStore';
   import { auth } from '$lib/firebase';
+  import { authService } from '$lib/services/authService';
   import { API_CONFIG } from '$lib/config/api';
 
   export let show = false;
@@ -64,7 +65,7 @@
     if (!tenantId) return;
     const user = auth().currentUser;
     if (!user) return;
-    const token = await user.getIdToken();
+    const token = await authService.getAuthTokenForApi();
     try {
       const [groupsRes, plansRes] = await Promise.all([
         fetch(`${HSS_API}/groups`, {
@@ -177,7 +178,7 @@
     isLoading = true;
     error = '';
     try {
-      const token = await user.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       const body = {
         imsi: imsi.trim(),
         subscriber_name: subscriber_name.trim(),

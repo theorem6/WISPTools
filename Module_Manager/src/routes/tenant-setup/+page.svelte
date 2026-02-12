@@ -131,7 +131,7 @@
       }
 
       // Get auth token
-      const token = await authService.getAuthToken();
+      const token = await authService.getAuthTokenForApi();
       
       // Create payment method
       const response = await fetch('/api/billing/payment-methods', {
@@ -232,7 +232,7 @@
         const response = await fetch(`/api/tenants/${tenantId}`, {
           method: 'PUT',
           headers: {
-            'Authorization': `Bearer ${await authService.getAuthToken()}`,
+            'Authorization': `Bearer ${await authService.getAuthTokenForApi()}`,
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({

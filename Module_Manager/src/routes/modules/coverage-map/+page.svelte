@@ -95,7 +95,7 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
       const user = authService.getCurrentUser();
       if (!user) return;
       
-      const token = await user.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       const devices: any[] = [];
       
       // Load SNMP devices
@@ -610,7 +610,7 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
       const user = authService.getCurrentUser();
       if (!user) return;
       
-      const token = await user.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       const devices: any[] = [];
       const seenIds = new Set<string>();
       

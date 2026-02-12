@@ -41,6 +41,7 @@
       </div>
     </div>
     <p class="help-header-desc">Complete guide to using the platform. Use the Help button in each module for context-specific tips.</p>
+    <p class="help-docs-link"><a href="/docs">Reference &amp; Project Status → /docs</a></p>
   </div>
   
   <div class="help-layout">
@@ -577,3 +578,17 @@
     </main>
   </div>
 </div>
+
+<style>
+  .help-docs-link {
+    margin-top: 0.5rem;
+    font-size: 0.95rem;
+  }
+  .help-docs-link a {
+    color: var(--primary, #3b82f6);
+    text-decoration: none;
+  }
+  .help-docs-link a:hover {
+    text-decoration: underline;
+  }
+</style>

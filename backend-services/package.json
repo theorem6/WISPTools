@@ -1,10 +1,11 @@
 {
-  "name": "wisp-billing-service",
+  "name": "wisptools-backend",
   "version": "1.0.0",
-  "description": "PayPal billing service for WispTools.io",
-  "main": "billing-api.js",
+  "description": "WISPTools main API server (auth, tenants, customers, billing, HSS, monitoring, etc.)",
+  "main": "server.js",
   "scripts": {
-    "start": "node billing-api.js",
+    "start": "node server.js",
+    "start:billing": "node billing-api.js",
     "init-plans": "node initialize-billing-plans.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },

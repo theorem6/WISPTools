@@ -82,7 +82,7 @@
       const user = auth().currentUser;
       if (!user) return;
       
-      const token = await user.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       const response = await fetch(`${HSS_API}/epc/remote/list`, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -176,7 +176,7 @@
       const user = auth().currentUser;
       if (!user) throw new Error('Not authenticated');
       
-      const token = await user.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       const response = await fetch(`${HSS_API}/epc/${selectedEPCDevice.epc_id}`, {
         method: 'PUT',
         headers: {
@@ -216,7 +216,7 @@
       const user = auth().currentUser;
       if (!user) throw new Error('Not authenticated');
       
-      const token = await user.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       const response = await fetch(`${HSS_API}/epc/${selectedEPCDevice.epc_id}/link-device`, {
         method: 'POST',
         headers: {

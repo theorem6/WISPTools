@@ -31,7 +31,7 @@ Prioritized list of improvements you can tackle next. Items marked **Done** are 
 
 ## High value (future)
 
-1. **Customer Portal MVP** – Branding schema + UI, ticket wiring, portal route polish (see CUSTOMER_PORTAL_IMPLEMENTATION_PLAN.md).
+1. **Customer Portal MVP** – ✅ **Done.** Branding schema + UI (Portal Setup), ticket wiring (tickets → work orders), billing (Stripe/PayPal in portal, invoice list, dunning cron), route polish (dashboard, billing, tickets, FAQ, KB, service status, live-chat placeholder). Optional later: live chat integration, KB search enhancements.
 
 ---
 

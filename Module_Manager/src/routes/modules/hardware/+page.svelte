@@ -13,12 +13,14 @@
   import { goto } from '$app/navigation';
   import ScanModal from '../inventory/components/ScanModal.svelte';
   import { auth } from '$lib/firebase';
+  import { authService } from '$lib/services/authService';
   import { API_CONFIG } from '$lib/config/api';
   import EPCDeploymentModal from '../deploy/components/EPCDeploymentModal.svelte';
   import { formatInTenantTimezone } from '$lib/utils/timezone';
   import { coverageMapService } from '../coverage-map/lib/coverageMapService.mongodb';
   import SNMPDevicesPanel from '../monitoring/components/SNMPDevicesPanel.svelte';
   import ModuleWizardMenu from '$lib/components/wizards/ModuleWizardMenu.svelte';
+  import { getWizardsForPath } from '$lib/config/wizardCatalog';
 
   const HSS_API = API_CONFIG.PATHS.HSS;
   
@@ -147,7 +149,7 @@
       const user = auth().currentUser;
       if (!user) return;
       
-      const token = await user.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       const response = await fetch(`${HSS_API}/epc/remote/list`, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -373,7 +375,7 @@
       const user = auth().currentUser;
       if (!user) throw new Error('Not authenticated');
       
-      const token = await user.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       
       const requestBody = {
         site_id: epcEditForm.site_id || null, // Always send site_id, use null if empty
@@ -439,7 +441,7 @@
       const user = auth().currentUser;
       if (!user) throw new Error('Not authenticated');
       
-      const token = await user.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       const response = await fetch(`${HSS_API}/epc/${epcId}/link-device`, {
         method: 'POST',
         headers: {
@@ -480,7 +482,7 @@
       const user = auth().currentUser;
       if (!user) throw new Error('Not authenticated');
       
-      const token = await user.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       // Use POST for delete (workaround for DELETE routing issues)
       const response = await fetch(`/api/epc-management/delete`, {
         method: 'POST',
@@ -536,7 +538,7 @@
         📊 Reports
       </button>
       <ModuleWizardMenu
-        wizards={[{ id: 'epc-deployment', label: 'EPC Deployment', icon: '🔧' }]}
+        wizards={getWizardsForPath('/modules/hardware')}
         on:select={() => showEPCWizard = true}
       />
       <!-- Add Hardware Dropdown -->

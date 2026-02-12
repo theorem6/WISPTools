@@ -211,7 +211,8 @@ function registerBrandingRoutes(app) {
         enableBilling: true,
         enableTickets: true,
         enableLiveChat: false,
-        enableKnowledgeBase: false
+        enableKnowledgeBase: false,
+        liveChatEmbedHtml: undefined
       },
       billingPortal: {
         paymentGateways: {

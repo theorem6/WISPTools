@@ -66,7 +66,7 @@
       const user = authService.getCurrentUser();
       if (!user) throw new Error('Not authenticated');
       
-      const token = await user.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       
       // Load device-specific details based on type
       switch (deviceType) {

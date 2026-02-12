@@ -25,8 +25,15 @@ app.use(require('./middleware/debug-header'));
 // MongoDB Connection - Atlas
 const MONGODB_URI = appConfig.mongodb.uri;
 
-console.log('🔗 Connecting to MongoDB Atlas...');
-console.log('📍 MongoDB URI:', MONGODB_URI.replace(/\/\/.*@/, '//***:***@'));
+if (!MONGODB_URI) {
+  console.error('❌ MONGODB_URI is required. Set it in .env (see .env.example).');
+  process.exit(1);
+}
+
+console.log('🔗 Connecting to MongoDB...');
+// Redact credentials in logs (user:pass@)
+const safeUri = MONGODB_URI.replace(/(\/\/)([^:@]+):([^@]+)(@)/, '$1***:***$4');
+console.log('📍 MongoDB URI:', safeUri);
 
 mongoose.connect(MONGODB_URI)
   .then(() => {
@@ -37,15 +44,17 @@ mongoose.connect(MONGODB_URI)
     process.exit(1);
   });
 
-// Health Check
-app.get('/health', (req, res) => {
+// Health Check (both /health and /api/health for nginx proxy path preservation)
+const healthHandler = (req, res) => {
   res.json({
     status: 'healthy',
     service: 'user-management-system',
     port: PORT,
     timestamp: new Date().toISOString()
   });
-});
+};
+app.get('/health', healthHandler);
+app.get('/api/health', healthHandler);
 
 // Debug endpoint to test token verification
 app.get('/api/debug/token', async (req, res) => {
@@ -85,15 +94,20 @@ app.get('/api/debug/token', async (req, res) => {
 });
 
 
-// Path rewrite: when LB/nginx strips path to /, use X-Original-Path from Cloud Function (internal key required)
-const INTERNAL_API_KEY_ENV = process.env.INTERNAL_API_KEY || '';
+// Path rewrite: when LB/nginx strips path to /, use X-Original-Path or X-Request-Uri from proxy
 app.use((req, res, next) => {
-  if (req.path !== '/' || !INTERNAL_API_KEY_ENV) return next();
-  const key = req.headers['x-internal-key'] || req.headers['X-Internal-Key'];
-  if (key !== INTERNAL_API_KEY_ENV) return next();
-  const originalPath = req.headers['x-original-path'];
-  if (!originalPath || typeof originalPath !== 'string') return next();
-  if (!originalPath.startsWith('/api/internal/')) return next();
+  if (req.path !== '/' && req.path !== '') return next();
+  let originalPath = req.headers['x-original-path'] || req.headers['x-request-uri'] || req.headers['x-original-url'];
+  if (typeof originalPath === 'string' && originalPath.startsWith('http')) {
+    try {
+      originalPath = new URL(originalPath).pathname;
+    } catch {
+      originalPath = null;
+    }
+  }
+  if (!originalPath || typeof originalPath !== 'string' || !originalPath.startsWith('/')) return next();
+  const pathOnly = originalPath.split('?')[0];
+  if (!pathOnly || pathOnly === '/') return next();
   req.url = originalPath;
   req.originalUrl = originalPath;
   next();

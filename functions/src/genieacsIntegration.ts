@@ -325,12 +325,13 @@ async function convertGenieACSDeviceToCPE(genieacsDevice: any): Promise<any> {
       signalStrength: genieacsDevice['Device.WiFi.Radio.1.SignalStrength'] || null
     };
     
-    // Extract performance metrics
+    // Extract performance metrics.
+    // bandwidth/latency/packetLoss require GenieACS traffic/error params or external ping; see docs/BACKEND_INTEGRATIONS.md.
     const performanceMetrics = {
       signalStrength: genieacsDevice['Device.WiFi.Radio.1.SignalStrength'] || -100,
-      bandwidth: 0, // TODO: Calculate from traffic stats
-      latency: 0, // TODO: Implement ping-based measurement
-      packetLoss: 0, // TODO: Calculate from error stats
+      bandwidth: 0, // Derive from device traffic stats (e.g. WAN byte counters) when GenieACS exposes them
+      latency: 0,   // Requires ping-based or NBI-based measurement
+      packetLoss: 0, // Derive from device error/drop stats when available
       uptime: genieacsDevice['Device.DeviceInfo.Uptime'] || 0,
       lastUpdate: new Date()
     };

@@ -12,6 +12,7 @@
   let supportHours = 'Mon-Fri 8am-5pm';
 
   $: featureEnabled = !!$portalBranding?.features?.enableLiveChat;
+  $: hasEmbed = !!(featureEnabled && $portalBranding?.features?.liveChatEmbedHtml?.trim());
   $: brandName = $portalBranding?.company?.displayName || $portalBranding?.company?.name || brandName;
   $: supportEmail = $portalBranding?.company?.supportEmail || 'support@example.com';
   $: supportPhone = $portalBranding?.company?.supportPhone || '';
@@ -47,9 +48,15 @@
     <p class="subtitle">Chat is monitored {supportHours}. Start a conversation and we’ll respond as soon as a specialist is available.</p>
     
     <div class="chat-wrapper">
-      <div class="chat-placeholder">
-        <p>Live chat integration placeholder</p>
-        <p class="hint">Embed your preferred chat widget here (Intercom, Zendesk, Drift, etc.).</p>
+      <div class="chat-placeholder">        {#if hasEmbed}
+          <span class="badge">Live</span>
+          <p>Chat widget is available on this page (look for the chat button in the corner).</p>
+          <p class="hint">You can also reach us by email or phone below.</p>
+        {:else}
+          <span class="badge">Coming soon</span>
+          <p>Live chat will be available here.</p>
+          <p class="hint">Add your chat widget embed code in Portal Setup → Features to enable it.</p>
+        {/if}
       </div>
       <div class="fallback-card">
         <h2>Need immediate help?</h2>
@@ -103,6 +110,17 @@
 
   .chat-placeholder .hint {
     font-size: 0.9rem;
+  }
+
+  .badge {
+    display: inline-block;
+    padding: 0.35rem 0.75rem;
+    border-radius: 9999px;
+    background: var(--brand-primary, #3b82f6);
+    color: white;
+    font-size: 0.875rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
   }
 
   .fallback-card {

@@ -70,7 +70,7 @@
         throw new Error('Not authenticated');
       }
       
-      const token = await user.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       
       const response = await fetch(`/api/tr069/metrics?deviceId=${selectedDeviceId}&hours=${hours}`, {
         headers: {

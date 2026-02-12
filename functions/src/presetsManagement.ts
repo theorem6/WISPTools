@@ -2,13 +2,27 @@
 // Handles CRUD operations for device provisioning presets
 
 // Import shared Firebase initialization (must be first)
-import { db } from './firebaseInit.js';
+import { db, auth } from './firebaseInit.js';
 
 import { onRequest } from 'firebase-functions/v2/https';
 import { FieldValue } from 'firebase-admin/firestore';
 import cors from 'cors';
 
 const corsHandler = cors({ origin: true });
+
+/** Get createdBy from Authorization Bearer token (Firebase ID token), or 'system' if missing/invalid. */
+async function getCreatedByFromRequest(req: { headers?: { authorization?: string } }): Promise<string> {
+  const authHeader = req.headers?.authorization;
+  if (typeof authHeader !== 'string' || !authHeader.startsWith('Bearer ')) return 'system';
+  const token = authHeader.split('Bearer ')[1];
+  if (!token) return 'system';
+  try {
+    const decoded = await auth.verifyIdToken(token);
+    return decoded.uid ?? 'system';
+  } catch {
+    return 'system';
+  }
+}
 
 // Get all presets
 export const getPresets = onRequest({
@@ -127,7 +141,7 @@ export const createPreset = onRequest({
         });
       }
       
-      // Create preset document
+      const createdBy = await getCreatedByFromRequest(req);
       const preset = {
         name: presetData.name,
         description: presetData.description,
@@ -139,7 +153,7 @@ export const createPreset = onRequest({
         enabled: presetData.enabled !== undefined ? presetData.enabled : true,
         createdAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp(),
-        createdBy: 'system' // TODO: Get from auth context
+        createdBy
       };
       
       await db.collection('presets').doc(presetId).set(preset);

@@ -15,6 +15,7 @@
   import InventoryCheckInWizard from '$lib/components/wizards/inventory/InventoryCheckInWizard.svelte';
   import RMATrackingWizard from '$lib/components/wizards/inventory/RMATrackingWizard.svelte';
   import ModuleWizardMenu from '$lib/components/wizards/ModuleWizardMenu.svelte';
+  import { getWizardsForPath } from '$lib/config/wizardCatalog';
   import { goto } from '$app/navigation';
   import { page } from '$app/stores';
   import HelpModal from '$lib/components/modals/HelpModal.svelte';
@@ -334,13 +335,10 @@
         📥 Scan Check In
       </button>
       <ModuleWizardMenu
-        wizards={[
-          { id: 'check-in', label: 'Check-in Wizard', icon: '📦' },
-          { id: 'rma', label: 'Track RMA', icon: '📋' }
-        ]}
+        wizards={getWizardsForPath('/modules/hardware')}
         on:select={(e) => {
-          if (e.detail.id === 'check-in') showCheckInWizard = true;
-          else if (e.detail.id === 'rma') showRMAWizard = true;
+          if (e.detail.id === 'inventory-checkin') showCheckInWizard = true;
+          else if (e.detail.id === 'rma-tracking') showRMAWizard = true;
         }}
       />
       <button class="btn-secondary" onclick={() => { scanMode = 'check-out'; showScanModal = true; }}>

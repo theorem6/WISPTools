@@ -13,7 +13,8 @@ param(
     [string]$GitUrl = "git@github.com:theorem6/WISPTools.git",
     [string]$GitHubToken = "",   # If set, Git deploy uses HTTPS with token (no SSH key on VM). Also from env GITHUB_TOKEN or update-backend-from-git.sh
     [switch]$SetupOnly = $false,
-    [switch]$UseIapTunnel = $true
+    [switch]$UseIapTunnel = $true,
+    [switch]$SkipRemote = $false   # Upload only; run remote install from Cloud Shell or another machine
 )
 
 Write-Host "Deploying backend services to GCE ($DeployMethod)..." -ForegroundColor Green
@@ -108,70 +109,53 @@ if ($DeployMethod -eq "Upload") {
         Write-Host "Upload failed." -ForegroundColor Red
         exit 1
     }
+    if ($SkipRemote) {
+        Write-Host "Upload complete (SkipRemote). Run remote install from Cloud Shell or a machine where gcloud ssh works:" -ForegroundColor Green
+        $tunnel = if ($UseIapTunnel) { " --tunnel-through-iap" } else { "" }
+        Write-Host "  gcloud compute ssh $InstanceName --project=$Project --zone=$Zone$tunnel --command=`"cd $BackendDir && npm install --omit=dev && pm2 reload ecosystem.config.js && pm2 save`"" -ForegroundColor Cyan
+        Write-Host "If this is the first upload, first move deploy dir: sudo mv $BackendDir ${BackendDir}.bak 2>/dev/null; sudo mv /tmp/backend-services-deploy $BackendDir; cp ${BackendDir}.bak/.env $BackendDir/.env 2>/dev/null" -ForegroundColor Gray
+        exit 0
+    }
 }
 
-# Remote script: install + pm2 (and for Upload, replace dir from /tmp; for Git, bootstrap then pull)
+# Run remote steps as separate short SSH commands (avoids plink/long-command issues on Windows)
+Write-Host "Running remote install and pm2 (step-by-step)..." -ForegroundColor Yellow
+$remoteFailed = $false
+function Invoke-Remote {
+    param([string]$Command)
+    & gcloud compute ssh @gcloudSshArgs --command $Command
+    if ($LASTEXITCODE -ne 0) { $script:remoteFailed = $true; return $false }
+    return $true
+}
 if ($DeployMethod -eq "Git") {
     $gitUrlEscaped = $GitUrl -replace "'", "'\\''"
-    $remoteScript = @"
-set -e
-REPO='$RepoPath'
-TARGET='$BackendDir'
-GITURL='$gitUrlEscaped'
-command -v git >/dev/null 2>&1 || (sudo apt-get update -qq && sudo apt-get install -y git)
-mkdir -p ~/.ssh
-[ -f ~/.ssh/id_ed25519 ] || [ -f ~/.ssh/id_rsa ] || ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519 -N "" -q
-grep -q github.com ~/.ssh/known_hosts 2>/dev/null || ssh-keyscan -t ed25519,rsa github.com >> ~/.ssh/known_hosts 2>/dev/null
-if [ ! -d "`$REPO/.git" ]; then
-  PARENT=`$(dirname "`$REPO")
-  sudo mkdir -p "`$PARENT"
-  sudo chown -R `$USER:`$USER "`$PARENT" 2>/dev/null || true
-  git clone "`$GITURL" "`$REPO" || { echo "Clone failed. Add this deploy key to GitHub (Settings -> Deploy keys):"; cat ~/.ssh/id_ed25519.pub 2>/dev/null || cat ~/.ssh/id_rsa.pub; exit 1; }
-fi
-cd "`$REPO" && git remote set-url origin "`$GITURL" && git pull
-cd "`$TARGET" && npm install --omit=dev
-command -v pm2 >/dev/null 2>&1 || sudo npm install -g pm2
-pm2 reload ecosystem.config.js 2>/dev/null || (cd "`$TARGET" && pm2 start ecosystem.config.js)
-pm2 save || true
-"@
+    if (-not (Invoke-Remote "test -d $RepoPath/.git 2>/dev/null || echo missing")) { $remoteFailed = $true }
+    if (-not $remoteFailed -and -not (Invoke-Remote "cd $RepoPath && git remote set-url origin '$gitUrlEscaped' && git pull")) { $remoteFailed = $true }
+    if (-not $remoteFailed) { Invoke-Remote "cd $BackendDir && npm install --omit=dev" | Out-Null }
+    if (-not $remoteFailed) { Invoke-Remote "command -v pm2 >/dev/null 2>&1 || sudo npm install -g pm2" | Out-Null }
+    if (-not $remoteFailed) { Invoke-Remote "cd $BackendDir && (pm2 reload ecosystem.config.js 2>/dev/null || pm2 start ecosystem.config.js)" | Out-Null }
+    if (-not $remoteFailed) { Invoke-Remote "pm2 save" | Out-Null }
 } else {
-    $remoteScript = @"
-set -e
-TARGET='$BackendDir'
-PARENT=`$(dirname "`$TARGET")
-sudo mkdir -p "`$PARENT" 2>/dev/null
-sudo chown -R `$USER:`$USER "`$PARENT" 2>/dev/null
-mv "`$TARGET" "`$TARGET.bak" 2>/dev/null
-mv /tmp/backend-services-deploy "`$TARGET"
-if [ -f "`${TARGET}.bak/.env" ]; then cp "`${TARGET}.bak/.env" "`$TARGET/.env"; echo "Preserved .env from previous deploy"; fi
-cd "`$TARGET" && npm install --omit=dev
-command -v pm2 >/dev/null 2>&1 || sudo npm install -g pm2
-pm2 reload ecosystem.config.js 2>/dev/null || (cd "`$TARGET" && pm2 start ecosystem.config.js)
-pm2 save || true
-"@
+    # Upload: move /tmp/backend-services-deploy to BackendDir, preserve .env, npm install, pm2 reload
+    $parentDir = $BackendDir -replace '/[^/]+$', ''
+    if (-not (Invoke-Remote "sudo mkdir -p $parentDir 2>/dev/null; sudo chown -R `$USER:`$USER $parentDir 2>/dev/null; mv $BackendDir ${BackendDir}.bak 2>/dev/null; mv /tmp/backend-services-deploy $BackendDir")) {
+        $remoteFailed = $true
+    }
+    if (-not $remoteFailed) {
+        Invoke-Remote "test -f ${BackendDir}.bak/.env && cp ${BackendDir}.bak/.env $BackendDir/.env" | Out-Null
+    }
+    if (-not $remoteFailed) { Invoke-Remote "cd $BackendDir && npm install --omit=dev" | Out-Null }
+    if (-not $remoteFailed) { Invoke-Remote "command -v pm2 >/dev/null 2>&1 || sudo npm install -g pm2" | Out-Null }
+    if (-not $remoteFailed) { Invoke-Remote "cd $BackendDir && (pm2 reload ecosystem.config.js 2>/dev/null || pm2 start ecosystem.config.js)" | Out-Null }
+    if (-not $remoteFailed) { Invoke-Remote "pm2 save" | Out-Null }
 }
-Write-Host "Running remote install and pm2..." -ForegroundColor Yellow
-$scriptUnix = ($remoteScript -replace "`r`n", "`n").TrimEnd() + "`n"
-$runnerPath = Join-Path $env:TEMP "backend-deploy-runner-$([Guid]::NewGuid().ToString('N').Substring(0,8)).sh"
-[System.IO.File]::WriteAllText($runnerPath, $scriptUnix, [System.Text.UTF8Encoding]::new($false))
-# Runner is a single file: SRC and DEST must be positional; flags can follow
-try {
-    if ($UseIapTunnel) {
-        gcloud compute scp $runnerPath "${InstanceName}:/tmp/backend-deploy-runner.sh" --project=$Project --zone=$Zone --tunnel-through-iap
-    } else {
-        gcloud compute scp $runnerPath "${InstanceName}:/tmp/backend-deploy-runner.sh" --project=$Project --zone=$Zone
-    }
-    if ($LASTEXITCODE -ne 0) { Write-Host "Failed to upload deploy runner script." -ForegroundColor Red; exit 1 }
-    & gcloud compute ssh @gcloudSshArgs --command "bash /tmp/backend-deploy-runner.sh"
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "Remote deploy step failed (SSH/plink may fail on this machine)." -ForegroundColor Red
-        Write-Host "If files were uploaded, run the install manually (e.g. from Cloud Shell):" -ForegroundColor Yellow
-        Write-Host "  gcloud compute ssh $InstanceName --project=$Project --zone=$Zone $(if ($UseIapTunnel) { '--tunnel-through-iap' }) --command=`"cd $BackendDir && npm install --omit=dev && pm2 reload ecosystem.config.js && pm2 save`"" -ForegroundColor Cyan
-        Write-Host "See DEPLOY_BACKEND_FALLBACK.md for full steps." -ForegroundColor Yellow
-        exit 1
-    }
-} finally {
-    Remove-Item -LiteralPath $runnerPath -Force -ErrorAction SilentlyContinue
+if ($remoteFailed) {
+    Write-Host "Remote deploy step failed (SSH/plink may fail on this machine)." -ForegroundColor Red
+    Write-Host "If files were uploaded, run the install manually (e.g. from Cloud Shell):" -ForegroundColor Yellow
+    $tunnel = if ($UseIapTunnel) { " --tunnel-through-iap" } else { "" }
+    Write-Host "  gcloud compute ssh $InstanceName --project=$Project --zone=$Zone$tunnel --command=`"cd $BackendDir && npm install --omit=dev && pm2 reload ecosystem.config.js && pm2 save`"" -ForegroundColor Cyan
+    Write-Host "See DEPLOY_BACKEND_FALLBACK.md for full steps." -ForegroundColor Yellow
+    exit 1
 }
 
 Write-Host "Backend deployment complete." -ForegroundColor Green

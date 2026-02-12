@@ -36,7 +36,7 @@
       const user = authService.getCurrentUser();
       if (!user) throw new Error('Not authenticated');
       
-      const token = await user.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       
       const response = await fetch('/api/tr069/firmware', {
         headers: {
@@ -89,7 +89,7 @@
       const user = authService.getCurrentUser();
       if (!user) throw new Error('Not authenticated');
       
-      const token = await user.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       
       const response = await fetch('/api/tr069/firmware/upgrade', {
         method: 'POST',

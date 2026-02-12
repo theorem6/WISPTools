@@ -22,11 +22,24 @@ On the GCE instance where the backend runs, you can run a script that calls the 
 
 Ensure the backend has **INTERNAL_API_KEY** set (same value the apiProxy Cloud Function uses). The script will send this in a header the backend accepts for internal cron routes.
 
-### 2. Internal cron route (optional)
+### 2. Internal cron route (recommended)
 
-If you prefer not to send a user Bearer token, add an internal route that accepts **x-internal-key** and runs generate-invoices / dunning for a tenant (or all tenants). Then the cron job calls that route with the internal key.
+The backend has **POST /api/internal/cron/billing** that accepts **x-internal-key** and optionally **X-Tenant-ID**. If **X-Tenant-ID** is omitted, it runs generate-invoices and dunning for **all tenants**. Use the script on GCE:
 
-Example (if you add an internal route like **POST /api/internal/cron/billing** that checks **x-internal-key** and runs both steps for all tenants or a list of tenants).
+**Script:** `backend-services/scripts/cron-billing.sh`. It reads **INTERNAL_API_KEY** from the environment or, if not set, from a `.env` file (script tries `../../.env` relative to the script, i.e. repo root). If your `.env` is in `backend-services/`, either export **INTERNAL_API_KEY** in the crontab or ensure the script can read it (e.g. `source /opt/lte-pci-mapper/backend-services/.env` before running).
+
+```bash
+# On GCE, ensure INTERNAL_API_KEY is in backend .env (or export in crontab), then:
+/opt/lte-pci-mapper/backend-services/scripts/cron-billing.sh
+```
+
+Crontab (run daily at 00:05):
+
+```cron
+5 0 * * * /opt/lte-pci-mapper/backend-services/scripts/cron-billing.sh
+```
+
+**Setup script:** From repo root on GCE, run `./scripts/setup-billing-cron.sh` to add or update the crontab entry automatically. See [scripts/setup-billing-cron.sh](../scripts/setup-billing-cron.sh).
 
 ### 3. Cron job calling the public API
 

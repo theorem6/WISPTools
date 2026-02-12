@@ -7,6 +7,8 @@ description: Cloud Function + INTERNAL_API_KEY for /api/user-tenants.
 
 **If you see 401 "Invalid or missing internal key":** run `.\scripts\set-internal-api-key-on-gce.ps1` (after `gcloud auth login`) so the backend and Cloud Function share the same INTERNAL_API_KEY.
 
+**If you see 401 on `/api/admin/tenants`:** The backend must verify Firebase tokens for admin routes. Set Firebase Admin credentials on the GCE backend: `.\scripts\set-firebase-admin-on-gce.ps1 -KeyPath "C:\path\to\wisptools-production-xxxxx.json"`. Also ensure your email is in `PLATFORM_ADMIN_EMAILS` (default: admin@wisptools.io) or set `PLATFORM_ADMIN_UIDS` in backend `.env`.
+
 **If user-tenants works (200) but you still get 401 on `/api/tenant-settings`, `/api/plans`, or `/api/notifications`:** the backend must verify Firebase tokens for those routes. Set Firebase Admin on the backend once: get a Firebase service account JSON (Firebase Console → Project Settings → Service accounts → Generate new private key), then run `.\scripts\set-firebase-admin-on-gce.ps1 -KeyPath "C:\path\to\wisptools-production-xxxxx.json"`. See [401 on /api/tenant-settings](#401-on-apitenant-settings-apiplans-apinotifications-backend-token-verification) below.
 
 ## Fix in use: Cloud Function + INTERNAL_API_KEY (no backend Firebase needed)
@@ -55,6 +57,33 @@ sudo bash /path/to/fix-nginx-api-routing.sh
 ```
 
 After the fix, `GET https://hss.wisptools.io/api/internal/user-tenants/:userId` (with `X-Internal-Key`) should reach the Node app with the correct path and return 200.
+
+---
+
+## 404 on /api/tenant-settings
+
+**Symptom:** `GET /api/tenant-settings?path=/api/tenant-settings` returns **404**.
+
+**Causes and fixes:**
+
+1. **authProxy path parsing:** Firebase Hosting may pass `req.url` as `/` when rewriting. The frontend sends `?path=/api/tenant-settings` so authProxy can resolve the route. If you still get 404, check Firebase Functions logs for authProxy – it may log `receivedPath: (empty)`.
+2. **Missing X-Tenant-ID:** authProxy requires `X-Tenant-ID`. The frontend must send it (tenantSettingsService uses `getAuthHeaders(tenantId)`). If tenant isn’t selected yet, the request may run without it and authProxy returns 400, not 404.
+3. **Backend returns 404:** The internal route returns 404 when `Tenant.findById(tenantId)` is null. Confirm the tenant exists and the ID matches (MongoDB `_id` string).
+4. **INTERNAL_API_KEY:** Ensure it’s set in Firebase (authProxy) and on the backend. Mismatch causes 401, not 404.
+
+---
+
+## 404 on /api/customer-billing (generate-invoices, dunning/run)
+
+**Symptom:** Frontend calls `POST /api/customer-billing/generate-invoices` or `POST /api/customer-billing/dunning/run` and gets **404 Not Found**.
+
+**Cause:** Firebase Hosting rewrites `/api/**` to the **apiProxy** Cloud Function, which forwards to `BACKEND_HOST` (default `https://hss.wisptools.io`). A 404 usually means (1) the path is not reaching the Node app (nginx stripping path – see [404 with path `/`](#404-route-not-found-with-path--nginx-stripping-path) above), or (2) **BACKEND_HOST** is wrong or the backend is not running.
+
+**Fix:**
+
+1. **Firebase:** Ensure apiProxy has **BACKEND_HOST** set (e.g. `https://hss.wisptools.io`) in the function’s environment or in Firebase config. No port is needed if nginx on that host proxies to the Node app.
+2. **GCE nginx:** Ensure `/api/` is proxied to the Node app with the full path. Run: `.\scripts\fix-nginx-api-routing-on-gce.ps1`
+3. **Backend:** The backend mounts customer-billing at `/api/customer-billing`; no internal key is required – only **X-Tenant-ID** and (optionally) **Authorization**. If nginx and BACKEND_HOST are correct, these routes should return 200.
 
 ---
 

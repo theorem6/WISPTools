@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { auth } from '$lib/firebase';
+  import { authService } from '$lib/services/authService';
   import { API_CONFIG } from '$lib/config/api';
   import { currentTenant } from '$lib/stores/tenantStore';
   
@@ -30,7 +31,7 @@
         return;
       }
       
-      const token = await user.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       
       // Load from SNMP discovered devices (filter for Mikrotik)
       const snmpResponse = await fetch(`${API_CONFIG.PATHS.SNMP_MONITORING}/discovered`, {

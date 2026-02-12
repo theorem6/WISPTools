@@ -328,6 +328,142 @@ export const userTenants = onRequest({
   }
 });
 
+// Auth Proxy - Verifies Firebase token then calls backend internal routes for tenant-settings and plans.
+// Fixes 401 on GCE when backend has no Firebase Admin: token is verified here, backend receives internal key + X-Tenant-ID.
+export const authProxy = onRequest({
+  region: FUNCTIONS_CONFIG.functions.apiProxy.region,
+  memory: '256MiB',
+  timeoutSeconds: 30,
+  cors: true,
+  invoker: 'public',
+  secrets: ['INTERNAL_API_KEY']
+}, async (req, res) => {
+  const allowedOrigins: string[] = [...FUNCTIONS_CONFIG.cors.origins];
+  const origin = (req.headers.origin as string) || '';
+  const allowedOrigin = allowedOrigins.includes(origin) ? origin : (allowedOrigins[0] || '*');
+  res.set('Access-Control-Allow-Origin', allowedOrigin);
+  res.set('Access-Control-Allow-Methods', 'GET, PUT, OPTIONS');
+  res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Tenant-ID');
+  res.set('Access-Control-Max-Age', '3600');
+  res.set('Vary', 'Origin');
+
+  if (req.method === 'OPTIONS') {
+    res.status(204).send('');
+    return;
+  }
+  if (req.method !== 'GET' && req.method !== 'PUT') {
+    res.status(405).json({ error: 'Method not allowed' });
+    return;
+  }
+
+  const internalKey = process.env.INTERNAL_API_KEY;
+  const backendHost = process.env.BACKEND_HOST || 'https://hss.wisptools.io';
+  if (!internalKey) {
+    console.error('[authProxy] INTERNAL_API_KEY not set');
+    res.status(503).json({ error: 'Service misconfiguration', message: 'INTERNAL_API_KEY not set' });
+    return;
+  }
+
+  // Path resolution: when Hosting rewrites to function, req.url can be '/' or path+query - use all fallbacks
+  const rawUrl = req.url || '';
+  let path = rawUrl.split('?')[0] || (req as any).path || '';
+  if (path.startsWith('http')) {
+    try {
+      path = new URL(path).pathname;
+    } catch {
+      path = '';
+    }
+  }
+  if ((!path || path === '/') && (req.headers['x-original-url'] as string)) {
+    const x = req.headers['x-original-url'] as string;
+    path = x.startsWith('http') ? (() => { try { return new URL(x).pathname; } catch { return x; } })() : x;
+  }
+  if ((!path || path === '/') && (req.headers['x-forwarded-path'] as string)) {
+    path = (req.headers['x-forwarded-path'] as string).startsWith('/')
+      ? (req.headers['x-forwarded-path'] as string) : `/${req.headers['x-forwarded-path']}`;
+  }
+  if ((!path || path === '/') && (req.headers['x-forwarded-request-uri'] as string)) {
+    const x = (req.headers['x-forwarded-request-uri'] as string).split('?')[0];
+    if (x.startsWith('/')) path = x;
+  }
+  if ((!path || path === '/') && (req as any).query?.path && typeof (req as any).query.path === 'string') {
+    const qPath = (req as any).query.path as string;
+    if (qPath.startsWith('/')) path = qPath.split('?')[0];
+  }
+  // Cloud Run may not populate req.query; parse path from query string in req.url (e.g. /?path=/api/tenant-settings)
+  if ((!path || path === '/') && rawUrl.includes('?')) {
+    try {
+      const qs = rawUrl.includes('?') ? rawUrl.substring(rawUrl.indexOf('?') + 1) : '';
+      const params = new URLSearchParams(qs);
+      const qPath = params.get('path');
+      if (qPath && qPath.startsWith('/')) path = qPath.split('?')[0];
+    } catch {
+      // ignore
+    }
+  }
+  // If path still empty, authProxy is only used for tenant-settings and plans - treat as tenant-settings
+  if ((!path || path === '/') && (req.method === 'GET' || req.method === 'PUT')) {
+    path = '/api/tenant-settings';
+  }
+  const query = rawUrl.includes('?') ? rawUrl.split('?')[1] || '' : '';
+  const isTenantSettings = path === '/api/tenant-settings' || path.endsWith('/api/tenant-settings');
+  const isPlans = path === '/api/plans' || path === '/api/plans/';
+  if (!isTenantSettings && !isPlans) {
+    res.status(404).json({ error: 'Not found', message: 'authProxy only handles /api/tenant-settings and GET /api/plans', receivedPath: path || '(empty)' });
+    return;
+  }
+
+  const tenantId = (req.headers['x-tenant-id'] || req.headers['X-Tenant-ID']) as string;
+  if (!tenantId) {
+    res.status(400).json({ error: 'Bad Request', message: 'X-Tenant-ID header required' });
+    return;
+  }
+
+  const authHeader = req.headers.authorization || req.headers.Authorization;
+  if (!authHeader || typeof authHeader !== 'string' || !authHeader.startsWith('Bearer ')) {
+    res.status(401).json({ error: 'Unauthorized', message: 'Missing or invalid Authorization header' });
+    return;
+  }
+  const token = authHeader.split('Bearer ')[1];
+  if (!token) {
+    res.status(401).json({ error: 'Unauthorized', message: 'No token' });
+    return;
+  }
+
+  try {
+    await auth.verifyIdToken(token, true);
+  } catch (e: any) {
+    console.error('[authProxy] Token verification failed:', e?.message);
+    res.status(401).json({
+      error: 'Invalid token',
+      message: e?.message || 'Token verification failed',
+      code: e?.code || 'unknown'
+    });
+    return;
+  }
+
+  try {
+    const internalPath = isTenantSettings ? '/api/internal/tenant-settings' : '/api/internal/plans';
+    const url = query ? `${backendHost}${internalPath}?${query}` : `${backendHost}${internalPath}`;
+    const method = req.method as 'GET' | 'PUT';
+    const headers: Record<string, string> = {
+      'x-internal-key': internalKey,
+      'x-tenant-id': tenantId,
+      'Content-Type': 'application/json'
+    };
+    if (method === 'PUT' && req.body) {
+      const ax = await axios.put(url, req.body, { timeout: 15000, headers, responseType: 'json', validateStatus: () => true });
+      res.status(ax.status).set('Content-Type', 'application/json').send(ax.data);
+    } else {
+      const ax = await axios.get(url, { timeout: 15000, headers, responseType: 'json', validateStatus: () => true });
+      res.status(ax.status).set('Content-Type', 'application/json').send(ax.data);
+    }
+  } catch (e: any) {
+    console.error('[authProxy] Backend call failed:', e?.message);
+    res.status(502).json({ error: 'Bad Gateway', message: e?.message || 'Backend request failed' });
+  }
+});
+
 // Main API Proxy - Provides HTTPS endpoint for unified backend API (Port 3001)
 // Handles all API routes: customers, work-orders, inventory, plans, HSS, billing, etc.
 // Also handles GET /api/user-tenants/:userId when Hosting routes it here (fallback for custom domain).
@@ -400,10 +536,11 @@ export const apiProxy = onRequest({
   } else if (req.path && req.path !== '/') {
     incoming = req.path;
   }
-  // Fallback: proxy headers (some gateways set X-Original-URL)
+  // Fallback: proxy headers (some gateways set X-Original-URL, X-Forwarded-Request-URI)
   if (!incoming || incoming === '/') {
     const xOriginal = req.headers['x-original-url'] as string | undefined;
     const xForwardedPath = req.headers['x-forwarded-path'] as string | undefined;
+    const xForwardedRequestUri = req.headers['x-forwarded-request-uri'] as string | undefined;
     if (xOriginal?.startsWith('http')) {
       try {
         incoming = new URL(xOriginal).pathname || '';
@@ -414,6 +551,9 @@ export const apiProxy = onRequest({
       incoming = xOriginal;
     } else if (xForwardedPath) {
       incoming = xForwardedPath.startsWith('/') ? xForwardedPath : `/${xForwardedPath}`;
+    } else if (xForwardedRequestUri) {
+      const p = xForwardedRequestUri.split('?')[0];
+      if (p.startsWith('/')) incoming = p;
     }
   }
 
@@ -510,6 +650,54 @@ export const apiProxy = onRequest({
     });
     return;
   }
+
+  // GET /api/user-tenants/tenant/:tenantId - verify token here and call backend internal route
+  // so backend does not need Firebase Admin (avoids 401 when GCE has no credentials)
+  const tenantDetailsMatch = proxiedPath.match(/^\/api\/user-tenants\/tenant\/([^/]+)$/);
+  if (req.method === 'GET' && tenantDetailsMatch) {
+    const internalKey = process.env.INTERNAL_API_KEY;
+    const backendHost = process.env.BACKEND_HOST || 'https://hss.wisptools.io';
+    const authHeader = req.headers['authorization'] || req.headers['Authorization'];
+    if (!internalKey) {
+      console.error('[apiProxy] INTERNAL_API_KEY not set for tenant-details');
+      res.set('Access-Control-Allow-Origin', origin).status(503).json({ error: 'Service misconfiguration' });
+      return;
+    }
+    if (!authHeader || typeof authHeader !== 'string' || !authHeader.startsWith('Bearer ')) {
+      res.set('Access-Control-Allow-Origin', origin).status(401).json({ error: 'Unauthorized', message: 'Missing or invalid Authorization header' });
+      return;
+    }
+    const token = authHeader.split('Bearer ')[1];
+    if (!token) {
+      res.set('Access-Control-Allow-Origin', origin).status(401).json({ error: 'Unauthorized', message: 'No token' });
+      return;
+    }
+    try {
+      const decoded = await auth.verifyIdToken(token, true);
+      const uid = decoded.uid;
+      const tenantId = tenantDetailsMatch[1];
+      const internalUrl = `${backendHost}/api/internal/tenant-details/${encodeURIComponent(tenantId)}`;
+      const ax = await axios.get(internalUrl, {
+        timeout: 15000,
+        headers: {
+          'x-internal-key': internalKey,
+          'x-firebase-uid': uid,
+          'Content-Type': 'application/json'
+        },
+        responseType: 'json',
+        validateStatus: () => true
+      });
+      res.status(ax.status).set('Content-Type', 'application/json').send(ax.data);
+      return;
+    } catch (e: any) {
+      console.error('[apiProxy] tenant-details token verify or backend call failed:', e?.message);
+      res.set('Access-Control-Allow-Origin', origin).status(e?.response?.status === 404 ? 404 : 401).json({
+        error: e?.response?.data?.error || 'Unauthorized',
+        message: e?.response?.data?.message || e?.message || 'Token verification or backend request failed'
+      });
+      return;
+    }
+  }
   
   try {
     // Create Axios instance with retry logic for this request
@@ -545,7 +733,8 @@ export const apiProxy = onRequest({
 
     // Build headers
     const headers: Record<string, string> = {
-      'Content-Type': 'application/json'
+      'Content-Type': 'application/json',
+      'X-Original-Path': proxiedPath // Backend uses this when nginx strips path to /
     };
     
     // Forward x-tenant-id if present (check both lowercase and camelCase)

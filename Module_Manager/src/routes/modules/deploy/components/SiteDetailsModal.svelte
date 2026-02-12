@@ -3,6 +3,7 @@
   import { createEventDispatcher } from 'svelte';
   import { coverageMapService } from '../../coverage-map/lib/coverageMapService.mongodb';
   import { auth } from '$lib/firebase';
+  import { authService } from '$lib/services/authService';
   import { API_CONFIG } from '$lib/config/api';
   import { currentTenant } from '$lib/stores/tenantStore';
   import type { TowerSite } from '../../coverage-map/lib/models';
@@ -44,7 +45,7 @@
       // Load EPC devices at this site
       const user = auth().currentUser;
       if (user) {
-        const token = await user.getIdToken();
+        const token = await authService.getAuthTokenForApi();
         try {
           const response = await fetch(`${API_CONFIG.PATHS.HSS}/epc/remote/list`, {
             headers: {

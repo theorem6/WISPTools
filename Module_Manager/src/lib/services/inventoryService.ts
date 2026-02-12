@@ -136,41 +136,11 @@ class InventoryService {
   }
   
   private async getAuthToken(): Promise<string> {
-    // Try using authService first (more reliable in iframe context)
-    try {
-      // Wait for auth to be ready (iframe might still be initializing)
-      let attempts = 0;
-      while (attempts < 5) {
-        const token = await authService.getAuthToken();
-        if (token) {
-          return token;
-        }
-        // Wait 200ms between attempts
-        await new Promise(resolve => setTimeout(resolve, 200));
-        attempts++;
-      }
-    } catch (err) {
-      console.warn('[InventoryService] authService.getAuthToken failed after retries, trying direct Firebase auth:', err);
+    const token = await authService.getAuthTokenForApi();
+    if (!token) {
+      throw new Error('Not authenticated - no user found after retries');
     }
-    
-    // Fallback to direct Firebase auth
-    const { auth } = await import('$lib/firebase');
-    let attempts = 0;
-    while (attempts < 5) {
-      const currentUser = auth().currentUser;
-      if (currentUser) {
-        try {
-          return await currentUser.getIdToken();
-        } catch (err) {
-          console.warn('[InventoryService] getIdToken failed, retrying...', err);
-        }
-      }
-      // Wait 200ms between attempts
-      await new Promise(resolve => setTimeout(resolve, 200));
-      attempts++;
-    }
-    
-    throw new Error('Not authenticated - no user found after retries');
+    return token;
   }
   
   private async apiCall(endpoint: string, options: RequestInit = {}, tenantId?: string): Promise<any> {

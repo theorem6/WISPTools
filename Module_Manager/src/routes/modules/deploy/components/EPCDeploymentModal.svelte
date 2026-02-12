@@ -1187,7 +1187,7 @@ echo "🎉 Deployment successful!";
       // Get authentication token
       let authToken: string | null = null;
       try {
-        authToken = await authService.getAuthToken();
+        authToken = await authService.getAuthTokenForApi();
       } catch (authErr) {
         console.warn('[EPCDeployment] Could not get auth token:', authErr);
       }

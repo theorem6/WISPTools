@@ -116,7 +116,7 @@
       if (!tenantId) return;
       
       const apiPath = API_CONFIG.PATHS.CUSTOMERS.split('/customers')[0];
-      const token = await (await import('$lib/services/authService')).authService.getIdToken();
+      const token = await (await import('$lib/services/authService')).authService.getAuthTokenForApi();
       
       const [groupsRes, plansRes] = await Promise.all([
         fetch(`${apiPath}/hss/groups`, {

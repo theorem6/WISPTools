@@ -3,6 +3,7 @@
   import ECharts from '$lib/components/ECharts.svelte';
   import type { EChartsOption } from 'echarts';
   import { auth } from '$lib/firebase';
+  import { authService } from '$lib/services/authService';
   import { currentTenant } from '$lib/stores/tenantStore';
   import { API_CONFIG } from '$lib/config/api';
   
@@ -75,7 +76,7 @@
       const user = auth().currentUser;
       if (!user) return;
       
-      const token = await user.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       const epcId = epc.epc_id || epc.epcId;
       
       const response = await fetch(`${API_CONFIG.BASE}/epc/${epcId}/status`, {
@@ -100,7 +101,7 @@
       const user = auth().currentUser;
       if (!user) return;
       
-      const token = await user.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       const epcId = epc.epc_id || epc.epcId;
       
       const response = await fetch(`${API_CONFIG.BASE}/epc/${epcId}/status/history?hours=6&limit=50`, {
@@ -150,7 +151,7 @@
       const user = auth().currentUser;
       if (!user) return;
       
-      const token = await user.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       const epcId = epc.epc_id || epc.epcId;
       
       const response = await fetch(`${API_CONFIG.BASE}/epc/${epcId}/commands/history?limit=10`, {
@@ -292,7 +293,7 @@
       const user = auth().currentUser;
       if (!user) throw new Error('Not authenticated');
       
-      const token = await user.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       const epcId = epc.epc_id || epc.epcId;
       
       const response = await fetch(`${API_CONFIG.BASE}/epc/${epcId}/service/${action}`, {
@@ -333,7 +334,7 @@
       const user = auth().currentUser;
       if (!user) throw new Error('Not authenticated');
       
-      const token = await user.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       const epcId = epc.epc_id || epc.epcId;
       
       const response = await fetch(`${API_CONFIG.BASE}/epc/commands`, {

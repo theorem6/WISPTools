@@ -30,6 +30,10 @@
   function handleMonitoring() {
     dispatch('monitoring', device);
   }
+
+  function handleEditTags() {
+    dispatch('editTags', device);
+  }
   
   function toggleExpand() {
     dispatch('toggleExpand', device);
@@ -85,7 +89,7 @@
 
 {#if isExpanded}
   <tr class="device-details-row">
-    <td colspan="11">
+    <td colspan="12">
       <div class="device-details">
         <div class="details-section">
           <h4>Device Information</h4>

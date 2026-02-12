@@ -29,6 +29,14 @@
       adminOnly: false
     },
     {
+      id: 'tasks',
+      name: 'Task Queue',
+      icon: '📋',
+      description: 'TR-069 task queue and pending operations',
+      path: '/modules/acs-cpe-management/tasks',
+      adminOnly: false
+    },
+    {
       id: 'presets',
       name: 'Presets',
       icon: '⚙️',

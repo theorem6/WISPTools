@@ -306,7 +306,7 @@ describe('One Tenant Per User Policy', () => {
 - [Multi-Tenant Architecture](./MULTI_TENANT_ARCHITECTURE.md)
 - [Tenant Management Guide](./MULTI_TENANT_SETUP_GUIDE.md)
 - [Admin and User Management](./ADMIN_AND_USER_MANAGEMENT.md)
-- [Tenant Loading Fix](./TENANT_LOADING_FIX.md)
+- [Tenant Persistence](./TENANT_PERSISTENCE_SYSTEM.md)
 
 ## Files Modified
 

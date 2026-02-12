@@ -1,3 +1,8 @@
+---
+title: Wizard Integration Complete
+description: All high-priority wizards integrated into modules; status and locations.
+---
+
 # Wizard Integration Complete
 
 **Date:** January 2025  

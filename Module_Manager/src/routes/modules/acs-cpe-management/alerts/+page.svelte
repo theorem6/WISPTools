@@ -65,7 +65,7 @@
       const user = authService.getCurrentUser();
       if (!user) throw new Error('Not authenticated');
       
-      const token = await user.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       
       const response = await fetch('/api/tr069/alerts/rules', {
         headers: {
@@ -96,7 +96,7 @@
       const user = authService.getCurrentUser();
       if (!user) throw new Error('Not authenticated');
       
-      const token = await user.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       
       const response = await fetch('/api/tr069/alerts', {
         headers: {
@@ -154,7 +154,7 @@
       const user = authService.getCurrentUser();
       if (!user) throw new Error('Not authenticated');
       
-      const token = await user.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       
       const endpoint = selectedRule 
         ? `/api/tr069/alerts/rules/${selectedRule.rule_id}`
@@ -206,7 +206,7 @@
       const user = authService.getCurrentUser();
       if (!user) throw new Error('Not authenticated');
       
-      const token = await user.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       
       const response = await fetch(`/api/tr069/alerts/rules/${rule.rule_id}`, {
         method: 'DELETE',

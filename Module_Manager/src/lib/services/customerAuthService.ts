@@ -33,7 +33,7 @@ class CustomerAuthService {
       }
       
       // Get ID token from the current user
-      const idToken = await authService.getIdToken();
+      const idToken = await authService.getAuthTokenForApi();
       
       // Call customer portal API to link/verify customer
       const response = await fetch(`${API_URL}/customer-portal/auth/login`, {
@@ -87,7 +87,7 @@ class CustomerAuthService {
       }
       
       // Get ID token from the current user
-      const idToken = await authService.getIdToken();
+      const idToken = await authService.getAuthTokenForApi();
       
       // Call customer portal API to link customer
       const response = await fetch(`${API_URL}/customer-portal/auth/signup`, {
@@ -135,7 +135,7 @@ class CustomerAuthService {
    */
   async getCurrentCustomer(): Promise<Customer | null> {
     try {
-      const token = await authService.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       
       if (!token) {
         return null;

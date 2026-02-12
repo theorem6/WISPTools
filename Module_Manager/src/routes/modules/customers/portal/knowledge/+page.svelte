@@ -12,6 +12,8 @@
   let brandName = 'Our team';
   let supportEmail = 'support@example.com';
   let articles: KBArticle[] = [];
+  let kbSearch = '';
+  let kbCategory = '';
 
   const fallbackGuides = [
     { title: 'Optimize Wi-Fi coverage at home', summary: 'Tips for positioning your router, reducing interference, and getting the best speeds from your plan.', readTime: '4 min read' },
@@ -23,7 +25,33 @@
   $: featureEnabled = !!$portalBranding?.features?.enableKnowledgeBase;
   $: brandName = $portalBranding?.company?.displayName || $portalBranding?.company?.name || brandName;
   $: supportEmail = $portalBranding?.company?.supportEmail || 'support@example.com';
-  $: displayItems = articles.length > 0 ? articles : fallbackGuides.map((g) => ({ _id: '', title: g.title, content: g.summary, category: '' }));
+  $: categories = (() => {
+    const list = articles.length > 0 ? articles : fallbackGuides.map((g) => ({ _id: '', title: g.title, content: g.summary, category: '' }));
+    const cats = new Set<string>();
+    list.forEach((a) => {
+      const c = (a.category || '').trim();
+      if (c) cats.add(c);
+    });
+    return Array.from(cats).sort();
+  })();
+
+  $: displayItems = (() => {
+    const list = articles.length > 0 ? articles : fallbackGuides.map((g) => ({ _id: '', title: g.title, content: g.summary, category: '' }));
+    let out = list;
+    if (kbSearch.trim()) {
+      const q = kbSearch.trim().toLowerCase();
+      out = out.filter(
+        (a) =>
+          (a.title || '').toLowerCase().includes(q) ||
+          (a.content || '').toLowerCase().includes(q) ||
+          (a.category || '').toLowerCase().includes(q)
+      );
+    }
+    if (kbCategory) {
+      out = out.filter((a) => (a.category || '').trim() === kbCategory);
+    }
+    return out;
+  })();
 
   onMount(async () => {
     const customer = await customerAuthService.getCurrentCustomer();
@@ -49,6 +77,7 @@
   <div class="loading">Loading knowledge base...</div>
 {:else if !featureEnabled}
   <div class="feature-disabled">
+    <p class="back-link"><a href="/modules/customers/portal/dashboard">← Back to Dashboard</a></p>
     <h1>Knowledge Base Unavailable</h1>
     <p>This tenant has not enabled the Knowledge Base module. For guidance, please contact <a href={`mailto:${supportEmail}`}>{supportEmail}</a>.</p>
   </div>
@@ -57,8 +86,24 @@
     <header>
       <h1>{brandName} Knowledge Base</h1>
       <p class="subtitle">Self-service guides curated by our support engineers.</p>
+      <div class="kb-filters">
+        <input
+          type="search"
+          class="kb-search"
+          placeholder="Search articles…"
+          bind:value={kbSearch}
+          aria-label="Search knowledge base"
+        />
+        {#if categories.length > 0}
+          <select class="kb-category" bind:value={kbCategory} aria-label="Filter by category">
+            <option value="">All categories</option>
+            {#each categories as cat}
+              <option value={cat}>{cat}</option>
+            {/each}
+          </select>
+        {/if}
+      </div>
     </header>
-    
     <section class="guides-grid">
       {#each displayItems as article}
         <article class="guide-card">
@@ -97,6 +142,40 @@
 
   .subtitle {
     color: var(--brand-text-secondary, #6b7280);
+    margin-bottom: 1rem;
+  }
+
+  .kb-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    align-items: center;
+    margin-top: 0.5rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .kb-search {
+    flex: 1;
+    min-width: 200px;
+    max-width: 400px;
+    padding: 0.6rem 1rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    font-size: 1rem;
+  }
+
+  .kb-category {
+    padding: 0.6rem 1rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    font-size: 1rem;
+    background: white;
+  }
+
+  .kb-search:focus {
+    outline: none;
+    border-color: var(--brand-primary, #3b82f6);
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
   }
 
   .guides-grid {
@@ -147,6 +226,16 @@
     color: var(--brand-text-secondary, #6b7280);
   }
 
+  .feature-disabled .back-link {
+    margin-bottom: 1rem;
+  }
+  .feature-disabled .back-link a {
+    color: var(--brand-primary, #3b82f6);
+    text-decoration: none;
+  }
+  .feature-disabled .back-link a:hover {
+    text-decoration: underline;
+  }
   .feature-disabled a {
     color: var(--brand-primary, #3b82f6);
     text-decoration: none;

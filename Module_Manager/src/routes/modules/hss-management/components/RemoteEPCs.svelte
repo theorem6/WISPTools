@@ -2,6 +2,7 @@
   import { onMount, onDestroy } from 'svelte';
   import { page } from '$app/stores';
   import { auth, db } from '$lib/firebase';
+  import { authService } from '$lib/services/authService';
   import { collection, query, where, getDocs, addDoc } from 'firebase/firestore';
   import EPCMonitor from './EPCMonitor.svelte';
   import SiteDevicesModal from './SiteDevicesModal.svelte';
@@ -227,7 +228,7 @@
       const user = auth().currentUser;
       if (!user) return;
       
-      const token = await user.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       const url = statusFilter === 'all' 
         ? `${HSS_API}/epc/list`
         : `${HSS_API}/epc/list?status=${statusFilter}`;
@@ -299,7 +300,7 @@
         return;
       }
       
-      const token = await user.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       console.log('[RemoteEPCs] Sending registration request...');
       
       const response = await fetch(`${HSS_API}/epc/register`, {
@@ -363,7 +364,7 @@
       const user = auth().currentUser;
       if (!user) return;
       
-      const token = await user.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       
       const response = await fetch(`${HSS_API}/epc/${epc.epc_id}/deployment-script`, {
         headers: {
@@ -404,7 +405,7 @@
       const user = auth().currentUser;
       if (!user) return;
       
-      const token = await user.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       
       // Call ISO Generation API via Cloud Function proxy
       const response = await fetch(`${ISO_PROXY}/api/epc/${epc.epc_id}/generate-iso`, {
@@ -481,7 +482,7 @@ To use:
       const user = auth().currentUser;
       if (!user) return;
       
-      const token = await user.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       // Build correct API URL for logs endpoint
       const logsApiUrl = HSS_API.includes('/api/hss') 
         ? HSS_API.replace('/api/hss', '/api/epc')
@@ -531,7 +532,7 @@ To use:
         return;
       }
       
-      const token = await user.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       const response = await fetch(`${HSS_API}/epc/${selectedEPC.epc_id}/link-device`, {
         method: 'POST',
         headers: {
@@ -591,7 +592,7 @@ To use:
       const user = auth().currentUser;
       if (!user) return;
       
-      const token = await user.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       
       const response = await fetch(`${HSS_API}/epc/${epc.epc_id}`, {
         method: 'DELETE',
@@ -621,7 +622,7 @@ To use:
       const user = auth().currentUser;
       if (!user) return;
       
-      const token = await user.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       
       const response = await fetch(`${HSS_API}/epc/${epc.epc_id}/install-component`, {
         method: 'POST',
@@ -656,7 +657,7 @@ To use:
       const user = auth().currentUser;
       if (!user) return;
       
-      const token = await user.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       
       const response = await fetch(`${HSS_API}/epc/${epc.epc_id}/uninstall-component`, {
         method: 'POST',

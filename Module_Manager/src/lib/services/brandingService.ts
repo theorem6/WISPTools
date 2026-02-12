@@ -46,6 +46,8 @@ export interface TenantBranding {
     enableTickets?: boolean;
     enableLiveChat?: boolean;
     enableKnowledgeBase?: boolean;
+    /** When set, this HTML/script is injected into the portal layout (e.g. Tawk.to, Crisp, Intercom embed). */
+    liveChatEmbedHtml?: string;
   };
   billingPortal?: {
     paymentGateways?: {
@@ -107,8 +109,8 @@ class BrandingService {
    */
   async updateTenantBranding(tenantId: string, branding: Partial<TenantBranding>): Promise<void> {
     try {
-      const authService = await import('$lib/services/authService');
-      const token = await authService.authService.getIdToken();
+      const { authService } = await import('$lib/services/authService');
+      const token = await authService.getAuthTokenForApi();
       
       // Get tenant ID from localStorage for X-Tenant-ID header
       const tenantIdHeader = localStorage.getItem('selectedTenantId') || tenantId;
@@ -165,8 +167,8 @@ class BrandingService {
    */
   async uploadLogo(tenantId: string, logoUrl: string, altText?: string): Promise<void> {
     try {
-      const authService = await import('$lib/services/authService');
-      const token = await authService.authService.getIdToken();
+      const { authService } = await import('$lib/services/authService');
+      const token = await authService.getAuthTokenForApi();
       
       const response = await fetch(`${API_URL}/branding/${tenantId}/logo`, {
         method: 'POST',
@@ -224,6 +226,8 @@ class BrandingService {
       features: {
         enableFAQ: true,
         enableServiceStatus: true,
+        enableBilling: true,
+        enableTickets: true,
         enableLiveChat: false,
         enableKnowledgeBase: false
       }

@@ -1,3 +1,8 @@
+---
+title: Deployment Ready Summary
+description: Pre-deployment checks and deployment readiness status.
+---
+
 # Deployment Ready Summary
 
 **Date:** January 2025  

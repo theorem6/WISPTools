@@ -31,55 +31,19 @@ export class TenantService {
 
   /**
    * Get authentication headers for API calls
-   * Uses authService.getIdToken() to ensure we use the same user reference that authService maintains
-   * This is more reliable than auth().currentUser which might lag behind after login
-   * Includes retry logic to wait for auth state to be ready
-   * Forces token refresh to ensure token is valid for backend
+   * Uses authService.getAuthTokenForApi() for robust token retrieval with retry and force refresh
    */
   private async getAuthHeaders(): Promise<Record<string, string>> {
-    // Wait for auth state to be ready (important after login)
-    const user = authService.getCurrentUser();
-    if (!user) {
-      throw new Error('User not authenticated');
-    }
-    
-    // Force refresh token to ensure it's valid (especially important after login)
-    // This ensures we get a fresh token that the backend will accept
-    let token: string | null = null;
-    let retries = 0;
-    const maxRetries = 5;
-    
-    while (!token && retries < maxRetries) {
-      try {
-        // Force refresh to get a fresh token
-        token = await user.getIdToken(true);
-      } catch (error: any) {
-        console.warn('[TenantService] Token refresh failed, retrying:', error);
-        // Wait a bit before retrying
-        await new Promise(resolve => setTimeout(resolve, 200 * (retries + 1)));
-        retries++;
-      }
-    }
-    
+    const token = await authService.getAuthTokenForApi();
     if (!token) {
       throw new Error('User not authenticated - failed to get valid token');
     }
-    
+
     const headers: Record<string, string> = {
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json'
     };
-    
-    console.log('[TenantService] Auth headers prepared:', {
-      hasToken: !!token,
-      tokenLength: token?.length,
-      tokenStart: token?.substring(0, 20) + '...',
-      headerKeys: Object.keys(headers),
-      userId: user?.uid || 'none',
-      retries,
-      forcedRefresh: true
-    });
-    
+
     return headers;
   }
 
@@ -141,8 +105,10 @@ export class TenantService {
   async getTenant(tenantId: string): Promise<{ tenant: Tenant | null; error?: 'not_found' | 'unauthorized' }> {
     try {
       const headers = await this.getAuthHeaders();
+      // Use same-origin URL so request goes through Hosting rewrite to apiProxy (avoids cross-origin 401).
+      // path param helps apiProxy resolve route when Hosting rewrites send req.url as '/'
       const path = `/api/user-tenants/tenant/${tenantId}`;
-      const url = `${API_CONFIG.CLOUD_FUNCTIONS.API_PROXY}?path=${encodeURIComponent(path)}`;
+      const url = `${path}?path=${encodeURIComponent(path)}`;
 
       const response = await fetch(url, {
         method: 'GET',
@@ -208,14 +174,16 @@ export class TenantService {
         if (errorText.trim().startsWith('<!')) {
           throw new Error('API route not found - received HTML instead of JSON');
         }
-        throw new Error(`Failed to get tenants: ${response.statusText}`);
+        const err = new Error(`Failed to get tenants: ${response.statusText}`) as Error & { status?: number };
+        err.status = response.status;
+        throw err;
       }
 
       const tenants = await response.json();
       return tenants.map((tenant: any) => this.mapApiTenantToTenant(tenant));
     } catch (error) {
       console.error('Error getting all tenants:', error);
-      return [];
+      throw error;
     }
   }
 

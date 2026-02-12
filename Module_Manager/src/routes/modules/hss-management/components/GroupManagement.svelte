@@ -83,7 +83,7 @@
   async function loadCustomers() {
     try {
       const apiPath = HSS_API.split('/hss')[0];
-      const token = await (await import('$lib/services/authService')).authService.getIdToken();
+      const token = await (await import('$lib/services/authService')).authService.getAuthTokenForApi();
       
       const response = await fetch(`${apiPath}/customers?limit=1000`, {
         headers: {

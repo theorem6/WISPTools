@@ -1,3 +1,8 @@
+---
+title: Field App – My Projects Integration
+description: How plans are assigned to techs and shown in the field app (My Projects).
+---
+
 # Field App – "My Projects" Integration
 
 ## Overview

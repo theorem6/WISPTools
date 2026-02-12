@@ -44,6 +44,7 @@
   import HelpModal from '$lib/components/modals/HelpModal.svelte';
   import ConflictResolutionWizard from '$lib/components/wizards/pci/ConflictResolutionWizard.svelte';
   import { pciResolutionDocs } from '$lib/docs/pci-resolution-docs';
+  import { getWizardsForPath } from '$lib/config/wizardCatalog';
   import type { CellSite } from '$lib/models/cellSite';
   import { convertLegacyToCellSite, convertCellSiteToLegacy } from '$lib/models/cellSite';
   
@@ -562,17 +563,14 @@
   <VerticalMenu 
     hasData={$hasData}
     hasConflicts={$hasConflicts}
-    wizardItems={[
-      { id: 'conflict-resolution', label: 'Conflict Resolution Wizard', icon: '📊' },
-      { id: 'import', label: 'Import Wizard', icon: '📥' }
-    ]}
+    wizardItems={getWizardsForPath('/modules/deploy')}
     on:import={() => showImportWizard = true}
     on:towers={() => showTowerManager = true}
     on:analyze={() => performAnalysis(true)}
     on:optimize={optimizePCIAssignments}
     on:wizard={(e) => {
-      if (e.detail?.id === 'import') showImportWizard = true;
-      else showConflictResolutionWizard = true;
+      if (e.detail?.id === 'pci-import') showImportWizard = true;
+      else if (e.detail?.id === 'conflict-resolution') showConflictResolutionWizard = true;
     }}
     on:analysis={() => uiActions.openModal('showAnalysisModal')}
     on:conflicts={() => uiActions.openModal('showConflictsModal')}

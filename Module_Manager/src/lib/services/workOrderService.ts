@@ -169,10 +169,10 @@ class WorkOrderService {
   private async getAuthToken(): Promise<string> {
     // Use authService for consistent token retrieval (lazy import to avoid timing issues)
     const authService = await getAuthService();
-    if (!authService || typeof authService.getIdToken !== 'function') {
+    if (!authService || typeof authService.getAuthTokenForApi !== 'function') {
       throw new Error('AuthService not properly initialized');
     }
-    const token = await authService.getIdToken();
+    const token = await authService.getAuthTokenForApi();
     if (!token) {
       throw new Error('Not authenticated');
     }

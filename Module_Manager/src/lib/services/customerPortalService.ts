@@ -207,6 +207,71 @@ class CustomerPortalService {
   }
 
   /**
+   * Get billing settings (paypalEmail, invoicePreferences, read-only invoiceFormat).
+   */
+  async getBillingSettings(tenantId?: string): Promise<{
+    paypalEmail: string;
+    paymentMethod: string;
+    invoicePreferences: { delivery: string };
+    invoiceFormat: { companyName: string; dueDays: number; currency: string };
+  }> {
+    const token = await this.getIdToken();
+    if (!token) throw new Error('Not authenticated');
+    const headers: Record<string, string> = { Authorization: `Bearer ${token}` };
+    if (tenantId) headers['X-Tenant-ID'] = tenantId;
+    const response = await fetch(`${API_URL}/customer-portal/billing/settings`, { headers });
+    if (!response.ok) throw new Error('Failed to fetch billing settings');
+    return await response.json();
+  }
+
+  /**
+   * Update billing settings (paypalEmail, invoicePreferences.delivery).
+   */
+  async updateBillingSettings(
+    payload: { paypalEmail?: string; invoicePreferences?: { delivery: string } },
+    tenantId?: string
+  ): Promise<void> {
+    const token = await this.getIdToken();
+    if (!token) throw new Error('Not authenticated');
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`
+    };
+    if (tenantId) headers['X-Tenant-ID'] = tenantId;
+    const response = await fetch(`${API_URL}/customer-portal/billing/settings`, {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify(payload)
+    });
+    if (!response.ok) throw new Error('Failed to update billing settings');
+  }
+
+  /**
+   * Get a single invoice by id (for view/download).
+   */
+  async getInvoice(invoiceId: string, tenantId?: string): Promise<{
+    invoiceId: string;
+    invoiceNumber: string;
+    amount: number;
+    status: string;
+    dueDate: string;
+    lineItems?: Array<{ description: string; quantity: number; unitPrice: number; total: number }>;
+  }> {
+    const token = await this.getIdToken();
+    if (!token) throw new Error('Not authenticated');
+    const headers: Record<string, string> = { Authorization: `Bearer ${token}` };
+    if (tenantId) headers['X-Tenant-ID'] = tenantId;
+    const response = await fetch(`${API_URL}/customer-portal/billing/invoices/${encodeURIComponent(invoiceId)}`, {
+      headers
+    });
+    if (!response.ok) {
+      if (response.status === 404) throw new Error('Invoice not found');
+      throw new Error('Failed to fetch invoice');
+    }
+    return await response.json();
+  }
+
+  /**
    * Create Stripe payment intent for portal pay-now. Returns { configured, clientSecret?, message? }.
    */
   async createPaymentIntent(
@@ -245,7 +310,7 @@ class CustomerPortalService {
   private async getIdToken(): Promise<string | null> {
     try {
       const { authService } = await import('$lib/services/authService');
-      return await authService.getIdToken();
+      return await authService.getAuthTokenForApi();
     } catch (error) {
       console.error('Error getting ID token:', error);
       return null;

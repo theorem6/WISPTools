@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { auth } from '$lib/firebase';
+  import { authService } from '$lib/services/authService';
   import { currentTenant } from '$lib/stores/tenantStore';
   import { goto } from '$app/navigation';
   import CPEPerformanceModal from '../../acs-cpe-management/components/CPEPerformanceModal.svelte';
@@ -37,7 +38,7 @@
       const user = auth().currentUser;
       if (!user) return;
       
-      const token = await user.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       
       const response = await fetch('/api/tr069/presets', {
         headers: {
@@ -99,7 +100,7 @@
       const user = auth().currentUser;
       if (!user) throw new Error('Not authenticated');
       
-      const token = await user.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       
       const response = await fetch('/api/tr069/bulk-tasks', {
         method: 'POST',
@@ -172,7 +173,7 @@
         return;
       }
       
-      const token = await user.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       
       const response = await fetch('/api/tr069/sync', {
         method: 'POST',

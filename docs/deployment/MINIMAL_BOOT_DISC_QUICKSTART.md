@@ -316,7 +316,7 @@ Before deploying to production sites:
 ### Documentation
 - [Full Architecture Document](MINIMAL_BOOT_DISC_PHASE.md)
 - [Distributed EPC Guide](../distributed-epc/DISTRIBUTED_EPC_OVERVIEW.md)
-- [API Documentation](../../BACKEND_API_DOCUMENTATION.md)
+- [API Documentation](../BACKEND_ARCHITECTURE.md)
 
 ### Logs to Check
 ```bash

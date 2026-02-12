@@ -40,7 +40,7 @@ const DEFAULT_COMPANY: CompanyInfo = {
 };
 
 async function getAuthHeaders(tenantId: string): Promise<HeadersInit> {
-  const token = await authService.getAuthToken();
+  const token = await authService.getAuthTokenForApi();
   const headers: Record<string, string> = {
     'Content-Type': 'application/json'
   };
@@ -58,7 +58,8 @@ export async function getTenantAppSettings(tenantId: string | undefined): Promis
     return loadFromLocalStorage();
   }
   try {
-    const res = await fetch(`${API_CONFIG.PATHS.API}/tenant-settings`, {
+    // path query helps authProxy resolve route when Hosting rewrites send req.url as '/'
+    const res = await fetch(`${API_CONFIG.PATHS.API}/tenant-settings?path=/api/tenant-settings`, {
       method: 'GET',
       headers: await getAuthHeaders(tenantId)
     });
@@ -84,7 +85,7 @@ export async function saveTenantAppSettings(
   if (!browser) return false;
   if (tenantId) {
     try {
-      const res = await fetch(`${API_CONFIG.PATHS.API}/tenant-settings`, {
+      const res = await fetch(`${API_CONFIG.PATHS.API}/tenant-settings?path=/api/tenant-settings`, {
         method: 'PUT',
         headers: await getAuthHeaders(tenantId),
         body: JSON.stringify(payload)

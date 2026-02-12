@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
   import { auth } from '$lib/firebase';
+  import { authService } from '$lib/services/authService';
   
   export let tenantId: string;
   export let HSS_API: string;
@@ -38,7 +39,7 @@
       const user = auth().currentUser;
       if (!user) return;
       
-      const token = await user.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       const url = epcId === 'all'
         ? `${HSS_API}/api/dashboard`
         : `${HSS_API}/api/dashboard?epc_id=${epcId}`;
@@ -67,7 +68,7 @@
       const user = auth().currentUser;
       if (!user) return;
       
-      const token = await user.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       const response = await fetch(`${HSS_API}/api/metrics/history?epc_id=${epcId}&granularity=hour`, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -89,7 +90,7 @@
       const user = auth().currentUser;
       if (!user) return;
       
-      const token = await user.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       const url = epcId === 'all'
         ? `${HSS_API}/api/subscribers/roster?limit=100`
         : `${HSS_API}/api/subscribers/roster?epc_id=${epcId}&limit=100`;
@@ -115,7 +116,7 @@
       const user = auth().currentUser;
       if (!user) return;
       
-      const token = await user.getIdToken();
+      const token = await authService.getAuthTokenForApi();
       const url = epcId === 'all'
         ? `${HSS_API}/api/events/attach-detach?hours=48&limit=100`
         : `${HSS_API}/api/events/attach-detach?epc_id=${epcId}&hours=48&limit=100`;

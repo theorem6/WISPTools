@@ -9,6 +9,7 @@
  */
 
 import { auth } from '$lib/firebase';
+import { authService } from '$lib/services/authService';
 
 // Use relative URL to leverage Firebase Hosting rewrites
 // This goes through Firebase Hosting rewrite to apiProxy function
@@ -83,7 +84,7 @@ async function getAuthHeaders(tenantId?: string): Promise<HeadersInit> {
     throw new Error('Not authenticated');
   }
 
-  const token = await user.getIdToken();
+  const token = await authService.getAuthTokenForApi();
   
   const headers: HeadersInit = {
     'Content-Type': 'application/json',

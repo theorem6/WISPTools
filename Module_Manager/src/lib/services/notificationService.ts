@@ -42,7 +42,7 @@ export interface AppNotification {
 }
 
 async function getAuthHeaders(tenantId?: string): Promise<HeadersInit> {
-  const token = await authService.getAuthToken();
+  const token = await authService.getAuthTokenForApi();
   const headers: Record<string, string> = {
     'Content-Type': 'application/json'
   };
@@ -61,7 +61,7 @@ async function getAuthHeaders(tenantId?: string): Promise<HeadersInit> {
  */
 export async function getNotifications(tenantId?: string): Promise<AppNotification[]> {
   if (!browser) return [];
-  const token = await authService.getAuthToken();
+  const token = await authService.getAuthTokenForApi();
   if (!token) return [];
   const res = await fetch(notificationsEndpoint('/api/notifications'), {
     method: 'GET',
@@ -87,7 +87,7 @@ export async function getNotifications(tenantId?: string): Promise<AppNotificati
  */
 export async function getUnreadCount(tenantId?: string): Promise<number> {
   if (!browser) return 0;
-  const token = await authService.getAuthToken();
+  const token = await authService.getAuthTokenForApi();
   if (!token) return 0;
   const res = await fetch(notificationsEndpoint('/api/notifications/count'), {
     method: 'GET',
