@@ -26,7 +26,7 @@ async function connectDB() {
   try {
     console.log('🔌 Connecting to MongoDB...');
     const MONGODB_URI = process.env.MONGODB_URI || 
-      'mongodb+srv://genieacs-user:Aezlf1N3Z568EwL9@cluster0.1radgkw.mongodb.net/hss_management?retryWrites=true&w=majority&appName=Cluster0';
+      '';
     
     const options = {
       maxPoolSize: 10,

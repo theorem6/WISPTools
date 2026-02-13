@@ -39,7 +39,7 @@ async function getGenieACSMongoDB() {
   let mongoUrl = process.env.GENIEACS_MONGODB_URI;
   if (!mongoUrl) {
     // Construct GenieACS URI from main MONGODB_URI by changing database name
-    const mainUri = process.env.MONGODB_URI || 'mongodb+srv://genieacs-user:Aezlf1N3Z568EwL9@cluster0.1radgkw.mongodb.net/hss_management?retryWrites=true&w=majority&appName=Cluster0';
+    const mainUri = process.env.MONGODB_URI || '';
     const uriObj = new URL(mainUri);
     uriObj.pathname = '/genieacs';
     mongoUrl = uriObj.toString();

@@ -602,6 +602,7 @@
       <img src="/wisptools-logo.svg" alt="WISPTools.io" class="brand-logo" />
       <h1>WISPTools.io</h1>
       <p class="brand-tagline">WISP Management Platform</p>
+      <p class="poc-notice">This is a proof of concept. Source code: <a href="https://github.com/theorem6/WISPTools" target="_blank" rel="noopener noreferrer">GitHub</a> · <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener noreferrer">CC BY 4.0</a></p>
     </div>
 
     <!-- Login Form -->
@@ -780,6 +781,12 @@
         <p>Frequency planning</p>
       </div>
     </div>
+
+    <footer class="login-footer">
+      <a href="https://github.com/theorem6/WISPTools" target="_blank" rel="noopener noreferrer">GitHub</a>
+      <span class="sep">·</span>
+      <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener noreferrer">CC BY 4.0</a>
+    </footer>
   </div>
 </div>
 
@@ -840,6 +847,39 @@
     font-size: 1rem;
     font-weight: 500;
     letter-spacing: 0.5px;
+  }
+
+  .poc-notice {
+    font-size: 0.9rem;
+    color: rgba(255, 255, 255, 0.85);
+    margin: 0.5rem 0 0;
+    max-width: 360px;
+  }
+  .poc-notice a {
+    color: #00d9ff;
+    text-decoration: underline;
+  }
+  .poc-notice a:hover {
+    color: #00f2fe;
+  }
+
+  .login-footer {
+    margin-top: 2rem;
+    padding-top: 1rem;
+    text-align: center;
+    font-size: 0.9rem;
+    color: rgba(255, 255, 255, 0.6);
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+  }
+  .login-footer a {
+    color: #00d9ff;
+    text-decoration: none;
+  }
+  .login-footer a:hover {
+    text-decoration: underline;
+  }
+  .login-footer .sep {
+    margin: 0 0.5rem;
   }
 
   .login-card {

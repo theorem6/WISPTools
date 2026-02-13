@@ -172,7 +172,7 @@ router.post('/', async (req, res) => {
         allowSelfRegistration: false,
         requireEmailVerification: true,
         maxUsers: 50,
-        maxDevices: 1000,
+        maxDevices: 20,
         features: {
           acs: true,
           hss: true,
@@ -184,7 +184,7 @@ router.post('/', async (req, res) => {
       },
       limits: {
         maxUsers: 50,
-        maxDevices: 1000,
+        maxDevices: 20,
         maxNetworks: 10,
         maxTowerSites: 100
       }

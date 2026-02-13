@@ -6,7 +6,6 @@
   import TenantGuard from '$lib/components/admin/TenantGuard.svelte';
   import { customerService, type Customer } from '$lib/services/customerService';
   import AddEditCustomerModal from './components/AddEditCustomerModal.svelte';
-  import CustomerBillingModal from './components/CustomerBillingModal.svelte';
   import CustomerOnboardingWizard from '$lib/components/wizards/customers/CustomerOnboardingWizard.svelte';
   import ModuleWizardMenu from '$lib/components/wizards/ModuleWizardMenu.svelte';
   import { getWizardsForPath } from '$lib/config/wizardCatalog';
@@ -17,7 +16,7 @@
   import { API_CONFIG, getApiUrl } from '$lib/config/api';
   import { authService } from '$lib/services/authService';
   
-  type CustomerTab = 'customers' | 'service-plans' | 'customer-groups' | 'billing' | 'portal';
+  type CustomerTab = 'customers' | 'service-plans' | 'customer-groups' | 'portal';
   
   let activeTab: CustomerTab = 'customers';
   const HSS_API = API_CONFIG.PATHS.HSS;
@@ -31,10 +30,8 @@
   // Modals
   let showAddModal = false;
   let showEditModal = false;
-  let showBillingModal = false;
   let showOnboardingWizard = false;
   let selectedCustomer: Customer | null = null;
-  let customerForBilling: Customer | null = null;
   
   // Search & Filters
   let searchQuery = '';
@@ -53,53 +50,10 @@
   $: tenantId = $currentTenant?.id || '';
   
   let loadTimeout: ReturnType<typeof setTimeout> | null = null;
-  let billingActionLoading = '';
-  let billingActionMessage = '';
-  
-  async function runGenerateInvoices() {
-    if (!tenantId) return;
-    billingActionLoading = 'invoices';
-    billingActionMessage = '';
-    try {
-      const token = await authService.getAuthTokenForApi();
-      const res = await fetch(`${getApiUrl()}/customer-billing/generate-invoices`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`, 'X-Tenant-ID': tenantId }
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed');
-      billingActionMessage = `Generated ${data.generated ?? 0} invoice(s).`;
-    } catch (e: any) {
-      billingActionMessage = e.message || 'Failed to generate invoices';
-    } finally {
-      billingActionLoading = '';
-    }
-  }
-  
-  async function runDunning() {
-    if (!tenantId) return;
-    billingActionLoading = 'dunning';
-    billingActionMessage = '';
-    try {
-      const token = await authService.getAuthTokenForApi();
-      const res = await fetch(`${getApiUrl()}/customer-billing/dunning/run`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`, 'X-Tenant-ID': tenantId }
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed');
-      billingActionMessage = `Processed ${data.processed ?? 0} billing record(s).`;
-    } catch (e: any) {
-      billingActionMessage = e.message || 'Failed to run dunning';
-    } finally {
-      billingActionLoading = '';
-    }
-  }
-  
+
   afterNavigate(({ to }) => {
     const tab = to?.url.searchParams.get('tab');
-    if (tab === 'billing') activeTab = 'billing';
-    else if (tab === 'portal') activeTab = 'portal';
+    if (tab === 'portal') activeTab = 'portal';
   });
   onMount(() => {
     if (browser) {
@@ -222,23 +176,9 @@
   function handleModalClose() {
     showAddModal = false;
     showEditModal = false;
-    showBillingModal = false;
     selectedCustomer = null;
-    customerForBilling = null;
   }
 
-  function handleOpenBilling(customer: Customer) {
-    customerForBilling = customer;
-    showBillingModal = true;
-  }
-
-  function handleBillingSaved() {
-    showBillingModal = false;
-    customerForBilling = null;
-    success = 'Billing saved.';
-    setTimeout(() => { success = ''; }, 3000);
-  }
-  
   async function handleCustomerSaved() {
     handleModalClose();
     success = selectedCustomer ? 'Customer updated successfully' : 'Customer created successfully';
@@ -316,12 +256,6 @@
         on:click={() => activeTab = 'customer-groups'}
       >
         📦 Customer Groups
-      </button>
-      <button 
-        class:active={activeTab === 'billing'} 
-        on:click={() => activeTab = 'billing'}
-      >
-        💳 Billing
       </button>
       <button 
         class:active={activeTab === 'portal'} 
@@ -482,9 +416,6 @@
                 <button class="btn-secondary btn-sm" on:click={() => handleEdit(customer)}>
                   ✏️ Edit
                 </button>
-                <button class="btn-secondary btn-sm" on:click={() => handleOpenBilling(customer)} title="View or edit billing">
-                  💳 Billing
-                </button>
                 <button class="btn-danger btn-sm" on:click={() => handleDelete(customer)}>
                   🗑️ Delete
                 </button>
@@ -511,49 +442,12 @@
       {:else if activeTab === 'customer-groups'}
         <!-- Customer Groups Tab -->
         <GroupManagement {tenantId} {HSS_API} />
-      {:else if activeTab === 'billing'}
-        <!-- Billing Tab: open customer billing from here or from customer cards -->
-        <div class="billing-tab">
-          <div class="billing-tab-header">
-            <p class="billing-tab-desc">View or edit per-customer billing (service plan, fees, billing cycle). You can also click <strong>Billing</strong> on any customer card in the Customers tab.</p>
-            <div class="billing-admin-actions">
-              <button type="button" class="btn-secondary" disabled={billingActionLoading !== ''} on:click={runGenerateInvoices}>
-                {billingActionLoading === 'invoices' ? 'Running…' : 'Generate invoices'}
-              </button>
-              <button type="button" class="btn-secondary" disabled={billingActionLoading !== ''} on:click={runDunning}>
-                {billingActionLoading === 'dunning' ? 'Running…' : 'Run dunning'}
-              </button>
-              {#if billingActionMessage}
-                <span class="billing-action-msg">{billingActionMessage}</span>
-              {/if}
-            </div>
-          </div>
-          {#if customers.length === 0}
-            <div class="empty-state">
-              <p>No customers yet.</p>
-              <p class="empty-sub">Add customers in the <strong>Customers</strong> tab, then open billing from their card or from this list.</p>
-              <button class="btn-primary" on:click={() => activeTab = 'customers'}>Go to Customers</button>
-            </div>
-          {:else}
-            <div class="billing-list">
-              {#each customers as customer (customer._id || customer.customerId)}
-                <div class="billing-row">
-                  <span class="billing-name">{customer.fullName || `${customer.firstName} ${customer.lastName}`}</span>
-                  <span class="billing-id">{customer.customerId}</span>
-                  <button class="btn-secondary btn-sm" on:click={() => handleOpenBilling(customer)} title="Open billing">
-                    💳 Open billing
-                  </button>
-                </div>
-              {/each}
-            </div>
-          {/if}
-        </div>
       {:else if activeTab === 'portal'}
         <!-- Portal Tab: setup and view customer portal -->
         <div class="portal-tab">
           <div class="portal-tab-header">
             <h2>Customer Portal</h2>
-            <p class="portal-tab-desc">The customer portal lets your subscribers log in to view tickets, service status, billing, and support. Use <strong>Customize Portal</strong> to configure branding and options; use <strong>View Portal</strong> to open the portal in a new tab.</p>
+            <p class="portal-tab-desc">The customer portal lets your subscribers log in to view tickets, service status, and support. Use <strong>Customize Portal</strong> to configure branding and options; use <strong>View Portal</strong> to open the portal in a new tab.</p>
           </div>
           <div class="portal-actions">
             <a href="/modules/customers/portal-setup" class="btn-primary" title="Customize portal branding, FAQ, alerts, and ticket options">
@@ -582,15 +476,6 @@
       show={showEditModal}
       customer={selectedCustomer}
       on:saved={handleCustomerSaved}
-      on:close={handleModalClose}
-    />
-  {/if}
-
-  {#if showBillingModal && customerForBilling}
-    <CustomerBillingModal
-      show={showBillingModal}
-      customer={customerForBilling}
-      on:saved={handleBillingSaved}
       on:close={handleModalClose}
     />
   {/if}

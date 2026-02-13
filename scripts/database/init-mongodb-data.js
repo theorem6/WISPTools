@@ -3,7 +3,7 @@
 
 const { MongoClient } = require('mongodb');
 
-const connectionUrl = 'mongodb+srv://genieacs-user:fg2E8I10Pnx58gYP@cluster0.1radgkw.mongodb.net/genieacs?retryWrites=true&w=majority&appName=Cluster0';
+const connectionUrl = process.env.MONGODB_URI || process.env.GENIEACS_MONGODB_URI || '';
 
 async function initializeGenieACSData() {
   console.log('🗄️ Connecting to MongoDB Atlas...');

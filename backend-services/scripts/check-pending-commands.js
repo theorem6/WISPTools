@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 
-const MONGODB_URI = 'mongodb+srv://genieacs-user:Aezlf1N3Z568EwL9@cluster0.1radgkw.mongodb.net/hss_management?retryWrites=true&w=majority';
+const MONGODB_URI = process.env.MONGODB_URI || '';
 const EPC_ID = process.argv[2] || 'EPC-CB4C5042';
 
 async function main() {

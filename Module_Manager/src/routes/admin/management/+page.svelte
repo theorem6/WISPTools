@@ -32,13 +32,6 @@
       description: 'Configure system-wide settings and preferences',
       icon: '⚙️',
       path: '/modules/backend-management'
-    },
-    {
-      id: 'billing-subscriptions',
-      name: 'Billing & Subscriptions',
-      description: 'Manage billing, subscriptions, and payment processing',
-      icon: '💳',
-      path: '/admin/billing'
     }
   ];
 

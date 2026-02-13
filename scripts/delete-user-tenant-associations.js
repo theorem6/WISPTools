@@ -17,7 +17,7 @@ async function connectDB() {
       const appConfig = require('../config/app');
       mongoUri = appConfig.mongodb.uri || process.env.MONGODB_URI;
     } catch (e) {
-      mongoUri = process.env.MONGODB_URI || 'mongodb+srv://genieacs-user:Aezlf1N3Z568EwL9@cluster0.1radgkw.mongodb.net/hss_management?retryWrites=true&w=majority&appName=Cluster0';
+      mongoUri = process.env.MONGODB_URI || '';
     }
     
     if (!mongoUri) {

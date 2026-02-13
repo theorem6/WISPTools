@@ -8,7 +8,7 @@ const mongoose = require('mongoose');
 const { SubscriptionPlan } = require('./billing-schema');
 
 // MongoDB Atlas connection
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://genieacs-user:Aezlf1N3Z568EwL9@cluster0.1radgkw.mongodb.net/hss_management?retryWrites=true&w=majority&appName=Cluster0';
+const MONGODB_URI = process.env.MONGODB_URI || '';
 
 console.log('🔗 Billing Plans: Connecting to MongoDB Atlas...');
 console.log('📍 MongoDB URI:', MONGODB_URI.replace(/\/\/.*@/, '//***:***@')); // Hide credentials in logs

@@ -143,10 +143,10 @@ PCI_mapper/
 - **Cloud Functions:** Firebase Functions (auto-deploy on Git push)
 - **Backend VM:** Google Compute Engine (manual update via SCP/Git)
 
-### OAuth Token for Private Repo:
-- ✅ Added to deployment script: `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`
-- ✅ Enables downloading from private GitHub repo
-- ✅ Fallback to embedded version if download fails
+### GitHub access for private repo:
+- Use **environment variable** `GITHUB_TOKEN` only (e.g. on the VM or in deploy scripts). **Do not commit tokens.**
+- Enables downloading from private GitHub repo when set.
+- Fallback to embedded version if download fails or token is not set.
 
 ---
 

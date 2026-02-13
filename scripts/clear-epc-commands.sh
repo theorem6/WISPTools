@@ -4,7 +4,8 @@
 
 EPC_ID="${1:-EPC-CB4C5042}"
 
-MONGODB_URI="mongodb+srv://genieacs-user:Aezlf1N3Z568EwL9@cluster0.1radgkw.mongodb.net/hss_management?retryWrites=true&w=majority"
+# Set MONGODB_URI in environment or .env - never commit credentials
+MONGODB_URI="${MONGODB_URI:-}"
 
 echo "=== Deleting old auto-update commands for ${EPC_ID} ==="
 

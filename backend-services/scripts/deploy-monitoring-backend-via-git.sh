@@ -151,7 +151,8 @@ Restart=always
 RestartSec=10
 Environment=NODE_ENV=production
 Environment=PORT=$PORT
-Environment=MONGODB_URI=mongodb+srv://genieacs-user:Aezlf1N3Z568EwL9@cluster0.1radgkw.mongodb.net/hss_management?retryWrites=true&w=majority&appName=Cluster0
+# Set MONGODB_URI in environment or .env - never commit credentials
+Environment=MONGODB_URI=${MONGODB_URI:-}
 StandardOutput=append:$BACKEND_DIR/logs/backend.log
 StandardError=append:$BACKEND_DIR/logs/backend-error.log
 

@@ -69,7 +69,7 @@ Complete guide for the Open5GS HSS + Management Platform deployment.
 ### **Configuration File:** `/etc/open5gs/hss.yaml`
 
 ```yaml
-db_uri: mongodb+srv://genieacs-user:Aezlf1N3Z568EwL9@cluster0.1radgkw.mongodb.net/open5gs?retryWrites=true&w=majority&appName=Cluster0
+db_uri: mongodb+srv://user:****@cluster0.1radgkw.mongodb.net/open5gs  # Set via env; never commit real credentials
 
 logger:
   level: info
@@ -390,7 +390,7 @@ journalctl -u genieacs-cwmp -f
 
 ```bash
 # Test Atlas connectivity
-mongosh "mongodb+srv://genieacs-user:Aezlf1N3Z568EwL9@cluster0.1radgkw.mongodb.net/open5gs"
+mongosh "mongodb+srv://user:****@cluster0.1radgkw.mongodb.net/open5gs"
 
 # Query subscribers
 db.subscribers.find().pretty()
@@ -421,7 +421,7 @@ show collections
 ### **2. Verify in MongoDB**
 
 ```bash
-mongosh "mongodb+srv://genieacs-user:Aezlf1N3Z568EwL9@cluster0.1radgkw.mongodb.net/open5gs"
+mongosh "mongodb+srv://user:****@cluster0.1radgkw.mongodb.net/open5gs"
 
 db.subscribers.findOne({imsi: "001010000000001"})
 ```
@@ -464,7 +464,7 @@ tail -f /var/log/open5gs/hss.log | grep "001010000000001"
 4. Verify IMEI is captured:
 
 ```bash
-mongosh "mongodb+srv://genieacs-user:Aezlf1N3Z568EwL9@cluster0.1radgkw.mongodb.net/open5gs"
+mongosh "mongodb+srv://user:****@cluster0.1radgkw.mongodb.net/open5gs"
 
 db.subscribers.findOne(
   {imsi: "001010000000001"},
@@ -609,7 +609,7 @@ MongoDB Atlas automatic backups:
 mongosh "mongodb+srv://..." --eval "db.subscribers.find()" > subscribers_backup.json
 
 # Or use mongodump
-mongodump --uri="mongodb+srv://genieacs-user:Aezlf1N3Z568EwL9@cluster0.1radgkw.mongodb.net/open5gs" --out=/backup/
+mongodump --uri="mongodb+srv://user:****@cluster0.1radgkw.mongodb.net/open5gs" --out=/backup/
 ```
 
 ### **Configuration Backup**

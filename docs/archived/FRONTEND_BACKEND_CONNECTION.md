@@ -77,7 +77,7 @@ You need to deploy the Node.js HSS management API from `hss-module/` to the serv
 #!/bin/bash
 # Deploy HSS Management API to server
 
-MONGODB_URI="mongodb+srv://genieacs-user:Aezlf1N3Z568EwL9@cluster0.1radgkw.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
+MONGODB_URI="mongodb+srv://user:****@cluster0.1radgkw.mongodb.net/..."  # Set in .env; never commit
 
 # Create HSS API directory
 mkdir -p /opt/hss-api

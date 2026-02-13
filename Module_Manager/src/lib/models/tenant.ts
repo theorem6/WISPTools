@@ -183,7 +183,7 @@ function generateRandomPassword(): string {
 
 // Default tenant limits (can be adjusted based on plan)
 export const DEFAULT_TENANT_LIMITS: TenantLimits = {
-  maxDevices: 100,
+  maxDevices: 20,
   maxUsers: 5,
   maxNetworks: 10,
   storageQuotaMB: 1000

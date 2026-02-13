@@ -449,7 +449,7 @@ export class TenantService {
         allowSelfRegistration: false,
         requireEmailVerification: true,
         maxUsers: 50,
-        maxDevices: 1000,
+        maxDevices: 20,
         features: {
           acs: true,
           hss: true,
@@ -461,7 +461,7 @@ export class TenantService {
       },
       limits: apiTenant.limits || {
         maxUsers: 50,
-        maxDevices: 1000,
+        maxDevices: 20,
         maxNetworks: 10,
         maxTowerSites: 100
       },

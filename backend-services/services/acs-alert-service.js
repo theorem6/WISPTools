@@ -82,7 +82,7 @@ class ACSAlertService {
   async getACSTenantDevices(tenantId) {
     try {
       const { MongoClient } = require('mongodb');
-      const mongoUrl = process.env.MONGODB_URI || 'mongodb+srv://genieacs-user:fg2E8I10Pnx58gYP@cluster0.1radgkw.mongodb.net/genieacs?retryWrites=true&w=majority&appName=Cluster0';
+      const mongoUrl = process.env.MONGODB_URI || process.env.GENIEACS_MONGODB_URI || '';
       const client = new MongoClient(mongoUrl);
       await client.connect();
       const db = client.db('genieacs');

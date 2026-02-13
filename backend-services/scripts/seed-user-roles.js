@@ -15,7 +15,7 @@ const { admin, auth } = require('../config/firebase');
 const { UserTenant } = require('../models/user');
 const { determineRoleFromEmail, getRoleDisplayName, getRoleDescription } = require('../config/user-hierarchy');
 
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://genieacs-user:Aezlf1N3Z568EwL9@cluster0.1radgkw.mongodb.net/hss_management?retryWrites=true&w=majority&appName=Cluster0';
+const MONGODB_URI = process.env.MONGODB_URI || '';
 
 async function seedUserRoles() {
   try {

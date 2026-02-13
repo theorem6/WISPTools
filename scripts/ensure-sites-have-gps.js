@@ -13,7 +13,7 @@ const { UnifiedSite } = require('../models/network');
 const appConfig = require('../config/app');
 
 // MongoDB connection
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://genieacs-user:Aezlf1N3Z568EwL9@cluster0.1radgkw.mongodb.net/hss_management?retryWrites=true&w=majority&appName=Cluster0';
+const MONGODB_URI = process.env.MONGODB_URI || '';
 
 // Geocoding configuration
 const arcgisConfig = appConfig?.externalServices?.arcgis || {};

@@ -148,7 +148,8 @@ try {
 app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/tenant-settings', require('./routes/tenant-settings'));
 app.use('/api/customers', require('./routes/customers'));
-app.use('/api/customer-billing', require('./routes/customer-billing'));
+// Tenant billing removed for proof-of-concept
+// app.use('/api/customer-billing', require('./routes/customer-billing'));
 app.use('/api/inventory', require('./routes/inventory'));
 app.use('/api/bundles', require('./routes/hardwareBundles'));
 app.use('/api/work-orders', require('./routes/work-orders'));
@@ -231,13 +232,8 @@ app.use('/api/customer-portal', require('./routes/customer-portal-api')); // Cus
 app.use('/api/portal', require('./routes/portal-domain')); // Portal domain routing
 app.use('/api/portal-content', require('./routes/portal-content')); // Portal content management (alerts, FAQ, KB, chat)
 console.log('✅ Portal Content API enabled');
-// Enable billing API (with graceful handling if PayPal not configured)
-try {
-  app.use('/api/billing', require('./billing-api'));
-  console.log('✅ Billing API enabled');
-} catch (error) {
-  console.warn('⚠️ Billing API disabled:', error.message);
-}
+// Billing API removed for proof-of-concept
+// try { app.use('/api/billing', require('./billing-api')); console.log('✅ Billing API enabled'); } catch (e) { console.warn('⚠️ Billing API disabled:', e.message); }
 // Enable equipment pricing API
 try {
   app.use('/api/equipment-pricing', require('./routes/equipment-pricing'));

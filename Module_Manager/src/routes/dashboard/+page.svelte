@@ -70,12 +70,12 @@
             {
               id: 'customers',
               name: '👥 Customers',
-              description: 'Manage customers, billing, and the customer portal (tabs: Customers, Billing, Portal)',
+              description: 'Manage customers and the customer portal',
               icon: '👥',
               color: 'var(--info)', // Blue
               status: 'active',
               path: '/modules/customers',
-              features: ['Customer Database', 'Billing & Service Plans', 'Customer Portal', 'Service Management', 'Installation History', 'Customer Support']
+              features: ['Customer Database', 'Customer Portal', 'Service Management', 'Installation History', 'Customer Support']
             },
             {
               id: 'hardware',
@@ -99,7 +99,7 @@
       status: 'active',
       path: '/admin/management',
       adminOnly: true,
-      features: ['User Management', 'Tenant Management', 'System Settings', 'Billing & Subscriptions']
+      features: ['User Management', 'Tenant Management', 'System Settings']
     },
     {
       id: 'system-management',
@@ -245,6 +245,7 @@
             <div class="branding">
               <h1 class="app-title">WISPTools.io</h1>
               <p class="app-subtitle">WISP Management Platform</p>
+            <p class="poc-notice">Proof of concept · Source code: <a href="https://github.com/theorem6/WISPTools" target="_blank" rel="noopener noreferrer">github.com/theorem6/WISPTools</a></p>
             </div>
           </div>
           <div class="header-icons">
@@ -352,6 +353,12 @@
         </div>
       {/if}
 
+      <!-- Footer: License + GitHub -->
+      <footer class="app-footer">
+        <a href="https://github.com/theorem6/WISPTools" target="_blank" rel="noopener noreferrer">GitHub</a>
+        <span class="sep">·</span>
+        <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener noreferrer">CC BY 4.0</a>
+      </footer>
     </div>
   </div>
 </TenantGuard>
@@ -429,6 +436,35 @@
     margin: 0;
     font-weight: 500;
     letter-spacing: 0.5px;
+  }
+
+  .poc-notice {
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.7);
+    margin: 0.25rem 0 0;
+  }
+  .poc-notice a {
+    color: #00d9ff;
+    text-decoration: underline;
+  }
+
+  .app-footer {
+    margin-top: 2rem;
+    padding: 1rem 2rem;
+    text-align: center;
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.6);
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+  }
+  .app-footer a {
+    color: #00d9ff;
+    text-decoration: none;
+  }
+  .app-footer a:hover {
+    text-decoration: underline;
+  }
+  .app-footer .sep {
+    margin: 0 0.5rem;
   }
 
   .header-icons {

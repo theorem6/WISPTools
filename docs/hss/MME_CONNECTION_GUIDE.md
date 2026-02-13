@@ -490,7 +490,7 @@ ssh root@136.112.111.167 "tail -f /var/log/open5gs/hss.log"
 
 ```bash
 # Check if subscriber authenticated
-mongosh "mongodb+srv://genieacs-user:Aezlf1N3Z568EwL9@cluster0.1radgkw.mongodb.net/open5gs"
+mongosh "mongodb+srv://user:****@cluster0.1radgkw.mongodb.net/open5gs"  # Use MONGODB_URI from env
 
 db.subscribers.findOne(
   {imsi: "001010000000001"},

@@ -71,7 +71,7 @@ const tenantSchema = new mongoose.Schema({
       allowSelfRegistration: false,
       requireEmailVerification: true,
       maxUsers: 50,
-      maxDevices: 1000,
+      maxDevices: 20,
       features: {
         acs: true,
         hss: true,
@@ -87,7 +87,7 @@ const tenantSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.Mixed,
     default: {
       maxUsers: 50,
-      maxDevices: 1000,
+      maxDevices: 20,
       maxNetworks: 10,
       maxTowerSites: 100
     }

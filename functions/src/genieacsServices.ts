@@ -11,7 +11,7 @@ let mongoClient: MongoClient | null = null;
 // Initialize MongoDB connection for GenieACS
 async function getGenieACSMongoClient(): Promise<MongoClient> {
   if (!mongoClient) {
-    const connectionUrl = process.env.MONGODB_CONNECTION_URL || 'mongodb+srv://genieacs-user:fg2E8I10Pnx58gYP@cluster0.1radgkw.mongodb.net/genieacs?retryWrites=true&w=majority&appName=Cluster0';
+    const connectionUrl = process.env.MONGODB_CONNECTION_URL || process.env.MONGODB_URI || '';
     mongoClient = new MongoClient(connectionUrl);
     await mongoClient.connect();
     console.log('✅ GenieACS MongoDB connection established');

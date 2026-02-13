@@ -8,7 +8,7 @@ const { RemoteEPC } = require('../models/distributed-epc-schema');
 
 require('dotenv').config({ path: require('path').join(__dirname, '../../.env') });
 
-const MONGO_URI = process.env.MONGODB_URI || 'mongodb+srv://genieacs-user:Aezlf1N3Z568EwL9@cluster0.1radgkw.mongodb.net/hss_management?retryWrites=true&w=majority&appName=Cluster0';
+const MONGO_URI = process.env.MONGODB_URI || '';
 
 async function updateEPCName() {
   try {

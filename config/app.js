@@ -11,9 +11,9 @@ module.exports = {
     environment: process.env.NODE_ENV || 'development'
   },
   
-  // MongoDB Configuration
+  // MongoDB Configuration (set MONGODB_URI in .env; never commit credentials)
   mongodb: {
-    uri: process.env.MONGODB_URI || 'mongodb+srv://genieacs-user:Aezlf1N3Z568EwL9@cluster0.1radgkw.mongodb.net/hss_management?retryWrites=true&w=majority&appName=Cluster0',
+    uri: process.env.MONGODB_URI || (process.env.NODE_ENV === 'production' ? '' : 'mongodb://localhost:27017/wisptools_dev'),
     options: {
       useNewUrlParser: true,
       useUnifiedTopology: true
