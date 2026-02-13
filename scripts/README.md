@@ -34,3 +34,11 @@ Scripts are organized for **Windows (PowerShell)** and **Linux (Bash)**. Use the
 
 - On the GCE instance, run from repo root: `sudo bash scripts/deployment/update-backend-from-git.sh`
 - Ensure `GITHUB_TOKEN` is set (in env or `/opt/lte-pci-mapper/.env`) for git pull.
+
+## GitHub CLI and releases
+
+- **Install (Windows):** `winget install GitHub.cli`
+- **Log in once:** `gh auth login` (browser or token).
+- **Create a release** (from repo root): `.\scripts\create-release.ps1 v1.0.0`  
+  Uses `RELEASE_NOTES_v1.0.0.md` if present; otherwise run  
+  `gh release create v1.0.0 --title "v1.0.0 - First release" --notes-file RELEASE_NOTES_v1.0.0.md`
