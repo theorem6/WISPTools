@@ -1,406 +1,289 @@
-# WISP Multitool
+# WISP Multitool (WispTools)
 
 > **The Complete Wireless ISP Management Platform**  
 > Professional multi-tenant solution for LTE/5G network operations, field technicians, customer support, and network optimization.
 
-## 📋 Table of Contents
+---
+
+## Make this repository public
+
+To make the repo **public** on GitHub:
+
+1. Open the repo on GitHub → **Settings** → **General**.
+2. Scroll to **Danger Zone**.
+3. Click **Change repository visibility** → choose **Public** → confirm.
+
+After that, the repo and this documentation are visible to everyone.
+
+---
+
+## Table of Contents
 
 - [Overview](#-overview)
 - [Features](#-features)
 - [Architecture](#-architecture)
 - [Quick Start](#-quick-start)
-- [Documentation](#-documentation)
+- [Full documentation (main page)](#-full-documentation-on-this-page)
 - [Deployment](#-deployment)
 - [Contributing](#-contributing)
 - [License](#-license)
 
-## 🎯 Overview
+---
+
+## Overview
 
 **WISP Multitool** is a comprehensive, enterprise-grade platform for wireless ISPs and network operators. Built with modern technologies and a modular architecture, it combines network planning, field operations, customer support, and system monitoring into one powerful platform.
 
-### Key Capabilities
+### Key capabilities
 
-- **Multi-Tenant Architecture** - Isolate organizations with their own data and configurations
-- **CBRS Management** - Full integration with Google SAS and Federated Wireless APIs
-- **ACS/TR-069** - Complete CPE device management and monitoring
-- **PCI Planning** - Advanced LTE PCI conflict resolution and optimization
-- **User Management** - Role-based access control (Owner, Admin, Member, Viewer)
-- **Network Visualization** - Interactive maps with ArcGIS integration
+- **Multi-tenant architecture** – Isolate organizations with their own data and configurations
+- **CBRS management** – Integration with Google SAS and Federated Wireless APIs
+- **ACS/TR-069** – CPE device management and monitoring
+- **PCI planning** – LTE PCI conflict resolution and optimization
+- **User management** – Role-based access (Owner, Admin, Member, Viewer)
+- **Network visualization** – Interactive maps with ArcGIS integration
 
-## ✨ Features
+---
 
-### 🏢 Multi-Tenant Management
-- **Organization Isolation** - Complete data separation per tenant
-- **User Roles** - Fine-grained permission control
-- **One Tenant Per User** - Simplified account management
-- **Admin Console** - Platform-wide administration tools
-- **Tenant Switching** - Easy access to multiple organizations
+## Features
 
-### 🔐 HSS & Subscriber Management
-- **Open5GS HSS** - Production-grade Home Subscriber Server
-- **S6a/Diameter Interface** - Standard 3GPP MME authentication
-- **Subscriber Management** - Full CRUD with IMSI, Ki, OPc, AMF, SQN
-- **Bandwidth Plans** - Speed tiers and QoS management
-- **Subscriber Groups** - Organize users with group policies
-- **Bulk Import** - CSV-based mass subscriber provisioning
-- **IMEI Capture** - Track device identifiers
-- **Remote MME Support** - Connect multiple MME sites
-- **MongoDB Atlas** - Cloud-based subscriber database
+| Area | Highlights |
+|------|------------|
+| **Multi-tenant** | Organization isolation, user roles, tenant switching, admin console |
+| **HSS & subscribers** | Open5GS HSS, S6a/Diameter, subscriber CRUD, bandwidth plans, groups, bulk import, IMEI, remote MME, MongoDB Atlas |
+| **CBRS** | Google SAS, Federated Wireless, device registration, grants/heartbeats, spectrum visualization |
+| **ACS/TR-069** | Provisioning, firmware, configuration, performance monitoring, fault management |
+| **PCI planning** | Auto PCI assignment, conflict detection, neighbor analysis, optimization algorithms |
+| **Security** | Firebase Auth, RBAC, API key management, encryption, audit logging |
 
-### 📡 CBRS Management Module
-- **Google SAS Integration** - Device registration, spectrum inquiry, grants
-- **Federated Wireless API** - Enhanced analytics and optimization
-- **Hybrid Deployment** - Shared or per-tenant API keys
-- **Grant Management** - Full grant lifecycle (request, heartbeat, relinquish)
-- **Device Monitoring** - Real-time CBSD status tracking
-- **Spectrum Visualization** - Available spectrum and grant status
+---
 
-### 🌐 ACS/TR-069 CPE Management
-- **Device Provisioning** - Automated CPE onboarding
-- **Firmware Management** - Remote firmware upgrades
-- **Configuration Management** - Bulk configuration deployment
-- **Performance Monitoring** - Real-time device metrics
-- **Fault Management** - Automated fault detection and alerts
-- **TR-069 Compliance** - Full Broadband Forum standard support
+## Architecture
 
-### 📶 PCI Planning & Optimization
-- **Automatic PCI Assignment** - Intelligent PCI allocation
-- **Conflict Detection** - Identify and resolve PCI collisions
-- **Neighbor Analysis** - Optimal PCI planning based on topology
-- **Visualization** - Interactive network maps
-- **Optimization Algorithms** - Simple and advanced optimization modes
-- **Zero Collision Guarantee** - Enhanced collision prevention
+**Frontend:** SvelteKit 2, TypeScript, ArcGIS Maps SDK, Firebase SDK  
 
-### 🎨 User Experience
-- **Modern UI** - Clean, responsive interface
-- **Dark/Light Mode** - User preference theming
-- **Interactive Maps** - ArcGIS Maps SDK integration
-- **Real-time Updates** - Live data synchronization
-- **Mobile Responsive** - Works on all devices
-- **Intuitive Navigation** - Module-based architecture
+**Backend:** Firebase Functions, Firestore, Firebase Auth; optional Node API on GCE (see [docs/BACKEND_ARCHITECTURE.md](docs/BACKEND_ARCHITECTURE.md))  
 
-### 🔐 Security & Authentication
-- **Firebase Authentication** - Secure user authentication
-- **Role-Based Access** - Granular permissions
-- **API Key Management** - Secure credential storage
-- **Data Encryption** - At rest and in transit
-- **Audit Logging** - Track all administrative actions
+**APIs:** Google SAS, Federated Wireless, GenieACS (TR-069), MongoDB  
 
-## 🏗️ Architecture
-
-### Technology Stack
-
-**Frontend:**
-- SvelteKit 2.0 - Modern web framework
-- TypeScript - Type-safe development
-- ArcGIS Maps SDK - Interactive mapping
-- Firebase SDK - Client-side integration
-
-**Backend:**
-- Firebase Functions - Serverless backend
-- Firebase App Hosting - Cloud Run deployment
-- Firestore - NoSQL database
-- Firebase Auth - Authentication
-
-**APIs & Integrations:**
-- Google SAS API - CBRS spectrum management
-- Federated Wireless API - Enhanced CBRS features
-- GenieACS - TR-069 ACS implementation
-- MongoDB - GenieACS data store
-
-### Project Structure
+**Project layout:**
 
 ```
-lte-pci-mapper/
-├── Module_Manager/              ← Main Application
-│   ├── src/
-│   │   ├── routes/
-│   │   │   ├── login/          ← Authentication
-│   │   │   ├── dashboard/      ← Main dashboard
-│   │   │   ├── tenant-setup/   ← Organization setup
-│   │   │   └── modules/        ← Feature modules
-│   │   │       ├── pci-resolution/        ← PCI planning
-│   │   │       ├── cbrs-management/       ← CBRS module
-│   │   │       ├── acs-cpe-management/    ← ACS/TR-069
-│   │   │       └── tenant-management/     ← Admin tools
-│   │   └── lib/
-│   │       ├── firebase.ts     ← Firebase config
-│   │       ├── models/         ← Data models
-│   │       └── services/       ← Business logic
-│   ├── apphosting.yaml         ← App Hosting config
-│   └── package.json
-│
-├── functions/                   ← Firebase Functions
-│   ├── src/
-│   │   ├── index.ts            ← Function exports
-│   │   ├── cbrsManagement.ts   ← CBRS functions
-│   │   ├── genieacsBridge*.ts  ← GenieACS bridge
-│   │   └── tenantMiddleware.ts ← Multi-tenant support
-│   └── package.json
-│
-├── gce-backend/                 ← GCE backend service (optional)
-├── genieacs-fork/               ← Modified GenieACS
-├── firebase.json                ← Firebase configuration
-└── package.json                 ← Root package
+WISPTools/
+├── Module_Manager/          # Main SvelteKit app
+│   ├── src/routes/          # login, dashboard, tenant-setup, modules/*
+│   └── src/lib/             # services, config, components
+├── backend-services/        # Node API (GCE)
+├── functions/               # Firebase Cloud Functions
+├── docs/                    # All documentation
+├── scripts/                 # Deployment and ops (see scripts/README.md)
+├── PROMPTS.md               # Architectural playbook (Vibe Coding)
+└── ORPHANED_FILES.md        # Cleanup candidates
 ```
 
-## 🚀 Quick Start
+---
 
-### Prerequisites
+## Quick Start
 
-- **Node.js** 20 or higher
-- **Firebase CLI**: `npm install -g firebase-tools`
-- **Git** for version control
-- **Google Cloud Account** for deployment
-
-### Local Development
-
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/theorem6/lte-pci-mapper.git
-   cd lte-pci-mapper
-   ```
-
-2. **Install dependencies**
-   ```bash
-   cd Module_Manager
-   npm install
-   ```
-
-3. **Configure Firebase**
-   ```bash
-   # Login to Firebase
-   firebase login
-
-   # Set Firebase project
-   firebase use lte-pci-mapper-65450042-bbf71
-   ```
-
-4. **Set up environment variables**
-   ```bash
-   # Copy example environment file
-   cp .env.example .env.local
-
-   # Edit .env.local with your Firebase config
-   # (See Module_Manager/FIREBASE_ENV_SETUP.md)
-   ```
-
-5. **Run development server**
-   ```bash
-   npm run dev
-   ```
-
-6. **Open browser**
-   ```
-   http://localhost:5173
-   ```
-
-### First-Time Setup
-
-1. **Create your account**
-   - Navigate to `/login`
-   - Sign up with email/password or Google
-
-2. **Set up your organization**
-   - Fill out organization details
-   - System automatically creates your tenant
-
-3. **Explore modules**
-   - Dashboard shows all available modules
-   - Click any module to access features
-
-4. **Configure API keys** (if using CBRS)
-   - Navigate to CBRS Management
-   - Click Settings
-   - Enter your Google SAS or Federated Wireless API keys
-   - See [CBRS_API_KEY_SETUP_GUIDE.md](CBRS_API_KEY_SETUP_GUIDE.md)
-
-## 📚 Documentation
-
-👉 **[Complete Documentation Index](docs/README.md)** - All guides organized by category
-
-### Quick Links
-
-#### **🚀 Getting Started:**
-- **[COMPLETE_DEPLOYMENT_NOW.md](docs/deployment/COMPLETE_DEPLOYMENT_NOW.md)** ⭐ Start here to deploy the system
-- **[FINAL_DEPLOYMENT_STATUS.md](docs/deployment/FINAL_DEPLOYMENT_STATUS.md)** - Current system status
-- **[GOOGLE_CLOUD_DEPLOYMENT.md](docs/deployment/GOOGLE_CLOUD_DEPLOYMENT.md)** - Cloud infrastructure
-
-#### **🔐 HSS & Subscriber Management:**
-- **[HSS_PRODUCTION_GUIDE.md](docs/hss/HSS_PRODUCTION_GUIDE.md)** - Complete HSS documentation
-- **[MME_CONNECTION_GUIDE.md](docs/hss/MME_CONNECTION_GUIDE.md)** - Connect remote MMEs
-- **[HSS_DEPLOYMENT_COMPLETE.md](docs/hss/HSS_DEPLOYMENT_COMPLETE.md)** - HSS system overview
-
-#### **📖 Feature Guides:**
-- **[MULTI_TENANT_SETUP_GUIDE.md](docs/guides/MULTI_TENANT_SETUP_GUIDE.md)** - Multi-tenancy
-- **[CBRS_HYBRID_MODEL_GUIDE.md](docs/guides/CBRS_HYBRID_MODEL_GUIDE.md)** - CBRS/SAS
-- **[TR069_FIRMWARE_UPGRADE_GUIDE.md](docs/guides/TR069_FIRMWARE_UPGRADE_GUIDE.md)** - CPE management
-- **[DATABASE_STRUCTURE.md](docs/guides/DATABASE_STRUCTURE.md)** - Database schema
-
-#### **👤 Administration:**
-- **[ADMIN_AND_USER_MANAGEMENT.md](docs/guides/ADMIN_AND_USER_MANAGEMENT.md)** - User roles
-- **[TENANT_DELETION_GUIDE.md](docs/guides/TENANT_DELETION_GUIDE.md)** - Tenant management
-
-## 🚢 Deployment
-
-### Firebase App Hosting (Recommended)
-
-Deploy the entire platform to Google Cloud:
+**Prerequisites:** Node.js 20+, Firebase CLI (`npm install -g firebase-tools`), Git, Google Cloud account (for deployment).
 
 ```bash
-# From project root
+git clone https://github.com/theorem6/WISPTools.git
+cd WISPTools/Module_Manager
+npm install
+cp .env.example .env.local   # Edit with your Firebase config
+npm run dev
+# Open http://localhost:5173
+```
+
+First-time: sign up at `/login`, set up your organization (tenant), then use the dashboard and modules. For CBRS, configure API keys in CBRS Management (see [CBRS_API_KEY_SETUP_GUIDE.md](docs/guides/CBRS_API_KEY_SETUP_GUIDE.md)).
+
+---
+
+## Full documentation (on this page)
+
+All documentation lives in the **`docs/`** folder. This section is the **full index** so the main page is your single entry point.
+
+### Status & planning (start here)
+
+| Document | Purpose |
+|----------|---------|
+| [WHERE_WE_ARE_AND_NEXT_STEPS.md](docs/WHERE_WE_ARE_AND_NEXT_STEPS.md) | Current state, deploy commands, next steps |
+| [WHERE_THINGS_ARE_AND_NEXT_STEPS.md](docs/status/WHERE_THINGS_ARE_AND_NEXT_STEPS.md) | Status and next steps (alternate) |
+| [NEXT_ITEMS_TO_ADD.md](docs/NEXT_ITEMS_TO_ADD.md) | Wizards, portal, billing, ACS, docs, monitoring |
+| [WHATS_MISSING_IN_APP.md](docs/WHATS_MISSING_IN_APP.md) | Done vs remaining checklist |
+| [ENHANCEMENTS.md](docs/ENHANCEMENTS.md) | Further enhancements |
+| [OPTIONAL_ITEMS.md](docs/OPTIONAL_ITEMS.md) | Optional work only |
+
+In-app: Dashboard → Help, or routes **/docs** and **/docs/reference/project-status**.
+
+### Operational setup
+
+| Task | Document |
+|------|----------|
+| **Billing automation** (invoices + dunning) | [BILLING_CRON_AND_DUNNING_SCHEDULE.md](docs/BILLING_CRON_AND_DUNNING_SCHEDULE.md) |
+| **Field App APK** (build + download URL) | [FIELD_APP_DOWNLOAD.md](docs/FIELD_APP_DOWNLOAD.md) |
+| **Backend deploy fallback** (when SSH fails) | [DEPLOY_BACKEND_FALLBACK.md](DEPLOY_BACKEND_FALLBACK.md) |
+| **Backend deployment** (full) | [BACKEND_DEPLOYMENT_INSTRUCTIONS.md](docs/deployment/BACKEND_DEPLOYMENT_INSTRUCTIONS.md) |
+| **Scripts (Windows/Linux)** | [scripts/README.md](scripts/README.md) |
+
+### Documentation structure
+
+```
+docs/
+├── hss/                 # HSS & subscriber management
+│   ├── HSS_PRODUCTION_GUIDE.md
+│   ├── MME_CONNECTION_GUIDE.md
+│   └── HSS_DEPLOYMENT_COMPLETE.md
+├── deployment/          # Deployment & setup (65+ guides)
+│   ├── COMPLETE_DEPLOYMENT_NOW.md   ⭐ Start here to deploy
+│   ├── FINAL_DEPLOYMENT_STATUS.md
+│   ├── GOOGLE_CLOUD_DEPLOYMENT.md
+│   ├── BACKEND_DEPLOYMENT_INSTRUCTIONS.md
+│   └── ...
+├── guides/              # Feature & module guides (30+)
+│   ├── MULTI_TENANT_ARCHITECTURE.md
+│   ├── MULTI_TENANT_SETUP_GUIDE.md
+│   ├── ADMIN_AND_USER_MANAGEMENT.md
+│   ├── CBRS_HYBRID_MODEL_GUIDE.md
+│   ├── TR069_FIRMWARE_UPGRADE_GUIDE.md
+│   ├── DATABASE_STRUCTURE.md
+│   └── ...
+├── fixes/               # Fix and troubleshooting docs
+├── status/              # Status reports
+├── distributed-epc/    # EPC deployment and backend
+├── setup/               # Setup guides
+└── archived/            # Superseded docs
+```
+
+### Quick links by goal
+
+| Goal | Document |
+|------|----------|
+| **Deploy the complete system** | [COMPLETE_DEPLOYMENT_NOW.md](docs/deployment/COMPLETE_DEPLOYMENT_NOW.md) |
+| **Understand HSS** | [HSS_PRODUCTION_GUIDE.md](docs/hss/HSS_PRODUCTION_GUIDE.md) |
+| **Connect an MME** | [MME_CONNECTION_GUIDE.md](docs/hss/MME_CONNECTION_GUIDE.md) |
+| **Deployment status** | [FINAL_DEPLOYMENT_STATUS.md](docs/deployment/FINAL_DEPLOYMENT_STATUS.md) |
+| **Google Cloud setup** | [GOOGLE_CLOUD_DEPLOYMENT.md](docs/deployment/GOOGLE_CLOUD_DEPLOYMENT.md) |
+| **CBRS/SAS** | [CBRS_HYBRID_MODEL_GUIDE.md](docs/guides/CBRS_HYBRID_MODEL_GUIDE.md) |
+| **Tenants** | [MULTI_TENANT_SETUP_GUIDE.md](docs/guides/MULTI_TENANT_SETUP_GUIDE.md) |
+| **Database** | [DATABASE_STRUCTURE.md](docs/guides/DATABASE_STRUCTURE.md) |
+
+### HSS & subscriber management
+
+- [HSS_PRODUCTION_GUIDE.md](docs/hss/HSS_PRODUCTION_GUIDE.md) – Architecture, config, MongoDB schema, workflows, monitoring, backup, security
+- [MME_CONNECTION_GUIDE.md](docs/hss/MME_CONNECTION_GUIDE.md) – Remote MMEs, FreeDiameter, S6a, firewall, TLS, troubleshooting
+- [HSS_DEPLOYMENT_COMPLETE.md](docs/hss/HSS_DEPLOYMENT_COMPLETE.md) – Overview, quick reference, service commands
+
+### Deployment & setup
+
+- [COMPLETE_DEPLOYMENT_NOW.md](docs/deployment/COMPLETE_DEPLOYMENT_NOW.md) ⭐ – Step-by-step deployment
+- [FINAL_DEPLOYMENT_STATUS.md](docs/deployment/FINAL_DEPLOYMENT_STATUS.md) – Current status and next steps
+- [GOOGLE_CLOUD_DEPLOYMENT.md](docs/deployment/GOOGLE_CLOUD_DEPLOYMENT.md) – GCE, Cloud Build, Firebase, secrets, IAM
+- [BUILD_INSTRUCTIONS.md](docs/deployment/BUILD_INSTRUCTIONS.md) – Dev environment and build
+- [BACKEND_DEPLOYMENT_INSTRUCTIONS.md](docs/deployment/BACKEND_DEPLOYMENT_INSTRUCTIONS.md) – Backend env and options
+
+### Feature & module guides
+
+**Tenant management:**  
+[MULTI_TENANT_ARCHITECTURE.md](docs/guides/MULTI_TENANT_ARCHITECTURE.md), [MULTI_TENANT_SETUP_GUIDE.md](docs/guides/MULTI_TENANT_SETUP_GUIDE.md), [ADMIN_AND_USER_MANAGEMENT.md](docs/guides/ADMIN_AND_USER_MANAGEMENT.md), [TENANT_DELETION_GUIDE.md](docs/guides/TENANT_DELETION_GUIDE.md), [ONE_TENANT_PER_USER.md](docs/guides/ONE_TENANT_PER_USER.md)
+
+**CBRS & spectrum:**  
+[CBRS_HYBRID_MODEL_GUIDE.md](docs/guides/CBRS_HYBRID_MODEL_GUIDE.md), [CBRS_MODULE_COMPLETE.md](docs/guides/CBRS_MODULE_COMPLETE.md), [CBRS_API_KEY_SETUP_GUIDE.md](docs/guides/CBRS_API_KEY_SETUP_GUIDE.md), [GOOGLE_OAUTH_SETUP.md](docs/guides/GOOGLE_OAUTH_SETUP.md)
+
+**Device management:**  
+[TR069_FIRMWARE_UPGRADE_GUIDE.md](docs/guides/TR069_FIRMWARE_UPGRADE_GUIDE.md)
+
+**Data & UI:**  
+[DATABASE_STRUCTURE.md](docs/guides/DATABASE_STRUCTURE.md), [DATA_MODEL.md](docs/guides/DATA_MODEL.md), [THEME_SYSTEM.md](docs/guides/THEME_SYSTEM.md)
+
+### Module-specific docs
+
+- **Module_Manager:** [Module_Manager/README.md](Module_Manager/README.md), [Module_Manager/QUICK_START.md](Module_Manager/QUICK_START.md), [Module_Manager/FIREBASE_ENV_SETUP.md](Module_Manager/FIREBASE_ENV_SETUP.md)
+- **HSS module:** [modules/hss-management/README.md](Module_Manager/src/routes/modules/hss-management/README.md)
+- **CBRS module:** [modules/cbrs-management/README.md](Module_Manager/src/routes/modules/cbrs-management/README.md)
+- **ACS/CPE module:** [modules/acs-cpe-management/README.md](Module_Manager/src/routes/modules/acs-cpe-management/README.md)
+
+### Recommended reading order
+
+**New users:** README (here) → [COMPLETE_DEPLOYMENT_NOW.md](docs/deployment/COMPLETE_DEPLOYMENT_NOW.md) → [HSS_PRODUCTION_GUIDE.md](docs/hss/HSS_PRODUCTION_GUIDE.md) → [MULTI_TENANT_SETUP_GUIDE.md](docs/guides/MULTI_TENANT_SETUP_GUIDE.md)
+
+**Network engineers:** [HSS_PRODUCTION_GUIDE.md](docs/hss/HSS_PRODUCTION_GUIDE.md) → [MME_CONNECTION_GUIDE.md](docs/hss/MME_CONNECTION_GUIDE.md) → [PCI_COLLISION_PREVENTION.md](docs/guides/PCI_COLLISION_PREVENTION.md) → [TR069_FIRMWARE_UPGRADE_GUIDE.md](docs/guides/TR069_FIRMWARE_UPGRADE_GUIDE.md)
+
+**Admins:** [ADMIN_AND_USER_MANAGEMENT.md](docs/guides/ADMIN_AND_USER_MANAGEMENT.md) → [MULTI_TENANT_ARCHITECTURE.md](docs/guides/MULTI_TENANT_ARCHITECTURE.md) → [DATABASE_STRUCTURE.md](docs/guides/DATABASE_STRUCTURE.md) → [GOOGLE_CLOUD_DEPLOYMENT.md](docs/deployment/GOOGLE_CLOUD_DEPLOYMENT.md)
+
+**Developers:** [BUILD_INSTRUCTIONS.md](docs/deployment/BUILD_INSTRUCTIONS.md) → [DATA_MODEL.md](docs/guides/DATA_MODEL.md) → [Module_Manager/README.md](Module_Manager/README.md) → [BACKEND_ARCHITECTURE.md](docs/BACKEND_ARCHITECTURE.md)
+
+### Search by topic
+
+| Topic | Documents |
+|-------|------------|
+| **HSS** | HSS_PRODUCTION_GUIDE, MME_CONNECTION_GUIDE, HSS_DEPLOYMENT_COMPLETE |
+| **Deployment** | COMPLETE_DEPLOYMENT_NOW, GOOGLE_CLOUD_DEPLOYMENT, BACKEND_DEPLOYMENT_INSTRUCTIONS |
+| **CBRS** | CBRS_HYBRID_MODEL_GUIDE, CBRS_API_KEY_SETUP_GUIDE, CBRS_MODULE_COMPLETE |
+| **Tenants** | MULTI_TENANT_SETUP_GUIDE, ADMIN_AND_USER_MANAGEMENT, MULTI_TENANT_ARCHITECTURE |
+| **Database** | DATABASE_STRUCTURE, DATA_MODEL |
+
+### Other key docs
+
+- **Architecture & workflow:** [BACKEND_ARCHITECTURE.md](docs/BACKEND_ARCHITECTURE.md), [PROJECT_WORKFLOW_QUICK_START.md](docs/PROJECT_WORKFLOW_QUICK_START.md), [BACKEND_INTEGRATIONS.md](docs/BACKEND_INTEGRATIONS.md)
+- **Portal & billing:** [CUSTOMER_PORTAL_ACCESS_AND_PAGES.md](docs/CUSTOMER_PORTAL_ACCESS_AND_PAGES.md), [BILLING_CRON_AND_DUNNING_SCHEDULE.md](docs/BILLING_CRON_AND_DUNNING_SCHEDULE.md)
+- **Wizards:** [WIZARD_ACCESS_GUIDE.md](docs/WIZARD_ACCESS_GUIDE.md), [WIZARD_INTEGRATION_COMPLETE.md](docs/WIZARD_INTEGRATION_COMPLETE.md)
+- **Fixes & troubleshooting:** [docs/fixes/](docs/fixes/) (e.g. AUTH_401, BILLING_404, CRITICAL_FIX_SUMMARY)
+- **Architectural playbook (Vibe Coding):** [PROMPTS.md](PROMPTS.md)
+- **Cleanup candidates:** [ORPHANED_FILES.md](ORPHANED_FILES.md)
+
+**Detailed doc index:** [docs/README.md](docs/README.md) (same content in doc folder).
+
+---
+
+## Deployment
+
+**Firebase (recommended):**
+
+```bash
 firebase deploy
-
-# Or deploy specific components
-firebase deploy --only apphosting  # Frontend
-firebase deploy --only functions    # Backend
+# Or: firebase deploy --only hosting  |  firebase deploy --only functions
 ```
 
-### Manual Cloud Run Deployment
+**Backend to GCE:** Use [deploy-backend-to-gce.ps1](deploy-backend-to-gce.ps1) (Windows) or [scripts/deployment/update-backend-from-git.sh](scripts/deployment/update-backend-from-git.sh) (on server). See [scripts/README.md](scripts/README.md) and [BACKEND_DEPLOYMENT_INSTRUCTIONS.md](docs/deployment/BACKEND_DEPLOYMENT_INSTRUCTIONS.md).
 
-For advanced deployments:
+**Secrets:** Use Firebase App Hosting / Secret Manager or env vars (see `.env.example` and [FIREBASE_ADMIN_SDK_SETUP.md](docs/FIREBASE_ADMIN_SDK_SETUP.md)). Never commit secrets.
 
-```bash
-# Build and push Docker image
-cd Module_Manager
-gcloud builds submit --tag gcr.io/PROJECT_ID/lte-pci-mapper
+---
 
-# Deploy to Cloud Run
-gcloud run deploy lte-pci-mapper \
-  --image gcr.io/PROJECT_ID/lte-pci-mapper \
-  --platform managed \
-  --region us-central1 \
-  --allow-unauthenticated
-```
-
-### Environment Variables
-
-Configure secrets in Firebase App Hosting:
-
-- `FIREBASE_CONFIG` - Firebase configuration JSON
-- `MONGODB_URI` - MongoDB connection string (for GenieACS)
-- `GOOGLE_SAS_CLIENT_SECRET` - Google SAS OAuth secret (optional)
-- `FEDERATED_WIRELESS_API_KEY` - Federated Wireless API key (optional)
-
-See [setup-apphosting-secrets.md](setup-apphosting-secrets.md) for detailed instructions.
-
-## 🔧 Configuration
-
-### Firebase Configuration
-
-1. **Create Firebase project**
-   - Go to [Firebase Console](https://console.firebase.google.com/)
-   - Create new project or use existing
-
-2. **Enable services**
-   - Authentication (Email/Password, Google)
-   - Firestore Database
-   - Functions
-   - App Hosting
-
-3. **Configure security rules**
-   ```bash
-   firebase deploy --only firestore:rules
-   firebase deploy --only storage:rules
-   ```
-
-### Platform Admins
-
-Add admin emails to `Module_Manager/src/lib/services/adminService.ts`:
-
-```typescript
-const ADMIN_EMAILS = [
-  'admin@yourcompany.com',
-  'support@yourcompany.com'
-];
-```
-
-## 👥 User Roles
+## User roles
 
 | Role | Permissions |
 |------|-------------|
-| **Platform Admin** | Full system access, manage all tenants |
-| **Tenant Owner** | Full access within their organization |
-| **Tenant Admin** | Manage users and settings |
+| **Platform Admin** | Full system access, all tenants |
+| **Tenant Owner** | Full access within organization |
+| **Tenant Admin** | Users and settings |
 | **Member** | Access modules and features |
-| **Viewer** | Read-only access |
-
-## 🤝 Contributing
-
-We welcome contributions! Please see:
-
-- **[genieacs-fork/CONTRIBUTING.md](genieacs-fork/CONTRIBUTING.md)** - Contributing to GenieACS fork
-- **Issues** - Report bugs or request features on GitHub
-- **Pull Requests** - Submit PRs with clear descriptions
-
-### Development Guidelines
-
-- Follow TypeScript best practices
-- Write tests for new features
-- Update documentation
-- Follow code style conventions
-- Create feature branches
-
-## 📄 License
-
-This project is proprietary software. All rights reserved.
-
-Third-party components:
-- **GenieACS**: AGPLv3 - See [genieacs-fork/README.md](genieacs-fork/README.md)
-- **SvelteKit**: MIT
-- **Firebase**: Google Terms of Service
-- **ArcGIS**: Esri License
-
-## 🆘 Support
-
-- **Documentation**: [DOCUMENTATION_INDEX.md](DOCUMENTATION_INDEX.md)
-- **Issues**: GitHub Issues
-- **Email**: support@yourcompany.com
-
-## 🙏 Acknowledgments
-
-- **GenieACS** - TR-069 ACS implementation
-- **WinnForum** - CBRS SAS specifications
-- **Broadband Forum** - TR-069 standard
-- **Firebase Team** - Backend infrastructure
-- **Svelte Team** - Frontend framework
+| **Viewer** | Read-only |
 
 ---
 
-## 🎯 Key Modules
+## Contributing
 
-### CBRS Management
-Manage CBRS devices and spectrum:
-- Device registration with SAS
-- Spectrum grants and heartbeats
-- Real-time monitoring
-- Analytics and reporting
-
-### ACS CPE Management
-TR-069 device management:
-- Automated provisioning
-- Firmware upgrades
-- Configuration management
-- Performance monitoring
-
-### PCI Resolution
-LTE network optimization:
-- Automatic PCI assignment
-- Conflict detection
-- Neighbor analysis
-- Network visualization
-
-### Tenant Management (Admin)
-Platform administration:
-- Create/delete tenants
-- Manage users
-- Configure platform keys
-- Monitor usage
+Contributions are welcome. Use **Issues** for bugs and feature requests and **Pull Requests** with clear descriptions. Prefer feature branches and keep docs updated. See [genieacs-fork/CONTRIBUTING.md](genieacs-fork/CONTRIBUTING.md) for the GenieACS fork.
 
 ---
 
-**Built with ❤️ for WISP operators worldwide**
+## License
 
-**Version**: 2.0  
-**Last Updated**: October 2025  
-**Status**: Production Ready
+This project is open source under **Creative Commons Attribution 4.0 International (CC BY 4.0)**. You may share and adapt the work with attribution. See [LICENSE](LICENSE) and [creativecommons.org/licenses/by/4.0](https://creativecommons.org/licenses/by/4.0/).
+
+Third-party: **GenieACS** (AGPLv3), **SvelteKit** (MIT), **Firebase** (Google ToS), **ArcGIS** (Esri License).
+
+---
+
+## Support
+
+- **Documentation:** This README and [docs/README.md](docs/README.md)
+- **Issues:** [GitHub Issues](https://github.com/theorem6/WISPTools/issues)
+
+---
+
+**Built for WISP operators worldwide.**  
+**Version:** 2.0 · **Last updated:** January 2026 · **Status:** Production ready
