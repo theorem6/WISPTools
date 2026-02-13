@@ -126,11 +126,14 @@ In-app: Dashboard → Help, or routes **/docs** and **/docs/reference/project-st
 | **Backend deploy fallback** (when SSH fails) | [DEPLOY_BACKEND_FALLBACK.md](DEPLOY_BACKEND_FALLBACK.md) |
 | **Backend deployment** (full) | [BACKEND_DEPLOYMENT_INSTRUCTIONS.md](docs/deployment/BACKEND_DEPLOYMENT_INSTRUCTIONS.md) |
 | **Scripts (Windows/Linux)** | [scripts/README.md](scripts/README.md) |
+| **Install (single machine or distributed)** | [INSTALLATION.md](docs/installation/INSTALLATION.md) |
 
 ### Documentation structure
 
 ```
 docs/
+├── installation/        # Install scripts and guide
+│   └── INSTALLATION.md  # Single-machine and distributed
 ├── hss/                 # HSS & subscriber management
 │   ├── HSS_PRODUCTION_GUIDE.md
 │   ├── MME_CONNECTION_GUIDE.md
@@ -161,6 +164,7 @@ docs/
 | Goal | Document |
 |------|----------|
 | **Deploy the complete system** | [COMPLETE_DEPLOYMENT_NOW.md](docs/deployment/COMPLETE_DEPLOYMENT_NOW.md) |
+| **Install backend (single or distributed)** | [INSTALLATION.md](docs/installation/INSTALLATION.md) |
 | **Understand HSS** | [HSS_PRODUCTION_GUIDE.md](docs/hss/HSS_PRODUCTION_GUIDE.md) |
 | **Connect an MME** | [MME_CONNECTION_GUIDE.md](docs/hss/MME_CONNECTION_GUIDE.md) |
 | **Deployment status** | [FINAL_DEPLOYMENT_STATUS.md](docs/deployment/FINAL_DEPLOYMENT_STATUS.md) |
