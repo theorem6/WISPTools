@@ -19,6 +19,8 @@ dist/
 .env.*
 !.env.example
 scripts/.internal-api-key-gce-temp
+scripts/bfg.jar
+.git-rewrite/
 
 # IDE
 .vscode/

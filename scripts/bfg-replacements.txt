@@ -1,0 +1,4 @@
+# Redact MongoDB credentials in all git history (used by BFG --replace-text)
+# Format: literal==>replacement  (one per line; # is comment)
+Aezlf1N3Z568EwL9==>********
+fg2E8I10Pnx58gYP==>********
